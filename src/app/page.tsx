@@ -1,3 +1,5 @@
+import { About } from "@/components/sections/About";
+import { Contact } from "@/components/sections/Contact";
 import { Hero } from "@/components/sections/Hero";
 import { Impact } from "@/components/sections/Impact";
 
@@ -6,6 +8,8 @@ export default function Home() {
     <main className="flex w-full flex-1 flex-col">
       <Hero />
       <Impact />
+      <About />
+      <Contact />
     </main>
   );
 }
