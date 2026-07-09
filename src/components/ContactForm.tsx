@@ -75,7 +75,7 @@ const FIELDS: {
     required: true,
     autoComplete: "tel",
     maxLength: FIELD_LIMITS.phone,
-    pattern: "[0-9+\\-\\s()]{9,20}",
+    pattern: "[0-9+\\-\\s()]+",
     inputMode: "tel",
   },
 ];
