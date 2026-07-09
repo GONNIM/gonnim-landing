@@ -3,12 +3,20 @@
 import { Resend } from "resend";
 import type { ContactState } from "@/lib/contact-state";
 import {
+  FIELD_LIMITS,
+  TOPIC_MIN_LENGTH,
+} from "@/lib/contact-constants";
+import {
   INQUIRY_CATEGORIES,
   isValidCategorySlug,
 } from "@/lib/inquiry-categories";
 
 const FROM_EMAIL = process.env.CONTACT_FROM_EMAIL ?? "hi@gonnim.dev";
 const TO_EMAIL = process.env.CONTACT_TO_EMAIL ?? "hi@gonnim.dev";
+
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const PHONE_REGEX = /^[0-9+\-\s()]{9,20}$/;
+const PHONE_DIGIT_MIN = 9;
 
 type ParsedForm = {
   name: string;
@@ -18,6 +26,7 @@ type ParsedForm = {
   phone: string;
   category: string;
   topic: string;
+  honeypot: string;
 };
 
 function parseForm(formData: FormData): ParsedForm {
@@ -30,23 +39,47 @@ function parseForm(formData: FormData): ParsedForm {
     phone: get("phone"),
     category: get("category"),
     topic: get("topic"),
+    honeypot: get("website"),
   };
 }
 
 function validate(parsed: ParsedForm): string | null {
   if (!parsed.name) return "이름을 입력해주세요.";
+  if (parsed.name.length > FIELD_LIMITS.name)
+    return `이름은 ${FIELD_LIMITS.name}자 이하로 입력해주세요.`;
+
   if (!parsed.company) return "회사명을 입력해주세요.";
+  if (parsed.company.length > FIELD_LIMITS.company)
+    return `회사명은 ${FIELD_LIMITS.company}자 이하로 입력해주세요.`;
+
   if (!parsed.role) return "직책을 입력해주세요.";
+  if (parsed.role.length > FIELD_LIMITS.role)
+    return `직책은 ${FIELD_LIMITS.role}자 이하로 입력해주세요.`;
+
   if (!parsed.email) return "이메일을 입력해주세요.";
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  if (!emailRegex.test(parsed.email)) return "올바른 이메일 형식이 아닙니다.";
+  if (parsed.email.length > FIELD_LIMITS.email)
+    return `이메일은 ${FIELD_LIMITS.email}자 이하로 입력해주세요.`;
+  if (!EMAIL_REGEX.test(parsed.email))
+    return "올바른 이메일 형식이 아닙니다.";
+
   if (!parsed.phone) return "전화번호를 입력해주세요.";
-  if (!isValidCategorySlug(parsed.category)) {
+  if (parsed.phone.length > FIELD_LIMITS.phone)
+    return `전화번호는 ${FIELD_LIMITS.phone}자 이하로 입력해주세요.`;
+  const phoneDigits = parsed.phone.replace(/\D/g, "");
+  if (phoneDigits.length < PHONE_DIGIT_MIN)
+    return `전화번호 숫자가 최소 ${PHONE_DIGIT_MIN}자리 이상이어야 합니다 (예: 010-0000-0000).`;
+  if (!PHONE_REGEX.test(parsed.phone))
+    return "전화번호는 숫자·하이픈·괄호·+ 만 허용됩니다.";
+
+  if (!isValidCategorySlug(parsed.category))
     return "문의 분야를 선택해주세요.";
-  }
-  if (!parsed.topic || parsed.topic.length < 10) {
-    return "상담 주제를 10자 이상 자세히 적어주세요.";
-  }
+
+  if (!parsed.topic) return "상담 주제를 입력해주세요.";
+  if (parsed.topic.length < TOPIC_MIN_LENGTH)
+    return `상담 주제를 ${TOPIC_MIN_LENGTH}자 이상 자세히 적어주세요.`;
+  if (parsed.topic.length > FIELD_LIMITS.topic)
+    return `상담 주제는 ${FIELD_LIMITS.topic}자 이하로 입력해주세요.`;
+
   return null;
 }
 
@@ -95,6 +128,18 @@ export async function submitContact(
   formData: FormData,
 ): Promise<ContactState> {
   const parsed = parseForm(formData);
+
+  // honeypot: 봇이 자동 채운 경우 성공처럼 응답하되 실 전송 안 함
+  if (parsed.honeypot) {
+    console.info("[contact] honeypot 필드 감지 · 봇 의심 · silent reject");
+    return {
+      status: "success",
+      message:
+        "요청이 접수되었습니다. 3영업일 이내 회신드리겠습니다. 회신은 입력하신 이메일로 전달됩니다.",
+      fieldError: null,
+    };
+  }
+
   const error = validate(parsed);
   if (error) {
     return { status: "error", message: error, fieldError: error };

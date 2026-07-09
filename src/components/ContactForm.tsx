@@ -4,6 +4,10 @@ import { useActionState, useEffect, useState } from "react";
 import { useFormStatus } from "react-dom";
 import { submitContact } from "@/app/actions/contact";
 import {
+  FIELD_LIMITS,
+  TOPIC_MIN_LENGTH,
+} from "@/lib/contact-constants";
+import {
   INITIAL_STATE,
   type ContactState,
 } from "@/lib/contact-state";
@@ -23,6 +27,9 @@ const FIELDS: {
   placeholder: string;
   required: boolean;
   autoComplete?: string;
+  maxLength: number;
+  pattern?: string;
+  inputMode?: "text" | "email" | "tel" | "numeric";
 }[] = [
   {
     name: "name",
@@ -31,6 +38,7 @@ const FIELDS: {
     placeholder: "홍길동",
     required: true,
     autoComplete: "name",
+    maxLength: FIELD_LIMITS.name,
   },
   {
     name: "company",
@@ -39,6 +47,7 @@ const FIELDS: {
     placeholder: "회사명",
     required: true,
     autoComplete: "organization",
+    maxLength: FIELD_LIMITS.company,
   },
   {
     name: "role",
@@ -47,6 +56,7 @@ const FIELDS: {
     placeholder: "예: CTO · 개발팀장 · 기획",
     required: true,
     autoComplete: "organization-title",
+    maxLength: FIELD_LIMITS.role,
   },
   {
     name: "email",
@@ -55,6 +65,7 @@ const FIELDS: {
     placeholder: "hong@company.com",
     required: true,
     autoComplete: "email",
+    maxLength: FIELD_LIMITS.email,
   },
   {
     name: "phone",
@@ -63,6 +74,9 @@ const FIELDS: {
     placeholder: "010-0000-0000",
     required: true,
     autoComplete: "tel",
+    maxLength: FIELD_LIMITS.phone,
+    pattern: "[0-9+\\-\\s()]{9,20}",
+    inputMode: "tel",
   },
 ];
 
@@ -88,6 +102,7 @@ export function ContactForm() {
     INITIAL_STATE,
   );
   const [category, setCategory] = useState<string>("");
+  const [topic, setTopic] = useState<string>("");
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -105,8 +120,15 @@ export function ContactForm() {
       ) as HTMLFormElement | null;
       form?.reset();
       setCategory("");
+      setTopic("");
     }
   }, [state.status]);
+
+  const topicLen = topic.length;
+  const topicOK = topicLen >= TOPIC_MIN_LENGTH;
+  const topicCountColor = topicOK
+    ? "text-[color:var(--color-muted)]"
+    : "text-[color:var(--color-accent)]";
 
   return (
     <form
@@ -137,10 +159,28 @@ export function ContactForm() {
               placeholder={field.placeholder}
               required={field.required}
               autoComplete={field.autoComplete}
+              maxLength={field.maxLength}
+              pattern={field.pattern}
+              inputMode={field.inputMode}
               className="h-11 rounded-lg border border-[color:var(--color-border)] bg-[color:var(--color-background)] px-3 text-sm text-[color:var(--color-foreground)] placeholder:text-[color:var(--color-muted)] focus:border-[color:var(--color-accent)] focus:outline-2 focus:outline-offset-1 focus:outline-[color:var(--color-accent)]"
             />
           </label>
         ))}
+      </div>
+
+      {/* honeypot: 봇 감지용 · sr-only + tabIndex=-1 + autoComplete=off · 사람은 안 보이고 봇은 채움 */}
+      <div className="sr-only" aria-hidden="true">
+        <label htmlFor="contact-website">
+          Website (leave blank)
+          <input
+            id="contact-website"
+            type="text"
+            name="website"
+            tabIndex={-1}
+            autoComplete="off"
+            defaultValue=""
+          />
+        </label>
       </div>
 
       <label
@@ -187,10 +227,23 @@ export function ContactForm() {
         className="flex flex-col gap-1.5 text-sm"
         htmlFor="contact-topic"
       >
-        <span className="font-semibold text-[color:var(--color-foreground)]">
-          상담 주제
-          <span aria-hidden className="ml-1 text-[color:var(--color-accent)]">
-            *
+        <span className="flex items-baseline justify-between font-semibold text-[color:var(--color-foreground)]">
+          <span>
+            상담 주제
+            <span
+              aria-hidden
+              className="ml-1 text-[color:var(--color-accent)]"
+            >
+              *
+            </span>
+          </span>
+          <span
+            aria-live="polite"
+            className={`text-xs font-normal ${topicCountColor}`}
+          >
+            {topicOK
+              ? `${topicLen} / ${FIELD_LIMITS.topic}자`
+              : `${topicLen} / ${TOPIC_MIN_LENGTH}자 이상 필요`}
           </span>
         </span>
         <textarea
@@ -198,8 +251,11 @@ export function ContactForm() {
           name="topic"
           required
           rows={5}
-          minLength={10}
-          placeholder="프로젝트 개요 · 현재 스택 · 해결하고 싶은 문제를 자유롭게 적어주세요. (최소 10자)"
+          minLength={TOPIC_MIN_LENGTH}
+          maxLength={FIELD_LIMITS.topic}
+          value={topic}
+          onChange={(event) => setTopic(event.target.value)}
+          placeholder={`프로젝트 개요 · 현재 스택 · 해결하고 싶은 문제를 자유롭게 적어주세요. (최소 ${TOPIC_MIN_LENGTH}자 · 최대 ${FIELD_LIMITS.topic}자)`}
           className="min-h-[120px] rounded-lg border border-[color:var(--color-border)] bg-[color:var(--color-background)] p-3 text-sm text-[color:var(--color-foreground)] placeholder:text-[color:var(--color-muted)] focus:border-[color:var(--color-accent)] focus:outline-2 focus:outline-offset-1 focus:outline-[color:var(--color-accent)]"
         />
       </label>
