@@ -3,6 +3,7 @@ import { ServiceCard, type ServiceCardProps } from "@/components/ServiceCard";
 const SERVICES: ServiceCardProps[] = [
   {
     index: "1",
+    slug: "local-llm",
     name: "Local LLM 온프레미스 구축",
     description:
       "회사 GPU 서버에 Llama3/qwen 배포 + RAG 파이프라인. 데이터 외부 유출 없이 팀 내부 챗봇/검색 구축.",
@@ -11,6 +12,7 @@ const SERVICES: ServiceCardProps[] = [
   },
   {
     index: "2",
+    slug: "grant-poc",
     name: "정부과제 PoC 컨설팅",
     description:
       "제안서 · 발표 · 기술 실증 풀사이클 지원. 과제 신청부터 완주까지 실제 개발자 관점으로 함께.",
@@ -19,6 +21,7 @@ const SERVICES: ServiceCardProps[] = [
   },
   {
     index: "3",
+    slug: "cloud-cost",
     name: "AWS/GCP 코스트 최적화",
     description:
       "Auto Scaling + CloudWatch + CI/CD 자동화. 방치된 리소스 정리 · 리즈드 인스턴스 · 상시 모니터링 설계.",
@@ -27,6 +30,7 @@ const SERVICES: ServiceCardProps[] = [
   },
   {
     index: "4",
+    slug: "app-stability",
     name: "앱 안정화 · 릴리즈 자동화",
     description:
       "Objective-C / Swift / Kotlin 리팩터링 + GitHub Actions 로 릴리즈 파이프라인 자동화. Sentry/Crashlytics 통합.",

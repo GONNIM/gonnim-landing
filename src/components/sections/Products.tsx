@@ -3,6 +3,7 @@ import { ProductCard, type ProductCardProps } from "@/components/ProductCard";
 const PRODUCTS: ProductCardProps[] = [
   {
     index: "1",
+    slug: "ai-hongbyun",
     featured: true,
     tagline: "AI 홍변 v3 · 법령 근거로 답하는 로컬 AI 상담원",
     description:
@@ -13,6 +14,7 @@ const PRODUCTS: ProductCardProps[] = [
   },
   {
     index: "2",
+    slug: "pocket-rag",
     tagline: "Pocket RAG · 회사 문서 전용 오프라인 챗봇",
     description:
       "임원 노트북 한 대로 구동 · 외부 API 0회. 설계도 · 매뉴얼 · 규정을 넣으면 답변 + 출처를 표시합니다.",
@@ -22,6 +24,7 @@ const PRODUCTS: ProductCardProps[] = [
   },
   {
     index: "3",
+    slug: "toss-tradebot",
     tagline: "Toss Tradebot MVP · 한국주식 자동매매 시스템",
     description:
       "Discovery(Crazy Picks) + 자동매매 + Moonshot 3모듈. Toss API 기반 · Confluence 5종 시그널.",
@@ -31,6 +34,7 @@ const PRODUCTS: ProductCardProps[] = [
   },
   {
     index: "4",
+    slug: "foodbid",
     tagline: "FoodBid MVP · 정부 조달 입찰 자동 매칭",
     description:
       "Production Ready · THETAK 인프라 재활용. 공고 자동 스캔 → 매칭 → 알림.",

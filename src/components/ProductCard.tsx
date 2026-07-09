@@ -1,5 +1,8 @@
+import { contactHrefForSlug } from "@/lib/inquiry-categories";
+
 export type ProductCardProps = {
   index: string;
+  slug: string;
   featured?: boolean;
   tagline: string;
   description: string;
@@ -10,6 +13,7 @@ export type ProductCardProps = {
 
 export function ProductCard({
   index,
+  slug,
   featured,
   tagline,
   description,
@@ -67,7 +71,7 @@ export function ProductCard({
       </dl>
 
       <a
-        href="#contact"
+        href={contactHrefForSlug(slug)}
         className={`mt-auto inline-flex h-11 items-center justify-center gap-2 rounded-full px-6 text-sm font-semibold transition-transform hover:scale-[1.01] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[color:var(--color-accent)] ${
           featured
             ? "bg-[color:var(--color-accent)] text-[color:var(--color-accent-foreground)] shadow-sm hover:shadow-md"

@@ -1,16 +1,16 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
+import {
+  GROUP_LABELS,
+  INQUIRY_CATEGORIES,
+  isValidCategorySlug,
+  type InquiryGroup,
+} from "@/lib/inquiry-categories";
 
 type Status = "idle" | "submitting" | "success" | "error";
 
-type FieldName =
-  | "name"
-  | "company"
-  | "role"
-  | "email"
-  | "phone"
-  | "topic";
+type FieldName = "name" | "company" | "role" | "email" | "phone";
 
 const FIELDS: {
   name: FieldName;
@@ -62,9 +62,21 @@ const FIELDS: {
   },
 ];
 
+const GROUP_ORDER: InquiryGroup[] = ["products", "services", "other"];
+
 export function ContactForm() {
   const [status, setStatus] = useState<Status>("idle");
   const [message, setMessage] = useState<string>("");
+  const [category, setCategory] = useState<string>("");
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    const raw = params.get("category");
+    if (isValidCategorySlug(raw)) {
+      setCategory(raw);
+    }
+  }, []);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -74,8 +86,8 @@ export function ContactForm() {
     const formData = new FormData(event.currentTarget);
     const payload = Object.fromEntries(formData.entries());
 
-    // TODO(D-3 오후 후반부): 폼 백엔드 결정 후 실 전송 (Resend + Server Action 유력)
-    // 현재는 UI 검증용 stub — 사용자에게 알림 후 콘솔 출력
+    // TODO(D-5+): 폼 백엔드 결정 후 실 전송 (Resend + Server Action 유력)
+    // 현재는 UI 검증용 stub — 콘솔 로그 + 임시 성공 메시지
     try {
       // eslint-disable-next-line no-console
       console.info("[contact-form:stub] submitted", payload);
@@ -85,6 +97,7 @@ export function ContactForm() {
         "요청이 접수되었습니다. 3영업일 이내 회신드리겠습니다. (현재는 UI 검증 단계 · 백엔드 연결 대기)",
       );
       event.currentTarget.reset();
+      setCategory("");
     } catch {
       setStatus("error");
       setMessage(
@@ -125,6 +138,47 @@ export function ContactForm() {
           </label>
         ))}
       </div>
+
+      <label
+        className="flex flex-col gap-1.5 text-sm"
+        htmlFor="contact-category"
+      >
+        <span className="font-semibold text-[color:var(--color-foreground)]">
+          문의 분야
+          <span aria-hidden className="ml-1 text-[color:var(--color-accent)]">
+            *
+          </span>
+          <span className="ml-2 text-xs font-normal text-[color:var(--color-muted)]">
+            (해당 상품·서비스가 없으면 기타 선택 후 상담 주제에 자유롭게 기술)
+          </span>
+        </span>
+        <select
+          id="contact-category"
+          name="category"
+          required
+          value={category}
+          onChange={(event) => setCategory(event.target.value)}
+          disabled={isSubmitting}
+          className="h-11 rounded-lg border border-[color:var(--color-border)] bg-[color:var(--color-background)] px-3 text-sm text-[color:var(--color-foreground)] focus:border-[color:var(--color-accent)] focus:outline-2 focus:outline-offset-1 focus:outline-[color:var(--color-accent)] disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          <option value="" disabled>
+            문의 분야를 선택해주세요
+          </option>
+          {GROUP_ORDER.map((group) => {
+            const items = INQUIRY_CATEGORIES.filter((c) => c.group === group);
+            if (items.length === 0) return null;
+            return (
+              <optgroup key={group} label={GROUP_LABELS[group]}>
+                {items.map((item) => (
+                  <option key={item.slug} value={item.slug}>
+                    {item.label}
+                  </option>
+                ))}
+              </optgroup>
+            );
+          })}
+        </select>
+      </label>
 
       <label
         className="flex flex-col gap-1.5 text-sm"

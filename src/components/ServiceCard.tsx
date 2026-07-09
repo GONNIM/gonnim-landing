@@ -1,5 +1,8 @@
+import { contactHrefForSlug } from "@/lib/inquiry-categories";
+
 export type ServiceCardProps = {
   index: string;
+  slug: string;
   name: string;
   description: string;
   evidence: string;
@@ -8,6 +11,7 @@ export type ServiceCardProps = {
 
 export function ServiceCard({
   index,
+  slug,
   name,
   description,
   evidence,
@@ -40,7 +44,7 @@ export function ServiceCard({
           {duration}
         </p>
         <a
-          href="#contact"
+          href={contactHrefForSlug(slug)}
           className="inline-flex h-9 items-center justify-center gap-1.5 rounded-full border border-[color:var(--color-border)] bg-[color:var(--color-background)] px-4 text-xs font-semibold text-[color:var(--color-foreground)] transition-colors hover:bg-[color:var(--color-border)]"
         >
           견적 요청
