@@ -1,3 +1,5 @@
+import { MobileNav } from "@/components/layout/MobileNav";
+
 const NAV_LINKS = [
   { href: "#about", label: "About" },
   { href: "#products", label: "Products" },
@@ -50,7 +52,7 @@ export function Header() {
           ))}
         </nav>
 
-        <div className="ml-auto flex items-center gap-2 md:ml-0">
+        <div className="ml-auto hidden items-center gap-2 md:flex md:ml-0">
           <a
             href={GITHUB_URL}
             target="_blank"
@@ -67,6 +69,10 @@ export function Header() {
             상담 요청
             <span aria-hidden>→</span>
           </a>
+        </div>
+
+        <div className="ml-auto md:hidden">
+          <MobileNav />
         </div>
       </div>
     </header>
