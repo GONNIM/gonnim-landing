@@ -69,6 +69,12 @@ export default function RootLayout({
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">
+        <a
+          href="#top"
+          className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[60] focus:inline-flex focus:h-10 focus:items-center focus:rounded-full focus:bg-[color:var(--color-accent)] focus:px-5 focus:text-sm focus:font-semibold focus:text-[color:var(--color-accent-foreground)] focus:shadow-lg"
+        >
+          본문으로 건너뛰기
+        </a>
         <Header />
         {children}
         <Footer />
