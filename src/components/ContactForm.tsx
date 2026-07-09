@@ -2,11 +2,11 @@
 
 import { useActionState, useEffect, useState } from "react";
 import { useFormStatus } from "react-dom";
+import { submitContact } from "@/app/actions/contact";
 import {
   INITIAL_STATE,
-  submitContact,
   type ContactState,
-} from "@/app/actions/contact";
+} from "@/lib/contact-state";
 import {
   GROUP_LABELS,
   INQUIRY_CATEGORIES,

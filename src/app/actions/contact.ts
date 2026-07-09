@@ -1,6 +1,7 @@
 "use server";
 
 import { Resend } from "resend";
+import type { ContactState } from "@/lib/contact-state";
 import {
   INQUIRY_CATEGORIES,
   isValidCategorySlug,
@@ -8,18 +9,6 @@ import {
 
 const FROM_EMAIL = process.env.CONTACT_FROM_EMAIL ?? "hi@gonnim.dev";
 const TO_EMAIL = process.env.CONTACT_TO_EMAIL ?? "hi@gonnim.dev";
-
-export type ContactState = {
-  status: "idle" | "success" | "error";
-  message: string;
-  fieldError?: string | null;
-};
-
-export const INITIAL_STATE: ContactState = {
-  status: "idle",
-  message: "",
-  fieldError: null,
-};
 
 type ParsedForm = {
   name: string;
