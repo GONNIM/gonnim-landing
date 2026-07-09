@@ -7,10 +7,10 @@
   --muted-foreground: #52525b;
   --surface: #fafafa;
   --border: #e4e4e7;
-  --accent: #0284c7;
+  --accent: #0369a1;
   --accent-foreground: #ffffff;
-  --accent-gradient-from: #0284c7;
-  --accent-gradient-to: #4f46e5;
+  --accent-gradient-from: #0369a1;
+  --accent-gradient-to: #4338ca;
 }
 
 @theme inline {
