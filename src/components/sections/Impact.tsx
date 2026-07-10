@@ -63,10 +63,10 @@ export function Impact() {
           Impact
         </p>
         <h2 className="text-balance text-3xl font-bold leading-tight tracking-tight text-[color:var(--color-foreground)] sm:text-4xl md:text-5xl">
-          지난 22년간 만든 것
+          숫자로 검증된 비즈니스 임팩트
         </h2>
         <p className="mt-4 text-base leading-relaxed text-[color:var(--color-muted-foreground)] sm:text-lg">
-          숫자로 검증된 실적입니다.
+          22년 · 20여 개 회사에서 완결된 6가지 실증 지표.
         </p>
       </header>
 

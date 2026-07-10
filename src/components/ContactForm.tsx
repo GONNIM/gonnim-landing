@@ -29,7 +29,6 @@ import {
   validatePhone,
   validateRole,
   validateTopic,
-  WORD_COUNT_MIN,
   type FieldError,
   type Region,
 } from "@/lib/contact-validation";
@@ -71,6 +70,7 @@ const TEXT_FIELDS: {
   type: "text" | "email" | "tel";
   autoComplete: string;
   maxLength: number;
+  required: boolean;
   inputMode?: "text" | "email" | "tel";
 }[] = [
   {
@@ -79,6 +79,7 @@ const TEXT_FIELDS: {
     type: "text",
     autoComplete: "name",
     maxLength: FIELD_LIMITS.name,
+    required: true,
   },
   {
     name: "company",
@@ -86,6 +87,7 @@ const TEXT_FIELDS: {
     type: "text",
     autoComplete: "organization",
     maxLength: FIELD_LIMITS.company,
+    required: true,
   },
   {
     name: "role",
@@ -93,6 +95,7 @@ const TEXT_FIELDS: {
     type: "text",
     autoComplete: "organization-title",
     maxLength: FIELD_LIMITS.role,
+    required: false,
   },
   {
     name: "email",
@@ -101,6 +104,7 @@ const TEXT_FIELDS: {
     autoComplete: "email",
     maxLength: FIELD_LIMITS.email,
     inputMode: "email",
+    required: true,
   },
   {
     name: "phone",
@@ -109,6 +113,7 @@ const TEXT_FIELDS: {
     autoComplete: "tel",
     maxLength: FIELD_LIMITS.phone,
     inputMode: "tel",
+    required: true,
   },
 ];
 
@@ -285,19 +290,14 @@ export function ContactForm() {
   }, [values, region]);
 
   const topicLen = values.topic.length;
-  const topicWords = values.topic
-    .trim()
-    .split(/\s+/)
-    .filter(Boolean).length;
-  const topicOK =
-    topicLen >= TOPIC_MIN_LENGTH && topicWords >= WORD_COUNT_MIN;
+  const topicOK = topicLen >= TOPIC_MIN_LENGTH;
   const topicCountColor = topicOK
     ? "text-[color:var(--color-muted)]"
     : "text-[color:var(--color-accent)]";
 
   const topicCountText = topicOK
-    ? `${topicLen} / ${FIELD_LIMITS.topic}자 · ${topicWords}어절`
-    : `${topicLen}자 · ${topicWords}어절 (${TOPIC_MIN_LENGTH}자 · ${WORD_COUNT_MIN}어절 이상 필요)`;
+    ? `${topicLen} / ${FIELD_LIMITS.topic}자`
+    : `${topicLen}자 (${TOPIC_MIN_LENGTH}자 이상 필요)`;
 
   return (
     <>
@@ -368,19 +368,25 @@ export function ContactForm() {
               >
                 <span className="font-semibold text-[color:var(--color-foreground)]">
                   {field.label}
-                  <span
-                    aria-hidden
-                    className="ml-1 text-[color:var(--color-accent)]"
-                  >
-                    *
-                  </span>
+                  {field.required ? (
+                    <span
+                      aria-hidden
+                      className="ml-1 text-[color:var(--color-accent)]"
+                    >
+                      *
+                    </span>
+                  ) : (
+                    <span className="ml-1 text-xs font-normal text-[color:var(--color-muted)]">
+                      (선택)
+                    </span>
+                  )}
                 </span>
                 <input
                   id={`contact-${field.name}`}
                   name={field.name}
                   type={field.type}
                   placeholder={placeholder}
-                  required
+                  required={field.required}
                   autoComplete={field.autoComplete}
                   maxLength={field.maxLength}
                   inputMode={field.inputMode}
@@ -522,8 +528,8 @@ export function ContactForm() {
             const err = showErr ? errors.topic ?? null : null;
             const topicPlaceholder =
               region === "kr"
-                ? `프로젝트 개요 · 현재 스택 · 해결하고 싶은 문제를 자유롭게 적어주세요 (최소 ${TOPIC_MIN_LENGTH}자 · ${WORD_COUNT_MIN}어절).`
-                : `Describe your project scope, current stack, and problem to solve (min ${TOPIC_MIN_LENGTH} chars / ${WORD_COUNT_MIN} words).`;
+                ? `예: 로컬 AI 도입 문의 · 상세 내용은 회신 시 논의 (최소 ${TOPIC_MIN_LENGTH}자).`
+                : `e.g. Local AI inquiry · details on reply (min ${TOPIC_MIN_LENGTH} chars).`;
             return (
               <>
                 <textarea

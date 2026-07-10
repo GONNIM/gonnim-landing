@@ -55,10 +55,10 @@ export function Products() {
           Products
         </p>
         <h2 className="text-balance text-3xl font-bold leading-tight tracking-tight text-[color:var(--color-foreground)] sm:text-4xl md:text-5xl">
-          만들어 놓은 상품
+          준비된 솔루션 · 즉시 도입 가능
         </h2>
         <p className="mt-4 text-base leading-relaxed text-[color:var(--color-muted-foreground)] sm:text-lg">
-          바로 시작할 수 있는 4가지 솔루션.
+          패키지 · 실증된 아키텍처. AI 홍변 v3 · Pocket RAG · Toss Tradebot · FoodBid.
         </p>
       </header>
 

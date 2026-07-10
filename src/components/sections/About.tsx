@@ -50,7 +50,7 @@ export function About() {
           About
         </p>
         <h2 className="text-balance text-3xl font-bold leading-tight tracking-tight text-[color:var(--color-foreground)] sm:text-4xl md:text-5xl">
-          저는 누구인가
+          엔지니어링 프로필
         </h2>
       </header>
 

@@ -7,4 +7,4 @@ export const FIELD_LIMITS = {
   topic: 2000,
 } as const;
 
-export const TOPIC_MIN_LENGTH = 10;
+export const TOPIC_MIN_LENGTH = 5;

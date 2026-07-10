@@ -50,10 +50,10 @@ export function Services() {
           Services
         </p>
         <h2 className="text-balance text-3xl font-bold leading-tight tracking-tight text-[color:var(--color-foreground)] sm:text-4xl md:text-5xl">
-          프로젝트 단위 서비스
+          맞춤 프로젝트 · 온디맨드 개발
         </h2>
         <p className="mt-4 text-base leading-relaxed text-[color:var(--color-muted-foreground)] sm:text-lg">
-          필요한 것만 짧게 함께 해결합니다.
+          기업별 맞춤 · 2~4주 단위. Local LLM 구축부터 앱 안정화까지.
         </p>
       </header>
 

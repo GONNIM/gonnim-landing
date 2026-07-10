@@ -18,17 +18,17 @@ export function Hero() {
         </p>
 
         <h1 className="max-w-4xl text-balance text-3xl font-bold leading-[1.2] tracking-tight text-[color:var(--color-foreground)] sm:text-4xl md:text-5xl md:leading-[1.15] lg:text-6xl">
-          22년 풀사이클 시니어 엔지니어.
+          데이터 유출 0%.
           <br />
-          AI/RAG 실전.
+          인터넷 없이 돌아가는{" "}
+          <span className="whitespace-nowrap">로컬 AI</span>.
         </h1>
 
         <p className="max-w-2xl text-balance text-base leading-relaxed text-[color:var(--color-muted-foreground)] sm:text-lg md:text-xl">
-          당신 회사 데이터가 밖으로 나가지 않는{" "}
-          <span className="whitespace-nowrap font-semibold text-[color:var(--color-foreground)]">
-            로컬 AI
+          <span className="font-semibold text-[color:var(--color-foreground)]">
+            22년 풀사이클 시니어 엔지니어
           </span>
-          , 제가 만듭니다.
+          가 대기업 검증 아키텍처로 구축합니다.
         </p>
 
         <div className="mt-4 flex w-full flex-col items-stretch justify-center gap-3 sm:w-auto sm:flex-row sm:items-center sm:gap-4">

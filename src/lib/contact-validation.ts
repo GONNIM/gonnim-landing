@@ -61,8 +61,6 @@ export const EMAIL_DOMAIN_BLACKLIST = new Set([
   "burnermail.io",
 ]);
 
-export const WORD_COUNT_MIN = 3;
-
 export function normalize(value: string): string {
   return value.trim().normalize("NFC");
 }
@@ -137,8 +135,17 @@ export function validateCompany(value: string, region: Region): FieldError {
   return checkText(value, region, FIELD_LIMITS.company, "회사명");
 }
 
+/** 직책 · 선택 필드 · 값이 있을 때만 문자셋 검증 */
 export function validateRole(value: string, region: Region): FieldError {
-  return checkText(value, region, FIELD_LIMITS.role, "직책");
+  if (!value) return null;
+  if (value.length > FIELD_LIMITS.role)
+    return `직책은 ${FIELD_LIMITS.role}자 이하로 입력해주세요.`;
+  const regex = region === "kr" ? TEXT_REGEX_KR : TEXT_REGEX_INTL;
+  if (!regex.test(value)) {
+    const langHint = region === "kr" ? "한글·영문·숫자" : "영문·숫자";
+    return `직책은(는) ${langHint}·허용기호(${TEXT_SYMBOL_HINT})만 사용해주세요.`;
+  }
+  return null;
 }
 
 export function validateEmail(value: string): FieldError {
@@ -180,12 +187,9 @@ export function validateCategory(value: string): FieldError {
 export function validateTopic(value: string): FieldError {
   if (!value) return "상담 주제를 입력해주세요.";
   if (value.length < TOPIC_MIN_LENGTH)
-    return `상담 주제를 ${TOPIC_MIN_LENGTH}자 이상 자세히 적어주세요.`;
+    return `상담 주제를 ${TOPIC_MIN_LENGTH}자 이상 입력해주세요.`;
   if (value.length > FIELD_LIMITS.topic)
     return `상담 주제는 ${FIELD_LIMITS.topic}자 이하로 입력해주세요.`;
-  const wc = countWords(value);
-  if (wc < WORD_COUNT_MIN)
-    return `상담 주제는 최소 ${WORD_COUNT_MIN}단어(어절) 이상으로 구체적으로 적어주세요.`;
   const { error: sanitizeError } = sanitizeTopic(value);
   if (sanitizeError) return sanitizeError;
   return null;
