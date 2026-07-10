@@ -1,5 +1,5 @@
 const CONTACT_ANCHOR = "#contact";
-const RESUME_URL = "#resume";
+const RESUME_URL = "/resume.pdf";
 
 export function Hero() {
   return (
@@ -41,6 +41,7 @@ export function Hero() {
           </a>
           <a
             href={RESUME_URL}
+            download
             className="inline-flex h-12 items-center justify-center gap-2 rounded-full border border-[color:var(--color-border)] bg-[color:var(--color-surface)] px-8 text-base font-semibold text-[color:var(--color-foreground)] transition-colors hover:bg-[color:var(--color-border)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[color:var(--color-foreground)]"
           >
             소개서 다운로드

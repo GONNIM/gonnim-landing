@@ -2,7 +2,7 @@ import { ContactForm } from "@/components/ContactForm";
 
 const EMAIL_PRIMARY = "hi@gonnim.dev";
 const EMAIL_BACKUP = "suauncle@gmail.com";
-const RESUME_URL = "#resume";
+const RESUME_URL = "/resume.pdf";
 
 export function Contact() {
   return (
@@ -83,6 +83,7 @@ export function Contact() {
           <div className="mt-6 flex flex-col gap-2 sm:flex-row">
             <a
               href={RESUME_URL}
+              download
               className="inline-flex h-11 flex-1 items-center justify-center gap-2 rounded-full border border-[color:var(--color-border)] bg-[color:var(--color-background)] px-4 text-sm font-semibold text-[color:var(--color-foreground)] transition-colors hover:bg-[color:var(--color-border)]"
             >
               Resume 다운로드
@@ -91,7 +92,7 @@ export function Contact() {
               aria-disabled
               className="inline-flex h-11 flex-1 items-center justify-center gap-2 rounded-full border border-dashed border-[color:var(--color-border)] px-4 text-sm font-medium text-[color:var(--color-muted)]"
             >
-              사례집 (D-4)
+              사례집 (준비 중)
             </span>
           </div>
         </article>

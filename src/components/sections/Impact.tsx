@@ -1,6 +1,6 @@
 import { ImpactCard, type ImpactCardProps } from "@/components/ImpactCard";
 
-const RESUME_URL = "#resume";
+const RESUME_URL = "/resume.pdf";
 
 const IMPACT_CARDS: ImpactCardProps[] = [
   {
@@ -79,6 +79,7 @@ export function Impact() {
       <div className="mt-14 flex justify-center">
         <a
           href={RESUME_URL}
+          download
           className="inline-flex h-11 items-center gap-2 rounded-full border border-[color:var(--color-border)] bg-[color:var(--color-surface)] px-6 text-sm font-semibold text-[color:var(--color-foreground)] transition-colors hover:bg-[color:var(--color-border)]"
         >
           더 자세한 실적 · Resume 다운로드
