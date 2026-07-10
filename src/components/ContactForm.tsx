@@ -25,7 +25,6 @@ import {
   validateCategory,
   validateCompany,
   validateEmail,
-  validateHumanCheck,
   validateName,
   validatePhone,
   validateRole,
@@ -190,8 +189,6 @@ export function ContactForm() {
   const [values, setValues] = useState<Values>(INITIAL_VALUES);
   const [errors, setErrors] = useState<Errors>({});
   const [touched, setTouched] = useState<Touched>({});
-  const [humanCheck, setHumanCheck] = useState<boolean>(false);
-  const [humanCheckTouched, setHumanCheckTouched] = useState<boolean>(false);
 
   const turnstileSiteKey = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY;
   const turnstileEnabled = Boolean(turnstileSiteKey);
@@ -212,8 +209,24 @@ export function ContactForm() {
       setValues(INITIAL_VALUES);
       setErrors({});
       setTouched({});
-      setHumanCheck(false);
-      setHumanCheckTouched(false);
+    }
+  }, [state.status]);
+
+  // Turnstile token 재사용 방지: 서버 응답(성공/실패) 후 위젯 reset · 새 token 발급
+  useEffect(() => {
+    if (state.status === "idle") return;
+    if (typeof window === "undefined") return;
+    const turnstile = (
+      window as unknown as {
+        turnstile?: { reset?: (widget?: string) => void };
+      }
+    ).turnstile;
+    if (turnstile && typeof turnstile.reset === "function") {
+      try {
+        turnstile.reset();
+      } catch (err) {
+        console.warn("[turnstile] reset 실패", err);
+      }
     }
   }, [state.status]);
 
@@ -266,11 +279,10 @@ export function ContactForm() {
       "category",
       "topic",
     ];
-    const fieldsOk = fieldsToCheck.every(
+    return fieldsToCheck.every(
       (f) => runValidator(f, values[f], region) === null,
     );
-    return fieldsOk && validateHumanCheck(humanCheck) === null;
-  }, [values, region, humanCheck]);
+  }, [values, region]);
 
   const topicLen = values.topic.length;
   const topicWords = values.topic
@@ -553,62 +565,10 @@ export function ContactForm() {
             className="cf-turnstile"
             data-sitekey={turnstileSiteKey}
             data-theme="auto"
+            data-refresh-expired="auto"
+            data-response-field-name="cf-turnstile-response"
           />
         )}
-
-        {/* 명시 봇 방어 · 사용자 체크 필수 */}
-        {(() => {
-          const err = humanCheckTouched
-            ? validateHumanCheck(humanCheck)
-            : null;
-          return (
-            <label
-              htmlFor="contact-human-check"
-              className={`flex items-start gap-3 rounded-lg border p-3 text-sm transition-colors ${
-                err
-                  ? "border-red-400 bg-red-50 dark:bg-red-950/20"
-                  : humanCheck
-                    ? "border-[color:var(--color-accent)] bg-[color:var(--color-surface)]"
-                    : "border-[color:var(--color-border)] bg-[color:var(--color-background)]"
-              }`}
-            >
-              <input
-                id="contact-human-check"
-                name="human_check"
-                type="checkbox"
-                checked={humanCheck}
-                onChange={(e) => {
-                  setHumanCheck(e.target.checked);
-                  setHumanCheckTouched(true);
-                }}
-                onBlur={() => setHumanCheckTouched(true)}
-                aria-invalid={Boolean(err)}
-                aria-describedby={err ? "err-human-check" : undefined}
-                className="mt-0.5 h-4 w-4 shrink-0 accent-[color:var(--color-accent)]"
-              />
-              <span className="flex-1 leading-relaxed text-[color:var(--color-foreground)]">
-                <span className="font-semibold">저는 봇이 아니며</span>{" "}
-                gonnim.dev 의 3영업일 이내 회신 정책에 동의합니다.
-                <span
-                  aria-hidden
-                  className="ml-1 text-[color:var(--color-accent)]"
-                >
-                  *
-                </span>
-                {err && (
-                  <span
-                    id="err-human-check"
-                    role="alert"
-                    aria-live="polite"
-                    className="mt-1 block text-xs text-red-600 dark:text-red-400"
-                  >
-                    {err}
-                  </span>
-                )}
-              </span>
-            </label>
-          );
-        })()}
 
         <SubmitButton disabled={!allValid} />
 

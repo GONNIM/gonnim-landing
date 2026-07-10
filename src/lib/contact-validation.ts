@@ -17,7 +17,6 @@ export type ParsedForm = {
   category: string;
   topic: string;
   honeypot: string;
-  humanCheck: boolean;
 };
 
 // 국내: 한글 (완성형 + 자음/모음) + 영문 + 숫자 + 허용 기호 + 공백
@@ -192,12 +191,6 @@ export function validateTopic(value: string): FieldError {
   return null;
 }
 
-export function validateHumanCheck(checked: boolean): FieldError {
-  if (!checked)
-    return "'저는 봇이 아닙니다' 항목에 체크해주세요.";
-  return null;
-}
-
 // ─── 서버 최종 검증 (전체) ────────────────────────────────────────
 export function validate(parsed: ParsedForm): FieldError {
   const errors = [
@@ -208,7 +201,6 @@ export function validate(parsed: ParsedForm): FieldError {
     validatePhone(parsed.phone, parsed.region),
     validateCategory(parsed.category),
     validateTopic(parsed.topic),
-    validateHumanCheck(parsed.humanCheck),
   ];
   const first = errors.find((e) => e !== null);
   return first ?? null;
@@ -217,7 +209,6 @@ export function validate(parsed: ParsedForm): FieldError {
 // ─── FormData 파싱 (NFC 정규화 포함) ────────────────────────────────
 export function parseForm(formData: FormData): ParsedForm {
   const get = (k: string) => normalize(String(formData.get(k) ?? ""));
-  const humanCheckRaw = String(formData.get("human_check") ?? "").trim();
   return {
     region: normalizeRegion(formData.get("region")),
     name: get("name"),
@@ -228,6 +219,5 @@ export function parseForm(formData: FormData): ParsedForm {
     category: get("category"),
     topic: get("topic"),
     honeypot: String(formData.get("website") ?? "").trim(),
-    humanCheck: humanCheckRaw === "on" || humanCheckRaw === "true",
   };
 }
