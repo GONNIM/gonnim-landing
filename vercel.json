@@ -1,0 +1,8 @@
+{
+  "crons": [
+    {
+      "path": "/api/cron/crawl-wishket",
+      "schedule": "0 23 * * *"
+    }
+  ]
+}
