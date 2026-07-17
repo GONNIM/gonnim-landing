@@ -44,15 +44,26 @@ export class WantedGigsCrawler implements Crawler {
 
       await page.goto(LIST_URL, {
         waitUntil: "domcontentloaded",
-        timeout: 30_000,
+        timeout: 45_000,
       });
+      const cardSelector = "a[data-attribute-id='gigs__project__detail']";
       await page
-        .waitForSelector("a[data-attribute-id='gigs__project__detail']", {
-          timeout: 20_000,
-        })
+        .waitForSelector(cardSelector, { timeout: 30_000 })
         .catch(() => null);
-      // Extra settling time for React hydration
-      await page.waitForTimeout(2500);
+      // Extra settling time for React hydration + slow CI networks
+      await page.waitForTimeout(5000);
+
+      // Diagnostic on empty result — dump title + screenshot to /tmp
+      const anchorCount = await page.locator(cardSelector).count();
+      if (anchorCount === 0) {
+        const title = await page.title().catch(() => "");
+        errors.push(
+          `no cards detected · title="${title.slice(0, 80)}" · url=${page.url()}`,
+        );
+        await page
+          .screenshot({ path: "/tmp/wanted-gigs-empty.png", fullPage: false })
+          .catch(() => null);
+      }
 
       // Evaluate in page context — must be pure JS with no TS helpers
       const cards = (await page.evaluate(() => {
