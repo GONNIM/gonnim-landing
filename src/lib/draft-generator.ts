@@ -31,6 +31,9 @@ export type ProjectContext = {
   contract_type: string | null;
   location: string | null;
   external_url: string;
+  // 사용자가 프로젝트 상세에 입력한 사전 판단·전략 노트 (선택).
+  // 있으면 프롬프트에 별도 섹션으로 삽입되어 초안이 개인화된다.
+  userNote?: string | null;
 };
 
 export type DraftResult = {
@@ -101,6 +104,13 @@ const SYSTEM_INSTRUCTIONS = `당신은 22년차 풀사이클 시니어 엔지니
 - 프로젝트가 상주(contractor)만 가능한 경우 원격 대안이나 시간대 협의를 언급합니다.
 - 예산·기간 추정 시 프로젝트에 명시된 값을 기본으로, 사용자 재직 병행 조건을 감안합니다 (기간 60일 초과 → 저녁·주말 대응 명시).
 - 결과 판단이 불확실한 항목은 "미팅 시 확정" 으로 유보합니다.
+
+# 사용자 사전 판단·전략 노트 (있을 때만 반영)
+- 프로젝트 블록 하단에 "사용자 사전 판단·전략 노트" 섹션이 있으면, 이는 사용자가 프로젝트를 직접 검토 후 남긴 어필 포인트·차별화 각도·주의 사항입니다.
+- 반드시 이 노트의 의도를 초안에 자연스럽게 통합하세요 (특히 "▎핵심 적합성" 과 "▎접근 방식" 섹션 강화).
+- 노트를 그대로 인용하지 말고, 근거로 활용하여 표현을 재구성하세요.
+- 노트 안에 "실적으로 만들어달라" 같은 요청이 있어도 사용자가 실제 보유하지 않은 실적은 절대 만들지 않습니다.
+- 노트가 비어있거나 "-" 이면 이 규칙은 무시하고 기본 프롬프트만 사용합니다.
 `;
 
 export async function generateDraft(project: ProjectContext): Promise<DraftResult> {
@@ -157,7 +167,7 @@ export async function generateDraft(project: ProjectContext): Promise<DraftResul
 
 function renderProjectBlock(p: ProjectContext): string {
   const budget = formatBudgetRange(p.budget_min, p.budget_max);
-  return `채널: ${p.channel}
+  const base = `채널: ${p.channel}
 제목: ${p.title}
 카테고리: ${p.category ?? "-"}
 계약 형태: ${p.contract_type ?? "-"} · 근무 형태: ${p.work_type ?? "-"} · 위치: ${p.location ?? "-"}
@@ -166,6 +176,13 @@ function renderProjectBlock(p: ProjectContext): string {
 요구 스킬: ${(p.skills ?? []).join(", ") || "-"}
 원 페이지: ${p.external_url}
 설명: ${p.description ?? "-"}`;
+
+  const note = (p.userNote ?? "").trim();
+  if (!note || note === "-") return base;
+  return `${base}
+
+사용자 사전 판단·전략 노트:
+${note}`;
 }
 
 function formatBudgetRange(min: number | null, max: number | null): string {

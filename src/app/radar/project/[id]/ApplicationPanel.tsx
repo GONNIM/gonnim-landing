@@ -99,7 +99,7 @@ export function ApplicationPanel({
       const res = await fetch("/api/radar/generate-draft", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ projectId }),
+        body: JSON.stringify({ projectId, userNote: notes }),
       });
       const data = (await res.json()) as {
         proposal?: string;
@@ -194,12 +194,13 @@ export function ApplicationPanel({
           </label>
           <label className="block sm:col-span-2">
             <span className="text-xs uppercase tracking-wide text-neutral-500">
-              메모
+              메모 · 사전 판단·전략 노트
             </span>
             <textarea
               rows={3}
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
+              placeholder="이 프로젝트만의 어필 포인트·차별화 각도·주의 사항을 남기세요 (예: '개인정보 강조 · AI 홍변 v3 매칭'). AI 초안 생성 시 자동 반영됩니다."
               className="mt-1 w-full rounded-md border border-neutral-800 bg-neutral-950 px-3 py-2 text-sm text-neutral-100 outline-none focus:border-neutral-500"
             />
           </label>

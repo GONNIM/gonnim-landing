@@ -33,7 +33,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
 
-  let body: { projectId?: string };
+  let body: { projectId?: string; userNote?: string | null };
   try {
     body = await req.json();
   } catch {
@@ -43,6 +43,9 @@ export async function POST(req: NextRequest) {
   if (!projectId) {
     return NextResponse.json({ error: "projectId 필요" }, { status: 400 });
   }
+  // 사용자가 아직 저장하지 않은 라이브 노트를 우선 사용. 없으면 DB의 saved 값을 폴백.
+  const clientNote =
+    typeof body.userNote === "string" ? body.userNote.trim() : null;
 
   const { data: project, error: projErr } = await supabase
     .from("projects")
@@ -60,6 +63,18 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "project not found" }, { status: 404 });
   }
 
+  // 사용자 노트 폴백: 클라이언트가 라이브 노트를 안 보내면 저장된 application.notes 조회.
+  let userNote: string | null = clientNote;
+  if (!userNote) {
+    // RLS 가 user 스코프를 강제하므로 project_id 만 필터.
+    const { data: appRow } = await supabase
+      .from("applications")
+      .select("notes")
+      .eq("project_id", projectId)
+      .maybeSingle<{ notes: string | null }>();
+    userNote = (appRow?.notes ?? "").trim() || null;
+  }
+
   const ctx: ProjectContext = {
     channel: project.channel,
     title: project.title,
@@ -73,6 +88,7 @@ export async function POST(req: NextRequest) {
     contract_type: project.contract_type,
     location: project.location,
     external_url: project.external_url,
+    userNote,
   };
 
   try {
