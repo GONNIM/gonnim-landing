@@ -27,6 +27,9 @@ export function ApplicationPanel({
     draft_budget: number | null;
     draft_duration_days: number | null;
     notes: string | null;
+    insight_report: string | null;
+    go_decision: string | null;
+    insight_generated_at: string | null;
   };
 }) {
   const router = useRouter();
@@ -51,6 +54,17 @@ export function ApplicationPanel({
   const [applicationId, setApplicationId] = useState<string | null>(
     application.id,
   );
+
+  const [insightReport, setInsightReport] = useState<string | null>(
+    application.insight_report,
+  );
+  const [goDecision, setGoDecision] = useState<string | null>(
+    application.go_decision,
+  );
+  const [insightGeneratedAt, setInsightGeneratedAt] = useState<string | null>(
+    application.insight_generated_at,
+  );
+  const [insightGenerating, setInsightGenerating] = useState(false);
 
   function run(fn: () => Promise<void>) {
     setMessage(null);
@@ -90,6 +104,38 @@ export function ApplicationPanel({
   }
 
   const [generating, setGenerating] = useState(false);
+
+  async function onGenerateInsight() {
+    setError(null);
+    setMessage(null);
+    setInsightGenerating(true);
+    try {
+      const res = await fetch("/api/radar/generate-insight", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ projectId, userNote: notes }),
+      });
+      const data = (await res.json()) as {
+        report?: string;
+        goDecision?: string | null;
+        goReason?: string;
+        generatedAt?: string;
+        error?: string;
+      };
+      if (!res.ok) throw new Error(data.error ?? "정밀 분석 생성 실패");
+      if (data.report) setInsightReport(data.report);
+      setGoDecision(data.goDecision ?? null);
+      setInsightGeneratedAt(data.generatedAt ?? new Date().toISOString());
+      setMessage(
+        `정밀 분석 완료${data.goReason ? " · " + data.goReason : ""}`,
+      );
+      router.refresh();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setInsightGenerating(false);
+    }
+  }
 
   async function onGenerateDraft() {
     setError(null);
@@ -141,6 +187,66 @@ export function ApplicationPanel({
             </button>
           ))}
         </div>
+      </div>
+
+      <div>
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-sm font-medium text-neutral-300">
+              🔍 정밀 분석 리포트
+            </h2>
+            {insightGeneratedAt && (
+              <p className="mt-1 text-[10px] text-neutral-500">
+                마지막 생성 · {new Date(insightGeneratedAt).toLocaleString("ko-KR")}
+              </p>
+            )}
+          </div>
+          <button
+            type="button"
+            disabled={insightGenerating || generating || isPending}
+            onClick={onGenerateInsight}
+            className="rounded-md border border-sky-700/60 bg-sky-950/40 px-3 py-1.5 text-xs font-medium text-sky-200 hover:border-sky-500 hover:text-sky-100 disabled:opacity-60"
+          >
+            {insightGenerating
+              ? "AI 분석 중…"
+              : insightReport
+                ? "🔄 재분석"
+                : "🔍 정밀 분석 실행"}
+          </button>
+        </div>
+        {goDecision && (
+          <div className="mt-3 flex items-center gap-2">
+            <span
+              className={`inline-flex items-center rounded px-2 py-1 text-xs font-semibold ${
+                goDecision === "go"
+                  ? "bg-emerald-950 text-emerald-300"
+                  : goDecision === "no-go"
+                    ? "bg-red-950 text-red-300"
+                    : "bg-amber-950 text-amber-300"
+              }`}
+            >
+              {goDecision === "go"
+                ? "✓ Go"
+                : goDecision === "no-go"
+                  ? "✗ No-go"
+                  : "◐ Conditional"}
+            </span>
+            <span className="text-[11px] text-neutral-500">
+              LLM 판정 · 프로젝트·도메인·상용화 정합성 종합
+            </span>
+          </div>
+        )}
+        {insightReport ? (
+          <pre className="mt-3 max-h-[520px] overflow-y-auto whitespace-pre-wrap rounded-md border border-neutral-800 bg-neutral-950 p-4 text-sm leading-6 text-neutral-100">
+            {insightReport}
+          </pre>
+        ) : (
+          <p className="mt-3 rounded-md border border-dashed border-neutral-800 bg-neutral-950/40 p-4 text-xs text-neutral-500">
+            🔍 위 버튼을 누르면 이 프로젝트의 Go/No-go 판단 + 도메인 정밀 분석 +
+            상용화 방안 리포트가 생성됩니다. 사전 판단·전략 노트가 있으면 자동
+            반영됩니다.
+          </p>
+        )}
       </div>
 
       <div>

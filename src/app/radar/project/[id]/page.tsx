@@ -50,6 +50,9 @@ type ProjectDetail = {
         draft_budget: number | null;
         draft_duration_days: number | null;
         notes: string | null;
+        insight_report: string | null;
+        go_decision: string | null;
+        insight_generated_at: string | null;
       }[]
     | null;
 };
@@ -67,7 +70,8 @@ export default async function ProjectDetailPage({ params }: PageProps) {
        first_seen_at, last_seen_at,
        relevance_scores(score, score_breakdown),
        applications(id, status, draft_proposal, draft_budget,
-                    draft_duration_days, notes)`,
+                    draft_duration_days, notes, insight_report,
+                    go_decision, insight_generated_at)`,
     )
     .eq("id", id)
     .maybeSingle<ProjectDetail>();
@@ -209,6 +213,9 @@ export default async function ProjectDetailPage({ params }: PageProps) {
           draft_budget: application?.draft_budget ?? null,
           draft_duration_days: application?.draft_duration_days ?? null,
           notes: application?.notes ?? null,
+          insight_report: application?.insight_report ?? null,
+          go_decision: application?.go_decision ?? null,
+          insight_generated_at: application?.insight_generated_at ?? null,
         }}
       />
     </div>
