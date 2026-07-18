@@ -51,7 +51,8 @@ type ProjectDetail = {
         draft_duration_days: number | null;
         notes: string | null;
         insight_report: string | null;
-        go_decision: string | null;
+        competition_level: string | null;
+        business_grade: string | null;
         insight_generated_at: string | null;
       }[]
     | null;
@@ -71,7 +72,7 @@ export default async function ProjectDetailPage({ params }: PageProps) {
        relevance_scores(score, score_breakdown),
        applications(id, status, draft_proposal, draft_budget,
                     draft_duration_days, notes, insight_report,
-                    go_decision, insight_generated_at)`,
+                    competition_level, business_grade, insight_generated_at)`,
     )
     .eq("id", id)
     .maybeSingle<ProjectDetail>();
@@ -214,7 +215,8 @@ export default async function ProjectDetailPage({ params }: PageProps) {
           draft_duration_days: application?.draft_duration_days ?? null,
           notes: application?.notes ?? null,
           insight_report: application?.insight_report ?? null,
-          go_decision: application?.go_decision ?? null,
+          competition_level: application?.competition_level ?? null,
+          business_grade: application?.business_grade ?? null,
           insight_generated_at: application?.insight_generated_at ?? null,
         }}
       />

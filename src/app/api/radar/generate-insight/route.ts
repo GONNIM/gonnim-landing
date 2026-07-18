@@ -106,7 +106,8 @@ export async function POST(req: NextRequest) {
         .from("applications")
         .update({
           insight_report: insight.report,
-          go_decision: insight.goDecision,
+          competition_level: insight.competitionLevel,
+          business_grade: insight.businessGrade,
           insight_generated_at: nowIso,
         })
         .eq("id", existing.id);
@@ -115,15 +116,17 @@ export async function POST(req: NextRequest) {
         project_id: projectId,
         status: "interested",
         insight_report: insight.report,
-        go_decision: insight.goDecision,
+        competition_level: insight.competitionLevel,
+        business_grade: insight.businessGrade,
         insight_generated_at: nowIso,
       });
     }
 
     return NextResponse.json({
       report: insight.report,
-      goDecision: insight.goDecision,
-      goReason: insight.goReason,
+      competitionLevel: insight.competitionLevel,
+      businessGrade: insight.businessGrade,
+      verdict: insight.verdict,
       generatedAt: nowIso,
     });
   } catch (err) {

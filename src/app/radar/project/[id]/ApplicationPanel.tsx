@@ -28,7 +28,8 @@ export function ApplicationPanel({
     draft_duration_days: number | null;
     notes: string | null;
     insight_report: string | null;
-    go_decision: string | null;
+    competition_level: string | null;
+    business_grade: string | null;
     insight_generated_at: string | null;
   };
 }) {
@@ -58,8 +59,11 @@ export function ApplicationPanel({
   const [insightReport, setInsightReport] = useState<string | null>(
     application.insight_report,
   );
-  const [goDecision, setGoDecision] = useState<string | null>(
-    application.go_decision,
+  const [competitionLevel, setCompetitionLevel] = useState<string | null>(
+    application.competition_level,
+  );
+  const [businessGrade, setBusinessGrade] = useState<string | null>(
+    application.business_grade,
   );
   const [insightGeneratedAt, setInsightGeneratedAt] = useState<string | null>(
     application.insight_generated_at,
@@ -117,17 +121,19 @@ export function ApplicationPanel({
       });
       const data = (await res.json()) as {
         report?: string;
-        goDecision?: string | null;
-        goReason?: string;
+        competitionLevel?: string | null;
+        businessGrade?: string | null;
+        verdict?: string;
         generatedAt?: string;
         error?: string;
       };
-      if (!res.ok) throw new Error(data.error ?? "정밀 분석 생성 실패");
+      if (!res.ok) throw new Error(data.error ?? "사업화 분석 생성 실패");
       if (data.report) setInsightReport(data.report);
-      setGoDecision(data.goDecision ?? null);
+      setCompetitionLevel(data.competitionLevel ?? null);
+      setBusinessGrade(data.businessGrade ?? null);
       setInsightGeneratedAt(data.generatedAt ?? new Date().toISOString());
       setMessage(
-        `정밀 분석 완료${data.goReason ? " · " + data.goReason : ""}`,
+        `사업화 분석 완료${data.verdict ? " · " + data.verdict : ""}`,
       );
       router.refresh();
     } catch (e) {
@@ -193,7 +199,7 @@ export function ApplicationPanel({
         <div className="flex items-center justify-between">
           <div>
             <h2 className="text-sm font-medium text-neutral-300">
-              🔍 정밀 분석 리포트
+              🔍 사업화 타당성 리포트
             </h2>
             {insightGeneratedAt && (
               <p className="mt-1 text-[10px] text-neutral-500">
@@ -211,39 +217,64 @@ export function ApplicationPanel({
               ? "AI 분석 중…"
               : insightReport
                 ? "🔄 재분석"
-                : "🔍 정밀 분석 실행"}
+                : "🔍 사업화 분석 실행"}
           </button>
         </div>
-        {goDecision && (
-          <div className="mt-3 flex items-center gap-2">
-            <span
-              className={`inline-flex items-center rounded px-2 py-1 text-xs font-semibold ${
-                goDecision === "go"
-                  ? "bg-emerald-950 text-emerald-300"
-                  : goDecision === "no-go"
+        {(competitionLevel || businessGrade) && (
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            {competitionLevel && (
+              <span
+                className={`inline-flex items-center rounded px-2 py-1 text-xs font-semibold ${
+                  competitionLevel === "red"
                     ? "bg-red-950 text-red-300"
-                    : "bg-amber-950 text-amber-300"
-              }`}
-            >
-              {goDecision === "go"
-                ? "✓ Go"
-                : goDecision === "no-go"
-                  ? "✗ No-go"
-                  : "◐ Conditional"}
-            </span>
+                    : competitionLevel === "yellow"
+                      ? "bg-amber-950 text-amber-300"
+                      : "bg-sky-950 text-sky-300"
+                }`}
+              >
+                {competitionLevel === "red"
+                  ? "🔴 Red · 포화"
+                  : competitionLevel === "yellow"
+                    ? "🟡 Yellow · 각도 존재"
+                    : "🔵 Blue · 미개척"}
+              </span>
+            )}
+            {businessGrade && (
+              <span
+                className={`inline-flex items-center rounded px-2 py-1 text-xs font-semibold ${
+                  businessGrade === "A"
+                    ? "bg-emerald-950 text-emerald-300"
+                    : businessGrade === "B"
+                      ? "bg-sky-950 text-sky-300"
+                      : businessGrade === "C"
+                        ? "bg-amber-950 text-amber-300"
+                        : "bg-neutral-800 text-neutral-400"
+                }`}
+              >
+                사업화 등급 {businessGrade}
+                {businessGrade === "A"
+                  ? " · 강추"
+                  : businessGrade === "B"
+                    ? " · 조건부"
+                    : businessGrade === "C"
+                      ? " · 재검토"
+                      : " · 제외"}
+              </span>
+            )}
             <span className="text-[11px] text-neutral-500">
-              LLM 판정 · 프로젝트·도메인·상용화 정합성 종합
+              마켓 검증 · 유사 솔루션 · 차별화 각도 종합 판정
             </span>
           </div>
         )}
         {insightReport ? (
-          <pre className="mt-3 max-h-[520px] overflow-y-auto whitespace-pre-wrap rounded-md border border-neutral-800 bg-neutral-950 p-4 text-sm leading-6 text-neutral-100">
+          <pre className="mt-3 max-h-[600px] overflow-y-auto whitespace-pre-wrap rounded-md border border-neutral-800 bg-neutral-950 p-4 text-sm leading-6 text-neutral-100">
             {insightReport}
           </pre>
         ) : (
           <p className="mt-3 rounded-md border border-dashed border-neutral-800 bg-neutral-950/40 p-4 text-xs text-neutral-500">
-            🔍 위 버튼을 누르면 이 프로젝트의 Go/No-go 판단 + 도메인 정밀 분석 +
-            상용화 방안 리포트가 생성됩니다. 사전 판단·전략 노트가 있으면 자동
+            🔍 위 버튼을 누르면 이 프로젝트를 사업 아이템 후보로 정밀 분석합니다.
+            프로젝트 인사이트 → 마켓 검증 · 레드오션 여부 → 사업화 모델 3가지 →
+            파일럿 실행 계획까지 7섹션 리포트. 사전 판단·전략 노트가 있으면 자동
             반영됩니다.
           </p>
         )}
