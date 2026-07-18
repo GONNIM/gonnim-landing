@@ -89,6 +89,37 @@ export function ApplicationPanel({
     });
   }
 
+  const [generating, setGenerating] = useState(false);
+
+  async function onGenerateDraft() {
+    setError(null);
+    setMessage(null);
+    setGenerating(true);
+    try {
+      const res = await fetch("/api/radar/generate-draft", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ projectId }),
+      });
+      const data = (await res.json()) as {
+        proposal?: string;
+        suggestedBudget?: number | null;
+        suggestedDurationDays?: number | null;
+        error?: string;
+      };
+      if (!res.ok) throw new Error(data.error ?? "초안 생성 실패");
+      if (data.proposal) setDraft(data.proposal);
+      if (data.suggestedBudget != null) setBudget(String(data.suggestedBudget));
+      if (data.suggestedDurationDays != null)
+        setDuration(String(data.suggestedDurationDays));
+      setMessage("AI 초안 반영됨 · 검토 후 저장하세요");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setGenerating(false);
+    }
+  }
+
   return (
     <section className="space-y-6 rounded-xl border border-neutral-800 bg-neutral-900/30 p-5">
       <div>
@@ -113,17 +144,27 @@ export function ApplicationPanel({
       </div>
 
       <div>
-        <h2 className="text-sm font-medium text-neutral-300">지원 초안</h2>
+        <div className="flex items-center justify-between">
+          <h2 className="text-sm font-medium text-neutral-300">지원 초안</h2>
+          <button
+            type="button"
+            disabled={generating || isPending}
+            onClick={onGenerateDraft}
+            className="rounded-md border border-emerald-700/60 bg-emerald-950/40 px-3 py-1.5 text-xs font-medium text-emerald-200 hover:border-emerald-500 hover:text-emerald-100 disabled:opacity-60"
+          >
+            {generating ? "AI 생성 중…" : "🪄 AI 초안 생성"}
+          </button>
+        </div>
         <div className="mt-3 grid gap-3 sm:grid-cols-2">
           <label className="block sm:col-span-2">
             <span className="text-xs uppercase tracking-wide text-neutral-500">
               제안서 초안
             </span>
             <textarea
-              rows={8}
+              rows={12}
               value={draft}
               onChange={(e) => setDraft(e.target.value)}
-              placeholder="Claude API 통합 예정 · 지금은 수동 편집"
+              placeholder="🪄 위의 AI 초안 생성 버튼을 누르면 사용자 자산을 인용한 맞춤형 제안서 초안이 채워집니다. 필요 시 자유 편집 후 저장."
               className="mt-1 w-full rounded-md border border-neutral-800 bg-neutral-950 px-3 py-2 text-sm text-neutral-100 outline-none focus:border-neutral-500"
             />
           </label>
