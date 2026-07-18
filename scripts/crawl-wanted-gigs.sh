@@ -46,4 +46,12 @@ fi
 
 osascript -e "display notification \"$ICON $SUMMARY\" with title \"Wanted Gigs Crawl @ $NOW\" sound name \"$SOUND\"" 2>/dev/null
 
+# P0-2 후크 · 정합도 ≥7 신규 프로젝트 감지 및 별도 알림
+# (Wishket · Wanted Gigs 양 채널 모두 커버 · Supabase 통합 조회)
+{
+    echo ""
+    echo "--- high-relevance notifier ---"
+    pnpm exec tsx scripts/notify-high-relevance.ts 2>&1
+} >> "$LOG" 2>&1
+
 exit 0
