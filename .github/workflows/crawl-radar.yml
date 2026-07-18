@@ -1,10 +1,9 @@
 name: Sprint Radar · Playwright crawlers
 
 on:
-  # 매일 08:00 KST = 23:00 UTC (전일)
-  schedule:
-    - cron: "0 23 * * *"
-  # 수동 트리거 (Actions 탭 · Run workflow 버튼)
+  # 스케줄 비활성: 원티드가 CloudFront WAF 로 GitHub Runner US IP 차단 (2026-07-17 확정)
+  # 실 크롤은 로컬 Mac crontab 08:00 KST · scripts/crawl-wanted-gigs.sh
+  # 수동 dispatch 는 유지 (테스트·향후 residential proxy 도입 시 재활성 대비)
   workflow_dispatch:
 
 jobs:
