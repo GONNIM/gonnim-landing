@@ -9,9 +9,11 @@ import {
   APPLICATION_STATUS_ORDER,
 } from "@/lib/radar-format";
 import {
+  decideSprintStatus,
   ensureApplication,
   saveDraftAndNotes,
   updateApplicationStatus,
+  type SprintDecision,
 } from "./actions";
 import type { ApplicationStatus } from "@/lib/supabase/types";
 
@@ -31,6 +33,8 @@ export function ApplicationPanel({
     competition_level: string | null;
     business_grade: string | null;
     insight_generated_at: string | null;
+    sprint_status: string | null;
+    sprint_decided_at: string | null;
   };
 }) {
   const router = useRouter();
@@ -70,6 +74,13 @@ export function ApplicationPanel({
   );
   const [insightGenerating, setInsightGenerating] = useState(false);
 
+  const [sprintStatus, setSprintStatus] = useState<string | null>(
+    application.sprint_status,
+  );
+  const [sprintDecidedAt, setSprintDecidedAt] = useState<string | null>(
+    application.sprint_decided_at,
+  );
+
   function run(fn: () => Promise<void>) {
     setMessage(null);
     setError(null);
@@ -108,6 +119,20 @@ export function ApplicationPanel({
   }
 
   const [generating, setGenerating] = useState(false);
+
+  async function onDecideSprintStatus(next: SprintDecision) {
+    const prev = sprintStatus;
+    setSprintStatus(next);
+    try {
+      await decideSprintStatus(projectId, next);
+      setSprintDecidedAt(new Date().toISOString());
+      setMessage(`Sprint 상태 → ${next}`);
+      router.refresh();
+    } catch (e) {
+      setSprintStatus(prev);
+      setError(e instanceof Error ? e.message : String(e));
+    }
+  }
 
   async function onGenerateInsight() {
     setError(null);
@@ -279,6 +304,70 @@ export function ApplicationPanel({
           </p>
         )}
       </div>
+
+      {insightReport && (
+        <div>
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-sm font-medium text-neutral-300">
+                🚀 Sprint 진행 결정
+              </h2>
+              {sprintDecidedAt && (
+                <p className="mt-1 text-[10px] text-neutral-500">
+                  결정 시각 · {new Date(sprintDecidedAt).toLocaleString("ko-KR")}
+                </p>
+              )}
+            </div>
+          </div>
+          <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+            {(
+              [
+                { key: "candidate", label: "◯ 후보 등록", tone: "neutral" },
+                { key: "pursuing", label: "▶ 진행중", tone: "sky" },
+                { key: "kicked-off", label: "🚀 킥오프", tone: "emerald" },
+                { key: "dropped", label: "✗ 제외", tone: "red" },
+              ] as const
+            ).map((btn) => {
+              const active = sprintStatus === btn.key;
+              const toneClass =
+                btn.tone === "emerald"
+                  ? "border-emerald-700/60 bg-emerald-950/40 text-emerald-200 hover:border-emerald-500"
+                  : btn.tone === "sky"
+                    ? "border-sky-700/60 bg-sky-950/40 text-sky-200 hover:border-sky-500"
+                    : btn.tone === "red"
+                      ? "border-red-700/60 bg-red-950/40 text-red-200 hover:border-red-500"
+                      : "border-neutral-700 bg-neutral-950 text-neutral-300 hover:border-neutral-500";
+              const activeClass =
+                btn.tone === "emerald"
+                  ? "bg-emerald-800 text-emerald-50"
+                  : btn.tone === "sky"
+                    ? "bg-sky-800 text-sky-50"
+                    : btn.tone === "red"
+                      ? "bg-red-800 text-red-50"
+                      : "bg-neutral-700 text-neutral-50";
+              return (
+                <button
+                  key={btn.key}
+                  type="button"
+                  onClick={() =>
+                    onDecideSprintStatus(btn.key as SprintDecision)
+                  }
+                  disabled={isPending || generating || insightGenerating}
+                  className={`rounded-md border px-3 py-2 text-xs font-medium transition ${
+                    active ? activeClass : toneClass
+                  } disabled:opacity-60`}
+                >
+                  {btn.label}
+                </button>
+              );
+            })}
+          </div>
+          <p className="mt-3 text-[11px] text-neutral-500">
+            🚀 킥오프 결정 시 로컬 cron (매일 22:00 KST) 이 Kickoff.md §7 사업
+            아이템 섹션에 자동 편입합니다. Sprint-Radar-Spec 매출 트리에 반영.
+          </p>
+        </div>
+      )}
 
       <div>
         <div className="flex items-center justify-between">

@@ -63,6 +63,54 @@ export async function updateApplicationStatus(
   revalidatePath("/radar");
 }
 
+export type SprintDecision =
+  | "candidate"
+  | "pursuing"
+  | "kicked-off"
+  | "dropped";
+
+// Sprint 진행 결정 갱신 · applications 레코드 없으면 생성.
+// kicked-off 로 전환 시 wiki (Kickoff.md) 자동 동기화는 로컬 cron
+// (scripts/sync-kickoff.sh) 이 감지 · Vercel 은 wiki 파일 쓰기 불가.
+export async function decideSprintStatus(
+  projectId: string,
+  status: SprintDecision,
+) {
+  const supabase = await ensureAuth();
+
+  const { data: existing } = await supabase
+    .from("applications")
+    .select("id")
+    .eq("project_id", projectId)
+    .maybeSingle<{ id: string }>();
+
+  const nowIso = new Date().toISOString();
+
+  if (existing?.id) {
+    const { error } = await supabase
+      .from("applications")
+      .update({
+        sprint_status: status,
+        sprint_decided_at: nowIso,
+        updated_at: nowIso,
+      })
+      .eq("id", existing.id);
+    if (error) throw new Error(error.message);
+  } else {
+    const { error } = await supabase.from("applications").insert({
+      project_id: projectId,
+      status: "interested",
+      sprint_status: status,
+      sprint_decided_at: nowIso,
+    });
+    if (error) throw new Error(error.message);
+  }
+
+  revalidatePath(`/radar/project/${projectId}`);
+  revalidatePath("/radar/business-ideas");
+  revalidatePath("/radar");
+}
+
 export async function saveDraftAndNotes(
   applicationId: string,
   projectId: string,

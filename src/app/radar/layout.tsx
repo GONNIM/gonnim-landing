@@ -38,6 +38,12 @@ export default async function RadarLayout({
                   프로젝트
                 </Link>
                 <Link
+                  href="/radar/business-ideas"
+                  className="hover:text-neutral-100"
+                >
+                  🎯 사업 아이템
+                </Link>
+                <Link
                   href="/radar/analytics"
                   className="hover:text-neutral-100"
                 >
