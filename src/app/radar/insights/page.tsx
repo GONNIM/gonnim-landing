@@ -27,6 +27,34 @@ type ApplicationInsightRow = {
   projects: { title: string; channel: string; category: string | null } | null;
 };
 
+type TrendLaunchRow = {
+  id: string;
+  source: string;
+  external_id: string;
+  external_url: string;
+  title: string;
+  tagline: string | null;
+  author: string | null;
+  published_at: string | null;
+  llm_business_grade: string | null;
+  promoted_to_idea: boolean | null;
+  first_seen_at: string;
+};
+
+const SOURCE_LABEL: Record<string, string> = {
+  "product-hunt": "🌟 Product Hunt",
+  "indie-hackers": "🎯 Indie Hackers",
+  "show-hn": "💬 Show HN",
+  "reddit-sideproject": "🔴 Reddit",
+  hn: "📰 Hacker News",
+  "github-trending": "🐙 GitHub",
+  "hugging-face": "🤗 HF",
+  medium: "📝 Medium",
+  geeknews: "🇰🇷 GeekNews",
+  yozm: "🇰🇷 요즘IT",
+  velog: "🇰🇷 Velog",
+};
+
 const GRADE_STYLE: Record<string, string> = {
   A: "bg-emerald-950 text-emerald-300",
   B: "bg-sky-950 text-sky-300",
@@ -89,6 +117,19 @@ export default async function InsightsPage() {
     .not("business_grade", "is", null)
     .order("insight_generated_at", { ascending: false })
     .returns<ApplicationInsightRow[]>();
+
+  // 최근 7일 IT 트렌드 launches (Product Hunt 등 · P-Insights-Ext)
+  const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+  const { data: trends } = await supabase
+    .from("trend_launches")
+    .select(
+      `id, source, external_id, external_url, title, tagline, author,
+       published_at, llm_business_grade, promoted_to_idea, first_seen_at`,
+    )
+    .gte("first_seen_at", sevenDaysAgo)
+    .order("published_at", { ascending: false })
+    .limit(20)
+    .returns<TrendLaunchRow[]>();
 
   if (projErr || appErr) {
     return (
@@ -319,6 +360,71 @@ export default async function InsightsPage() {
                 </li>
               );
             })}
+          </ul>
+        )}
+      </section>
+
+      {/* §3.5 · 최근 IT 트렌드 launches (Product Hunt 등) */}
+      <section className="space-y-3 rounded-xl border border-neutral-800 bg-neutral-900/30 p-5">
+        <div>
+          <h2 className="text-sm font-medium text-neutral-300">
+            🌟 최근 IT 트렌드 (지난 7일)
+          </h2>
+          <p className="mt-1 text-[11px] text-neutral-500">
+            Product Hunt 등 원천 자동 수집 · Wiki `Thoughts/Trends/` 저장 · 원본 링크 포함
+          </p>
+        </div>
+        {(trends ?? []).length === 0 ? (
+          <p className="rounded-md border border-dashed border-neutral-800 bg-neutral-950/40 p-4 text-xs text-neutral-500">
+            트렌드 launch 없음 · 크롤러 09:30 KST 자동 실행 대기
+          </p>
+        ) : (
+          <ul className="grid gap-2 sm:grid-cols-2">
+            {(trends ?? []).map((t) => (
+              <li
+                key={t.id}
+                className="rounded-lg border border-neutral-800 bg-neutral-950/40 p-3 transition hover:border-neutral-600"
+              >
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="rounded bg-neutral-800 px-1.5 py-0.5 text-[10px] text-neutral-300">
+                    {SOURCE_LABEL[t.source] ?? t.source}
+                  </span>
+                  {t.llm_business_grade && (
+                    <span
+                      className={`rounded px-1.5 py-0.5 text-[10px] font-semibold ${GRADE_STYLE[t.llm_business_grade] ?? ""}`}
+                    >
+                      {t.llm_business_grade}
+                    </span>
+                  )}
+                  {t.promoted_to_idea && (
+                    <span className="rounded bg-emerald-950 px-1.5 py-0.5 text-[10px] text-emerald-300">
+                      💡 Ideas 승격
+                    </span>
+                  )}
+                  <span className="text-[10px] text-neutral-600">
+                    {formatDate(t.published_at)}
+                  </span>
+                </div>
+                <a
+                  href={t.external_url}
+                  target="_blank"
+                  rel="noreferrer noopener"
+                  className="mt-1.5 block truncate text-sm font-medium text-neutral-100 hover:text-white"
+                >
+                  {t.title}
+                </a>
+                {t.tagline && (
+                  <p className="mt-1 line-clamp-2 text-[11px] text-neutral-400">
+                    {t.tagline}
+                  </p>
+                )}
+                {t.author && (
+                  <p className="mt-1 text-[10px] text-neutral-600">
+                    by {t.author}
+                  </p>
+                )}
+              </li>
+            ))}
           </ul>
         )}
       </section>

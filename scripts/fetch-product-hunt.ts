@@ -14,6 +14,8 @@ import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
 import * as cheerio from "cheerio";
+import { createClient } from "@supabase/supabase-js";
+import WebSocket from "ws";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 config({ path: path.resolve(__dirname, "..", ".env.local") });
@@ -116,9 +118,9 @@ async function main() {
   const dateStr = `${yyyy}-${mm}-${dd}`;
   const filePath = path.join(TRENDS_DIR, `${dateStr}.md`);
 
-  if (fs.existsSync(filePath)) {
-    console.log(`  이미 존재 · skip: ${filePath}`);
-    return;
+  const wikiExists = fs.existsSync(filePath);
+  if (wikiExists) {
+    console.log(`  Wiki 이미 존재 · Wiki 저장 skip · DB upsert 는 진행: ${filePath}`);
   }
 
   // frontmatter + digest 조립
@@ -163,9 +165,63 @@ related:
     )
     .join("\n");
 
-  fs.writeFileSync(filePath, fm + rows, "utf8");
-  console.log(`\n✓ 저장 완료: ${filePath}`);
-  console.log(`  ${launches.length} launches`);
+  if (!wikiExists) {
+    fs.writeFileSync(filePath, fm + rows, "utf8");
+    console.log(`\n✓ Wiki 저장 완료: ${filePath}`);
+    console.log(`  ${launches.length} launches`);
+  }
+
+  // Supabase DB upsert (P-Insights-Ext · Radar 뷰어 원천)
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !serviceKey) {
+    console.log("  ⚠ Supabase env 없음 · DB 저장 skip");
+    return;
+  }
+  const supabase = createClient(url, serviceKey, {
+    auth: { autoRefreshToken: false, persistSession: false },
+    realtime: { transport: WebSocket as unknown as never },
+  });
+
+  let dbNew = 0;
+  let dbUpdated = 0;
+  const nowIso = new Date().toISOString();
+  for (const l of launches) {
+    const { data: existing } = await supabase
+      .from("trend_launches")
+      .select("id")
+      .eq("source", "product-hunt")
+      .eq("external_id", l.id)
+      .maybeSingle<{ id: string }>();
+
+    const payload = {
+      source: "product-hunt",
+      external_id: l.id,
+      external_url: l.productUrl,
+      title: l.title,
+      tagline: l.tagline || null,
+      author: l.author || null,
+      published_at: l.published,
+      raw_data: {
+        wiki_path: filePath.replace("/Users/gonnim/GON-LLM-Wiki/", ""),
+        ingested_at: nowIso,
+      },
+      last_seen_at: nowIso,
+    };
+
+    if (existing?.id) {
+      const { error } = await supabase
+        .from("trend_launches")
+        .update(payload)
+        .eq("id", existing.id);
+      if (!error) dbUpdated += 1;
+    } else {
+      const { error } = await supabase.from("trend_launches").insert(payload);
+      if (!error) dbNew += 1;
+      else console.log(`  ⚠ DB insert 실패 ${l.title}: ${error.message}`);
+    }
+  }
+  console.log(`  ✓ DB upsert: ${dbNew} new · ${dbUpdated} updated`);
 }
 
 main().catch((err) => {
