@@ -18,6 +18,7 @@
 
 import OpenAI from "openai";
 import { USER_PROFILE } from "./radar-user-profile";
+import { GTM_ASSETS } from "./gtm-assets";
 import type { ProjectContext } from "./draft-generator";
 
 const DEFAULT_MODEL = "glm-5.2";
@@ -50,13 +51,29 @@ const SYSTEM_INSTRUCTIONS = `당신은 22년차 풀사이클 시니어 엔지니
 - 사용자가 실제 보유하지 않은 기술·실적을 절대 만들지 마세요
 - 위 프로필의 강점 (Local LLM · RAG · 정부과제 · 대기업 검증 · 22년차 시니어) 을 명시 근거로 활용
 
-# 판정 기준
+# ★ 사용자 GTM 자원 이중 필터 (엄격 적용 · Business Grade 결정 요소)
+아래 GTM 자원 실 상태를 판정 필터로 반드시 적용. 시장 검증만 통과해도 자원 정합 없으면 C 이하:
+
+- **레퍼럴 필수** 사업은 절대 A 등급 X (사용자 실명 레퍼럴 자산 = 0)
+- **콜드 아웃바운드 다수 필요** 사업은 절대 A 등급 X (담당자 응답률 0% 근접)
+- **SEO 콘텐츠·기술 블로그 통한 인바운드** 필요 사업은 B 이하 (콘텐츠 파급력 미미)
+- **정부·공공 조달** 사업 (조달·컨설턴트 풀·정부과제 확장) = A 등급 가능 (정부과제 4건 자산 정합)
+- **프리랜서 계약형** 사업 (마켓플레이스 자연 유입) = A~B 등급 가능 (크몽·숨고·이랜서·위시켓·원티드 5개 등록)
+- **B2B enterprise SaaS 라이선스** = 콜드 필수 시 C · 마켓플레이스 유입 가능 시 B
+- **SMB SaaS 인바운드** = 콘텐츠·마케팅 자원 필요 · B or C
+- **B2C SaaS·제품** = Product Hunt·Ollama Hub 등 제품 마켓플레이스 미활성 · C 이하
+
+# 판정 기준 (자원 정합 이중 필터 적용)
 - competition_level: red/yellow/blue (경쟁 강도)
 - business_grade:
-  - A: 사업화 강추 · 재현성 확인 · 진입 각도 확보 · 사용자 자산 정합
-  - B: 조건부 · 특정 조건 (자본·파트너·시점) 충족 시 진행
-  - C: 재검토 · 시장 존재하나 사용자 자산 정합 낮음 or 자본 필요 과다
-  - D: 제외 · 단일 기업 특수 pain or 이미 포화 · 차별화 각도 없음
+  - **A**: 시장 검증 ✓ + **자원 강 정합** (정부·공공 조달 or 프리랜서 계약형 확실 · 5축 or 4축 활용)
+  - **B**: 시장 검증 ✓ + **자원 중 정합** (1축 유효 · 마켓플레이스 유입 or 랜딩 유도 가능)
+  - **C**: 시장 검증 ✓ + **자원 약 정합** (콜드·레퍼럴 필수 · 실 진입 어려움)
+  - **D**: 시장 검증 X or 재현성 X
+
+# 시장 실 검증 옵션 · LLM 판정은 초기 참고 자료
+LLM 조사는 knowledge cutoff · 국내 신흥 스타트업 매출 데이터 부족 가능성.
+▎5.5 섹션 (아래 신설) 에 "시장 실 검증 액션 추천" 필드 · **사용자가 실 검증 필요 여부 자체 판단**.
 
 # 출력 형식 (엄수)
 반드시 다음 JSON 형식으로만 응답. 다른 설명·마크다운 wrapper 없이 JSON 만:
@@ -100,7 +117,14 @@ const SYSTEM_INSTRUCTIONS = `당신은 22년차 풀사이클 시니어 엔지니
   · 매출 모델 · 필요 자본 · 반복성 · 초기 6개월 시나리오
 - C안 라이선스·API·플러그인
   · 매출 모델 · 필요 자본 · 반복성 · 초기 6개월 시나리오
-- 사용자 재직 병행 조건에서 추천 모델 (1개 · 근거 1~2문장)
+- 사용자 재직 병행 조건 + GTM 자원 정합 반영 추천 모델 (1개 · 근거 1~2문장)
+
+▎5.5 시장 실 검증 액션 추천 (LLM 조사의 한계 보완)
+LLM 조사 (§3) 는 knowledge cutoff · 실 매출·리텐션 데이터 부족 가능. 사용자가 실 결정 전 검증할 액션:
+- 잠재 고객 인터뷰: N명 · 어떤 카테고리 (예: 아동상담센터장·심리검사 도구 개발사 대표 등)
+- 유사 솔루션 리텐션 확인: G2·Capterra·리뷰 링크 or 사용자가 확인할 소스
+- 지불 근거 확인: 유사 스타트업 매출·투자 뉴스 검색 키워드 2~3점
+- 검증 우선순위: 필수 / 권장 / 선택 (LLM 판단)
 
 ▎6. 파일럿 실행 계획
 - MVP 스펙 (4~8주 개발 가능 · 최소 기능 3~5점 · 무엇을 안 만들 것인가도 명시)
@@ -138,7 +162,7 @@ export async function generateInsight(project: ProjectContext): Promise<InsightR
   const model = process.env.ZAI_MODEL || DEFAULT_MODEL;
 
   const projectBlock = renderProjectBlock(project);
-  const systemContent = `${SYSTEM_INSTRUCTIONS}\n\n# 사용자 프로필 (홍해연)\n\n${USER_PROFILE}`;
+  const systemContent = `${SYSTEM_INSTRUCTIONS}\n\n# 사용자 프로필 (홍해연)\n\n${USER_PROFILE}\n\n# 사용자 GTM 자원 실 상태 (SSOT · Radar 판정 필터)\n\n${GTM_ASSETS}`;
 
   const response = await client.chat.completions.create({
     model,
