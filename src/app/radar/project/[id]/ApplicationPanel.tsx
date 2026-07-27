@@ -198,7 +198,7 @@ export function ApplicationPanel({
   }
 
   return (
-    <section className="space-y-6 rounded-xl border border-neutral-800 bg-neutral-900/30 p-5">
+    <section className="space-y-6 rounded-xl border border-neutral-700 bg-neutral-900/30 p-5">
       <div>
         <h2 className="text-sm font-medium text-neutral-300">Funnel 상태</h2>
         <div className="mt-3 flex flex-wrap gap-2">
@@ -227,7 +227,7 @@ export function ApplicationPanel({
               🔍 사업화 타당성 리포트
             </h2>
             {insightGeneratedAt && (
-              <p className="mt-1 text-[10px] text-neutral-500">
+              <p className="mt-1 text-xs text-neutral-500">
                 마지막 생성 · {new Date(insightGeneratedAt).toLocaleString("ko-KR")}
               </p>
             )}
@@ -286,17 +286,17 @@ export function ApplicationPanel({
                       : " · 제외"}
               </span>
             )}
-            <span className="text-[11px] text-neutral-500">
+            <span className="text-xs text-neutral-500">
               마켓 검증 · 유사 솔루션 · 차별화 각도 종합 판정
             </span>
           </div>
         )}
         {insightReport ? (
-          <pre className="mt-3 max-h-[600px] overflow-y-auto whitespace-pre-wrap rounded-md border border-neutral-800 bg-neutral-950 p-4 text-sm leading-6 text-neutral-100">
+          <pre className="mt-3 max-h-[600px] overflow-y-auto whitespace-pre-wrap rounded-md border border-neutral-700 bg-neutral-950 p-4 text-sm leading-6 text-neutral-100">
             {insightReport}
           </pre>
         ) : (
-          <p className="mt-3 rounded-md border border-dashed border-neutral-800 bg-neutral-950/40 p-4 text-xs text-neutral-500">
+          <p className="mt-3 rounded-md border border-dashed border-neutral-700 bg-neutral-950/40 p-4 text-xs text-neutral-500">
             🔍 위 버튼을 누르면 이 프로젝트를 사업 아이템 후보로 정밀 분석합니다.
             프로젝트 인사이트 → 마켓 검증 · 레드오션 여부 → 사업화 모델 3가지 →
             파일럿 실행 계획까지 7섹션 리포트. 사전 판단·전략 노트가 있으면 자동
@@ -313,7 +313,7 @@ export function ApplicationPanel({
                 🚀 Sprint 진행 결정
               </h2>
               {sprintDecidedAt && (
-                <p className="mt-1 text-[10px] text-neutral-500">
+                <p className="mt-1 text-xs text-neutral-500">
                   결정 시각 · {new Date(sprintDecidedAt).toLocaleString("ko-KR")}
                 </p>
               )}
@@ -362,7 +362,7 @@ export function ApplicationPanel({
               );
             })}
           </div>
-          <p className="mt-3 text-[11px] text-neutral-500">
+          <p className="mt-3 text-xs text-neutral-500">
             🚀 킥오프 결정 시 로컬 cron (매일 22:00 KST) 이 Kickoff.md §7 사업
             아이템 섹션에 자동 편입합니다. Sprint-Radar-Spec 매출 트리에 반영.
           </p>
@@ -391,7 +391,7 @@ export function ApplicationPanel({
               value={draft}
               onChange={(e) => setDraft(e.target.value)}
               placeholder="🪄 위의 AI 초안 생성 버튼을 누르면 사용자 자산을 인용한 맞춤형 제안서 초안이 채워집니다. 필요 시 자유 편집 후 저장."
-              className="mt-1 w-full rounded-md border border-neutral-800 bg-neutral-950 px-3 py-2 text-sm text-neutral-100 outline-none focus:border-neutral-500"
+              className="mt-1 w-full rounded-md border border-neutral-700 bg-neutral-950 px-3 py-2 text-sm text-neutral-100 outline-none focus:border-neutral-500"
             />
           </label>
           <label className="block">
@@ -403,7 +403,7 @@ export function ApplicationPanel({
               min={0}
               value={budget}
               onChange={(e) => setBudget(e.target.value)}
-              className="mt-1 w-full rounded-md border border-neutral-800 bg-neutral-950 px-3 py-2 text-sm text-neutral-100 outline-none focus:border-neutral-500"
+              className="mt-1 w-full rounded-md border border-neutral-700 bg-neutral-950 px-3 py-2 text-sm text-neutral-100 outline-none focus:border-neutral-500"
             />
           </label>
           <label className="block">
@@ -415,7 +415,7 @@ export function ApplicationPanel({
               min={0}
               value={duration}
               onChange={(e) => setDuration(e.target.value)}
-              className="mt-1 w-full rounded-md border border-neutral-800 bg-neutral-950 px-3 py-2 text-sm text-neutral-100 outline-none focus:border-neutral-500"
+              className="mt-1 w-full rounded-md border border-neutral-700 bg-neutral-950 px-3 py-2 text-sm text-neutral-100 outline-none focus:border-neutral-500"
             />
           </label>
           <label className="block sm:col-span-2">
@@ -427,7 +427,7 @@ export function ApplicationPanel({
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               placeholder="이 프로젝트만의 어필 포인트·차별화 각도·주의 사항을 남기세요 (예: '개인정보 강조 · AI 홍변 v3 매칭'). AI 초안 생성 시 자동 반영됩니다."
-              className="mt-1 w-full rounded-md border border-neutral-800 bg-neutral-950 px-3 py-2 text-sm text-neutral-100 outline-none focus:border-neutral-500"
+              className="mt-1 w-full rounded-md border border-neutral-700 bg-neutral-950 px-3 py-2 text-sm text-neutral-100 outline-none focus:border-neutral-500"
             />
           </label>
         </div>

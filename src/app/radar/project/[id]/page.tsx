@@ -107,7 +107,7 @@ export default async function ProjectDetailPage({ params }: PageProps) {
         </Link>
       </div>
 
-      <header className="space-y-3 rounded-xl border border-neutral-800 bg-neutral-900/40 p-5">
+      <header className="space-y-3 rounded-xl border border-neutral-700 bg-neutral-900/40 p-5">
         <div className="flex flex-wrap items-center gap-2">
           <span
             className={`inline-flex items-center rounded px-2 py-0.5 text-xs font-semibold ${scoreTone(score)}`}
@@ -162,13 +162,13 @@ export default async function ProjectDetailPage({ params }: PageProps) {
       </header>
 
       {breakdown && (
-        <section className="space-y-2 rounded-xl border border-neutral-800 bg-neutral-900/30 p-4">
+        <section className="space-y-2 rounded-xl border border-neutral-700 bg-neutral-900/30 p-4">
           <h2 className="text-sm font-medium text-neutral-300">정합도 근거</h2>
           <div className="flex flex-wrap gap-2 text-xs">
             {Object.entries(breakdown).map(([k, v]) => (
               <span
                 key={k}
-                className={`rounded border border-neutral-800 px-2 py-1 ${
+                className={`rounded border border-neutral-700 px-2 py-1 ${
                   v > 0
                     ? "text-emerald-300"
                     : v < 0
@@ -184,13 +184,13 @@ export default async function ProjectDetailPage({ params }: PageProps) {
       )}
 
       {project.skills && project.skills.length > 0 && (
-        <section className="space-y-2 rounded-xl border border-neutral-800 bg-neutral-900/30 p-4">
+        <section className="space-y-2 rounded-xl border border-neutral-700 bg-neutral-900/30 p-4">
           <h2 className="text-sm font-medium text-neutral-300">기술 스택</h2>
           <div className="flex flex-wrap gap-2 text-xs">
             {project.skills.map((s) => (
               <span
                 key={s}
-                className="rounded border border-neutral-800 px-2 py-1 text-neutral-300"
+                className="rounded border border-neutral-700 px-2 py-1 text-neutral-300"
               >
                 {s}
               </span>
@@ -200,7 +200,7 @@ export default async function ProjectDetailPage({ params }: PageProps) {
       )}
 
       {project.description && (
-        <section className="space-y-2 rounded-xl border border-neutral-800 bg-neutral-900/30 p-4">
+        <section className="space-y-2 rounded-xl border border-neutral-700 bg-neutral-900/30 p-4">
           <h2 className="text-sm font-medium text-neutral-300">설명</h2>
           <p className="whitespace-pre-wrap text-sm text-neutral-300">
             {project.description}

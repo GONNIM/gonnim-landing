@@ -141,41 +141,41 @@ export default async function BusinessIdeasPage({
       />
 
       {rows.length === 0 ? (
-        <div className="rounded-xl border border-dashed border-neutral-800 bg-neutral-900/30 p-8 text-center">
+        <div className="rounded-xl border border-dashed border-neutral-700 bg-neutral-900/30 p-8 text-center">
           <p className="text-sm text-neutral-400">
             조건에 맞는 사업 아이템이 없습니다.
           </p>
-          <p className="mt-2 text-xs text-neutral-500">
+          <p className="mt-2 text-sm text-neutral-500">
             자동 분석 배치가 매일 15:00 KST 실행됩니다. 개별 프로젝트에서 수동
             분석도 가능합니다.
           </p>
         </div>
       ) : (
-        <ul className="grid gap-3 sm:grid-cols-2">
+        <ul className="grid gap-4 sm:grid-cols-2">
           {rows.map((r) => {
             const p = r.projects!;
             return (
               <li
                 key={r.id}
-                className="rounded-xl border border-neutral-800 bg-neutral-900/40 p-4 transition hover:border-neutral-600"
+                className="rounded-xl border border-neutral-700 bg-neutral-900/40 p-5 transition hover:border-neutral-500"
               >
                 <div className="flex flex-wrap items-center gap-2">
                   {r.business_grade && (
                     <span
-                      className={`inline-flex items-center rounded px-2 py-1 text-xs font-semibold ${GRADE_STYLE[r.business_grade] ?? ""}`}
+                      className={`inline-flex items-center rounded px-2 py-0.5 text-xs font-semibold ${GRADE_STYLE[r.business_grade] ?? ""}`}
                     >
                       등급 {r.business_grade}
                     </span>
                   )}
                   {r.competition_level && (
                     <span
-                      className={`inline-flex items-center rounded px-2 py-1 text-xs font-semibold ${COMPETITION_STYLE[r.competition_level] ?? ""}`}
+                      className={`inline-flex items-center rounded px-2 py-0.5 text-xs font-semibold ${COMPETITION_STYLE[r.competition_level] ?? ""}`}
                     >
                       {COMPETITION_LABEL[r.competition_level] ?? r.competition_level}
                     </span>
                   )}
                   {r.sprint_status && (
-                    <span className="rounded border border-neutral-700 bg-neutral-950 px-2 py-1 text-[11px] text-neutral-300">
+                    <span className="rounded bg-neutral-800/60 px-2 py-0.5 text-xs text-neutral-300">
                       {SPRINT_STATUS_LABEL[r.sprint_status] ?? r.sprint_status}
                     </span>
                   )}
@@ -186,7 +186,7 @@ export default async function BusinessIdeasPage({
                 >
                   {p.title}
                 </Link>
-                <p className="mt-2 text-xs text-neutral-500">
+                <p className="mt-2 max-w-xl text-sm leading-6 text-neutral-500">
                   {CHANNEL_LABEL[p.channel] ?? p.channel} ·{" "}
                   {p.category ?? "카테고리 -"} · 예산{" "}
                   {p.budget_min
@@ -197,7 +197,7 @@ export default async function BusinessIdeasPage({
                     : ""}{" "}
                   · {p.duration_days ?? "-"}일
                 </p>
-                <p className="mt-2 text-[11px] text-neutral-600">
+                <p className="mt-2 text-xs text-neutral-600">
                   분석 완료 {formatDate(r.insight_generated_at)}
                   {r.sprint_decided_at
                     ? ` · Sprint 결정 ${formatDate(r.sprint_decided_at)}`

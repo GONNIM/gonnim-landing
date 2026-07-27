@@ -166,7 +166,7 @@ export default async function AnalyticsPage() {
       </div>
 
       {/* Revenue tree */}
-      <section className="rounded-xl border border-neutral-800 bg-neutral-900/40 p-6">
+      <section className="rounded-xl border border-neutral-700 bg-neutral-900/40 p-6">
         <div className="flex items-baseline justify-between">
           <h2 className="text-sm font-medium text-neutral-300">
             Q1 매출 트리 (2026-10-06 마감)
@@ -198,7 +198,7 @@ export default async function AnalyticsPage() {
           {APPLICATION_STATUS_ORDER.map((s) => (
             <div
               key={s}
-              className="rounded-lg border border-neutral-800/70 bg-neutral-950 p-3"
+              className="rounded-lg border border-neutral-700/70 bg-neutral-950 p-3"
             >
               <p className="text-xs text-neutral-500">{APPLICATION_STATUS[s]}</p>
               <p className="mt-1 text-lg font-semibold text-neutral-100">
@@ -218,7 +218,7 @@ export default async function AnalyticsPage() {
       {/* Channel breakdown */}
       <section className="space-y-3">
         <h2 className="text-lg font-medium">채널별 통계</h2>
-        <div className="overflow-x-auto rounded-xl border border-neutral-800">
+        <div className="overflow-x-auto rounded-xl border border-neutral-700">
           <table className="min-w-full divide-y divide-neutral-800 text-sm">
             <thead className="bg-neutral-900/60 text-xs uppercase tracking-wide text-neutral-500">
               <tr>
@@ -274,7 +274,7 @@ export default async function AnalyticsPage() {
       <section className="space-y-3">
         <h2 className="text-lg font-medium">최근 활동 (12건)</h2>
         {activity.length === 0 ? (
-          <div className="rounded-xl border border-dashed border-neutral-800 p-8 text-center text-sm text-neutral-500">
+          <div className="rounded-xl border border-dashed border-neutral-700 p-8 text-center text-sm text-neutral-500">
             지원 활동 이력이 아직 없습니다. 프로젝트 상세에서 Funnel 상태를 조작하면 여기에 기록됩니다.
           </div>
         ) : (
@@ -286,7 +286,7 @@ export default async function AnalyticsPage() {
               return (
                 <li
                   key={`${e.app.id}-${e.label}-${i}`}
-                  className="flex items-center justify-between rounded-lg border border-neutral-800/70 bg-neutral-950/70 px-4 py-3"
+                  className="flex items-center justify-between rounded-lg border border-neutral-700/70 bg-neutral-950/70 px-4 py-3"
                 >
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2 text-xs">
@@ -326,7 +326,7 @@ function RateCard({
   note: string;
 }) {
   return (
-    <div className="rounded-lg border border-neutral-800 bg-neutral-950 p-4">
+    <div className="rounded-lg border border-neutral-700 bg-neutral-950 p-4">
       <p className="text-xs text-neutral-500">{label}</p>
       <p className="mt-1 text-2xl font-semibold text-neutral-100">{value}%</p>
       <p className="mt-1 text-xs text-neutral-500">{note}</p>
