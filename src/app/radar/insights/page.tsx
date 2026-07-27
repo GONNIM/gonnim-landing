@@ -41,6 +41,30 @@ type TrendLaunchRow = {
   first_seen_at: string;
 };
 
+type JobPostingRow = {
+  id: string;
+  source: string;
+  external_id: string;
+  external_url: string;
+  title: string;
+  company: string;
+  company_industry: string | null;
+  location: string | null;
+  annual_from: number | null;
+  annual_to: number | null;
+  skill_tags: string[] | null;
+  llm_market_signal: string | null;
+  llm_user_asset_match: string | null;
+  llm_business_grade: string | null;
+  first_seen_at: string;
+};
+
+const JOB_SOURCE_LABEL: Record<string, string> = {
+  wanted: "💼 원티드",
+  jobkorea: "💼 잡코리아",
+  saramin: "💼 사람인",
+};
+
 const SOURCE_LABEL: Record<string, string> = {
   "product-hunt": "🌟 Product Hunt",
   "indie-hackers": "🎯 Indie Hackers",
@@ -120,6 +144,21 @@ export default async function InsightsPage() {
 
   // 최근 7일 IT 트렌드 launches (Product Hunt 등 · P-Insights-Ext)
   const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+
+  // 최근 7일 채용공고 (Q4-Step5 · IT 채용 시장 요구 signal)
+  const { data: jobs } = await supabase
+    .from("job_postings")
+    .select(
+      `id, source, external_id, external_url, title, company, company_industry,
+       location, annual_from, annual_to, skill_tags,
+       llm_market_signal, llm_user_asset_match, llm_business_grade, first_seen_at`,
+    )
+    .gte("first_seen_at", sevenDaysAgo)
+    .in("llm_business_grade", ["A", "B", "C"])
+    .order("first_seen_at", { ascending: false })
+    .limit(15)
+    .returns<JobPostingRow[]>();
+
   const { data: trends } = await supabase
     .from("trend_launches")
     .select(
@@ -422,6 +461,93 @@ export default async function InsightsPage() {
                   <p className="mt-1 text-[10px] text-neutral-600">
                     by {t.author}
                   </p>
+                )}
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+
+      {/* §3.6 · IT 채용 시장 요구 (Q4 · Wanted 채용공고 signal) */}
+      <section className="space-y-3 rounded-xl border border-neutral-800 bg-neutral-900/30 p-5">
+        <div>
+          <h2 className="text-sm font-medium text-neutral-300">
+            💼 IT 채용 시장 요구 (지난 7일 · A/B/C 등급)
+          </h2>
+          <p className="mt-1 text-[11px] text-neutral-500">
+            사용자 아이디어 · 채용공고 주요업무 = 기업이 지금 필요로 하는 것 · LLM 판정 사용자 자산 매치 signal
+          </p>
+        </div>
+        {(jobs ?? []).length === 0 ? (
+          <p className="rounded-md border border-dashed border-neutral-800 bg-neutral-950/40 p-4 text-xs text-neutral-500">
+            매치 채용공고 없음 · 크롤러 09:45 KST · 판정 배치 10:05 KST 대기
+          </p>
+        ) : (
+          <ul className="space-y-3">
+            {(jobs ?? []).map((j) => (
+              <li
+                key={j.id}
+                className="rounded-lg border border-neutral-800 bg-neutral-950/40 p-4 transition hover:border-neutral-600"
+              >
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="rounded bg-neutral-800 px-1.5 py-0.5 text-[10px] text-neutral-300">
+                    {JOB_SOURCE_LABEL[j.source] ?? j.source}
+                  </span>
+                  {j.llm_business_grade && (
+                    <span
+                      className={`rounded px-1.5 py-0.5 text-[10px] font-semibold ${GRADE_STYLE[j.llm_business_grade] ?? ""}`}
+                    >
+                      등급 {j.llm_business_grade}
+                    </span>
+                  )}
+                  <span className="text-[11px] text-neutral-400">
+                    {j.company}
+                    {j.company_industry && (
+                      <span className="text-neutral-600"> · {j.company_industry}</span>
+                    )}
+                  </span>
+                  {j.annual_from != null && j.annual_to != null && (
+                    <span className="text-[10px] text-neutral-600">
+                      {j.annual_from}~{j.annual_to}만원
+                    </span>
+                  )}
+                </div>
+                <a
+                  href={j.external_url}
+                  target="_blank"
+                  rel="noreferrer noopener"
+                  className="mt-2 block text-sm font-medium text-neutral-100 hover:text-white"
+                >
+                  {j.title}
+                </a>
+                {j.llm_market_signal && (
+                  <p className="mt-2 text-[12px] text-neutral-300">
+                    <span className="text-neutral-500">시장 signal · </span>
+                    {j.llm_market_signal}
+                  </p>
+                )}
+                {j.llm_user_asset_match && (
+                  <p className="mt-1 text-[12px] text-neutral-400">
+                    <span className="text-neutral-500">자산 매치 · </span>
+                    {j.llm_user_asset_match}
+                  </p>
+                )}
+                {j.skill_tags && j.skill_tags.length > 0 && (
+                  <div className="mt-2 flex flex-wrap gap-1">
+                    {j.skill_tags.slice(0, 8).map((tag) => (
+                      <span
+                        key={tag}
+                        className="rounded border border-neutral-800 bg-neutral-950 px-1.5 py-0.5 text-[10px] text-neutral-400"
+                      >
+                        {tag}
+                      </span>
+                    ))}
+                    {j.skill_tags.length > 8 && (
+                      <span className="text-[10px] text-neutral-600">
+                        +{j.skill_tags.length - 8}
+                      </span>
+                    )}
+                  </div>
                 )}
               </li>
             ))}
