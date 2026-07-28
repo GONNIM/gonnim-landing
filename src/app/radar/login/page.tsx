@@ -3,13 +3,12 @@
 "use client";
 
 import { Suspense, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { getBrowserClient } from "@/lib/supabase/browser";
 
 type Mode = "magic" | "password";
 
 function LoginForm() {
-  const router = useRouter();
   const search = useSearchParams();
   const next = search.get("next") ?? "/radar";
 
@@ -66,8 +65,8 @@ function LoginForm() {
       return;
     }
 
-    router.push(next);
-    router.refresh();
+    // Full page reload · RSC prefetch cache 우회 (router.push는 stale redirect 재사용 가능)
+    window.location.assign(next);
   }
 
   async function onSignup(e: React.FormEvent) {
@@ -122,8 +121,8 @@ function LoginForm() {
     }
 
     setSignupOpen(false);
-    router.push(next);
-    router.refresh();
+    // Full page reload · RSC prefetch cache 우회
+    window.location.assign(next);
   }
 
   return (
