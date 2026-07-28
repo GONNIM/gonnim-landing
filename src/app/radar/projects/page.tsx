@@ -100,7 +100,7 @@ export default async function ProjectsPage({
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">프로젝트</h1>
-        <p className="mt-1 text-sm text-neutral-400">
+        <p className="mt-1 text-sm text-muted-foreground">
           전체 {count ?? 0}건 · 표시 {rows.length}건 · 페이지 {page}/{totalPages}
         </p>
       </div>
@@ -113,9 +113,9 @@ export default async function ProjectsPage({
         sortKey={sortKey}
       />
 
-      <ul className="divide-y divide-neutral-800/60 rounded-xl border border-neutral-800 bg-neutral-900/30">
+      <ul className="divide-y divide-[color:var(--border)]/70/60 rounded-xl border border-[color:var(--border)]/70 bg-surface/30">
         {rows.length === 0 ? (
-          <li className="p-8 text-center text-sm text-neutral-500">
+          <li className="p-8 text-center text-sm text-muted">
             조건에 맞는 프로젝트가 없습니다.
           </li>
         ) : (
@@ -129,7 +129,7 @@ export default async function ProjectsPage({
                     >
                       ★ {p.relevance}/10
                     </span>
-                    <span className="text-xs uppercase tracking-wide text-neutral-500">
+                    <span className="text-xs uppercase tracking-wide text-muted">
                       {CHANNEL_LABEL[p.channel] ?? p.channel}
                     </span>
                     {p.contract_type && (
@@ -137,23 +137,23 @@ export default async function ProjectsPage({
                         className={`rounded px-1.5 py-0.5 text-[10px] uppercase tracking-wide ${
                           p.contract_type === "outsourcing"
                             ? "bg-emerald-950 text-emerald-300"
-                            : "bg-neutral-800 text-neutral-400"
+                            : "bg-[color:var(--muted)]/20 text-muted-foreground"
                         }`}
                       >
                         {CONTRACT_LABEL[p.contract_type] ?? p.contract_type}
                       </span>
                     )}
-                    <span className="text-[10px] uppercase tracking-wide text-neutral-500">
+                    <span className="text-[10px] uppercase tracking-wide text-muted">
                       {formatDate(p.first_seen_at)} 수집
                     </span>
                   </div>
                   <Link
                     href={`/radar/project/${p.id}`}
-                    className="mt-1 block truncate text-base font-medium text-neutral-100 hover:text-white"
+                    className="mt-1 block truncate text-base font-medium text-foreground hover:text-white"
                   >
                     {p.title}
                   </Link>
-                  <p className="mt-1 text-xs text-neutral-500">
+                  <p className="mt-1 text-xs text-muted">
                     {p.category ?? "카테고리 -"} · 예산 {formatKRW(p.budget_min)}
                     {p.budget_max && p.budget_max !== p.budget_min
                       ? ` ~ ${formatKRW(p.budget_max)}`
@@ -166,7 +166,7 @@ export default async function ProjectsPage({
                   href={p.external_url}
                   target="_blank"
                   rel="noreferrer noopener"
-                  className="shrink-0 rounded-md border border-neutral-700 px-3 py-1.5 text-xs text-neutral-300 hover:border-neutral-500 hover:text-neutral-100"
+                  className="shrink-0 rounded-md border border-[color:var(--border)] px-3 py-1.5 text-xs text-foreground/85 hover:border-[color:var(--accent)] hover:text-foreground"
                 >
                   원 페이지 ↗
                 </a>
@@ -208,7 +208,7 @@ function FilterBar({
     <form
       action="/radar/projects"
       method="get"
-      className="grid gap-3 rounded-xl border border-neutral-800 bg-neutral-900/40 p-4 sm:grid-cols-2 lg:grid-cols-5"
+      className="grid gap-3 rounded-xl border border-[color:var(--border)]/70 bg-surface/40 p-4 sm:grid-cols-2 lg:grid-cols-5"
     >
       <Select name="channel" label="채널" value={channel ?? ""}>
         <option value="">전체</option>
@@ -253,7 +253,7 @@ function FilterBar({
       <div className="col-span-full flex justify-end">
         <button
           type="submit"
-          className="rounded-md bg-neutral-100 px-4 py-2 text-xs font-medium text-neutral-900 hover:bg-white"
+          className="rounded-md bg-foreground px-4 py-2 text-xs font-medium text-background hover:bg-foreground/90"
         >
           적용
         </button>
@@ -275,13 +275,13 @@ function Select({
 }) {
   return (
     <label className="block">
-      <span className="text-xs uppercase tracking-wide text-neutral-500">
+      <span className="text-xs uppercase tracking-wide text-muted">
         {label}
       </span>
       <select
         name={name}
         defaultValue={value}
-        className="mt-1 w-full rounded-md border border-neutral-800 bg-neutral-950 px-3 py-2 text-sm text-neutral-100 outline-none focus:border-neutral-500"
+        className="mt-1 w-full rounded-md border border-[color:var(--border)]/70 bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-neutral-500"
       >
         {children}
       </select>
@@ -320,13 +320,13 @@ function Pagination({
   next.set("page", String(Math.min(totalPages, page + 1)));
 
   return (
-    <div className="flex items-center justify-between text-xs text-neutral-500">
+    <div className="flex items-center justify-between text-xs text-muted">
       <Link
         href={`/radar/projects?${prev.toString()}`}
-        className={`rounded-md border border-neutral-700 px-3 py-1.5 ${
+        className={`rounded-md border border-[color:var(--border)] px-3 py-1.5 ${
           page <= 1
             ? "pointer-events-none opacity-40"
-            : "hover:border-neutral-500 hover:text-neutral-200"
+            : "hover:border-[color:var(--accent)] hover:text-foreground"
         }`}
       >
         ← 이전
@@ -336,10 +336,10 @@ function Pagination({
       </span>
       <Link
         href={`/radar/projects?${next.toString()}`}
-        className={`rounded-md border border-neutral-700 px-3 py-1.5 ${
+        className={`rounded-md border border-[color:var(--border)] px-3 py-1.5 ${
           page >= totalPages
             ? "pointer-events-none opacity-40"
-            : "hover:border-neutral-500 hover:text-neutral-200"
+            : "hover:border-[color:var(--accent)] hover:text-foreground"
         }`}
       >
         다음 →

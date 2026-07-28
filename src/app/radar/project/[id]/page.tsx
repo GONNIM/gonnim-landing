@@ -84,7 +84,7 @@ export default async function ProjectDetailPage({ params }: PageProps) {
     return (
       <div className="mx-auto max-w-2xl space-y-3">
         <h1 className="text-lg font-semibold text-red-300">DB 오류</h1>
-        <p className="text-sm text-neutral-400">{error.message}</p>
+        <p className="text-sm text-muted-foreground">{error.message}</p>
       </div>
     );
   }
@@ -101,20 +101,20 @@ export default async function ProjectDetailPage({ params }: PageProps) {
       <div>
         <Link
           href="/radar/projects"
-          className="text-xs text-neutral-500 hover:text-neutral-300"
+          className="text-xs text-muted hover:text-foreground/85"
         >
           ← 프로젝트 리스트
         </Link>
       </div>
 
-      <header className="space-y-3 rounded-xl border border-neutral-700 bg-neutral-900/40 p-5">
+      <header className="space-y-3 rounded-xl border border-[color:var(--border)] bg-surface/40 p-5">
         <div className="flex flex-wrap items-center gap-2">
           <span
             className={`inline-flex items-center rounded px-2 py-0.5 text-xs font-semibold ${scoreTone(score)}`}
           >
             ★ {score}/10
           </span>
-          <span className="text-xs uppercase tracking-wide text-neutral-500">
+          <span className="text-xs uppercase tracking-wide text-muted">
             {CHANNEL_LABEL[project.channel] ?? project.channel}
           </span>
           {project.contract_type && (
@@ -122,22 +122,22 @@ export default async function ProjectDetailPage({ params }: PageProps) {
               className={`rounded px-1.5 py-0.5 text-[10px] uppercase tracking-wide ${
                 project.contract_type === "outsourcing"
                   ? "bg-emerald-950 text-emerald-300"
-                  : "bg-neutral-800 text-neutral-400"
+                  : "bg-[color:var(--muted)]/20 text-muted-foreground"
               }`}
             >
               {CONTRACT_LABEL[project.contract_type] ?? project.contract_type}
             </span>
           )}
           {project.work_type && (
-            <span className="rounded bg-neutral-800 px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-neutral-300">
+            <span className="rounded bg-[color:var(--muted)]/20 px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-foreground/85">
               {WORK_TYPE_LABEL[project.work_type] ?? project.work_type}
             </span>
           )}
         </div>
-        <h1 className="text-2xl font-semibold text-neutral-100">
+        <h1 className="text-2xl font-semibold text-foreground">
           {project.title}
         </h1>
-        <p className="text-sm text-neutral-400">
+        <p className="text-sm text-muted-foreground">
           {project.category ?? "카테고리 -"} · 예산 {formatKRW(project.budget_min)}
           {project.budget_max && project.budget_max !== project.budget_min
             ? ` ~ ${formatKRW(project.budget_max)}`
@@ -145,7 +145,7 @@ export default async function ProjectDetailPage({ params }: PageProps) {
           · 기간 {project.duration_days ?? "-"}일 · 지원자{" "}
           {project.applicants_count ?? 0}명 · {project.location ?? "-"}
         </p>
-        <p className="text-xs text-neutral-500">
+        <p className="text-xs text-muted">
           첫 수집 {formatDate(project.first_seen_at)} · 마지막 감지{" "}
           {formatDate(project.last_seen_at)} · 마감 {formatDate(project.deadline_at)}
         </p>
@@ -154,7 +154,7 @@ export default async function ProjectDetailPage({ params }: PageProps) {
             href={project.external_url}
             target="_blank"
             rel="noreferrer noopener"
-            className="inline-flex items-center rounded-md border border-neutral-700 px-3 py-1.5 text-xs text-neutral-200 hover:border-neutral-500 hover:text-white"
+            className="inline-flex items-center rounded-md border border-[color:var(--border)] px-3 py-1.5 text-xs text-foreground hover:border-[color:var(--accent)] hover:text-white"
           >
             원 프로젝트 페이지 ↗
           </a>
@@ -162,18 +162,18 @@ export default async function ProjectDetailPage({ params }: PageProps) {
       </header>
 
       {breakdown && (
-        <section className="space-y-2 rounded-xl border border-neutral-700 bg-neutral-900/30 p-4">
-          <h2 className="text-sm font-medium text-neutral-300">정합도 근거</h2>
+        <section className="space-y-2 rounded-xl border border-[color:var(--border)] bg-surface/30 p-4">
+          <h2 className="text-sm font-medium text-foreground/85">정합도 근거</h2>
           <div className="flex flex-wrap gap-2 text-xs">
             {Object.entries(breakdown).map(([k, v]) => (
               <span
                 key={k}
-                className={`rounded border border-neutral-700 px-2 py-1 ${
+                className={`rounded border border-[color:var(--border)] px-2 py-1 ${
                   v > 0
                     ? "text-emerald-300"
                     : v < 0
                       ? "text-red-300"
-                      : "text-neutral-400"
+                      : "text-muted-foreground"
                 }`}
               >
                 {k} {v > 0 ? `+${v}` : v}
@@ -184,13 +184,13 @@ export default async function ProjectDetailPage({ params }: PageProps) {
       )}
 
       {project.skills && project.skills.length > 0 && (
-        <section className="space-y-2 rounded-xl border border-neutral-700 bg-neutral-900/30 p-4">
-          <h2 className="text-sm font-medium text-neutral-300">기술 스택</h2>
+        <section className="space-y-2 rounded-xl border border-[color:var(--border)] bg-surface/30 p-4">
+          <h2 className="text-sm font-medium text-foreground/85">기술 스택</h2>
           <div className="flex flex-wrap gap-2 text-xs">
             {project.skills.map((s) => (
               <span
                 key={s}
-                className="rounded border border-neutral-700 px-2 py-1 text-neutral-300"
+                className="rounded border border-[color:var(--border)] px-2 py-1 text-foreground/85"
               >
                 {s}
               </span>
@@ -200,9 +200,9 @@ export default async function ProjectDetailPage({ params }: PageProps) {
       )}
 
       {project.description && (
-        <section className="space-y-2 rounded-xl border border-neutral-700 bg-neutral-900/30 p-4">
-          <h2 className="text-sm font-medium text-neutral-300">설명</h2>
-          <p className="whitespace-pre-wrap text-sm text-neutral-300">
+        <section className="space-y-2 rounded-xl border border-[color:var(--border)] bg-surface/30 p-4">
+          <h2 className="text-sm font-medium text-foreground/85">설명</h2>
+          <p className="whitespace-pre-wrap text-sm text-foreground/85">
             {project.description}
           </p>
         </section>

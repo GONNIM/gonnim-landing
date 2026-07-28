@@ -83,7 +83,7 @@ const GRADE_STYLE: Record<string, string> = {
   A: "bg-emerald-950 text-emerald-300",
   B: "bg-sky-950 text-sky-300",
   C: "bg-amber-950 text-amber-300",
-  D: "bg-neutral-800 text-neutral-400",
+  D: "bg-[color:var(--muted)]/20 text-muted-foreground",
 };
 
 const COMP_STYLE: Record<string, string> = {
@@ -174,7 +174,7 @@ export default async function InsightsPage() {
     return (
       <div className="mx-auto max-w-2xl space-y-3">
         <h1 className="text-lg font-semibold text-red-300">DB 오류</h1>
-        <p className="text-sm text-neutral-400">
+        <p className="text-sm text-muted-foreground">
           {projErr?.message ?? appErr?.message}
         </p>
       </div>
@@ -263,7 +263,7 @@ export default async function InsightsPage() {
         <h1 className="text-2xl font-semibold tracking-tight">
           🔍 시장 인텔리전스
         </h1>
-        <p className="mt-1 text-sm text-neutral-400">
+        <p className="mt-1 text-sm text-muted-foreground">
           트렌드 · 시장 pain · 사업 아이템 후보 요약 · 통계 · 분석 (원본 링크
           포함) · 사용자 Q10 정의
         </p>
@@ -279,12 +279,12 @@ export default async function InsightsPage() {
       </section>
 
       {/* §2 · 주간 트렌드 (채널 stacked bar · ASCII) */}
-      <section className="space-y-3 rounded-xl border border-neutral-800 bg-neutral-900/30 p-5">
+      <section className="space-y-3 rounded-xl border border-[color:var(--border)]/70 bg-surface/30 p-5">
         <div>
-          <h2 className="text-sm font-medium text-neutral-300">
+          <h2 className="text-sm font-medium text-foreground/85">
             📈 주간 트렌드 · 신규 프로젝트 (지난 4주)
           </h2>
-          <p className="mt-1 text-[11px] text-neutral-500">
+          <p className="mt-1 text-[11px] text-muted">
             월요일 기준 주 경계 · 채널별 stacked
           </p>
         </div>
@@ -293,9 +293,9 @@ export default async function InsightsPage() {
             const total = Object.values(w.byChannel).reduce((a, b) => a + b, 0);
             return (
               <div key={w.label} className="flex items-center gap-3 text-xs">
-                <span className="w-16 text-neutral-500">{w.label}~</span>
+                <span className="w-16 text-muted">{w.label}~</span>
                 <div className="flex-1">
-                  <div className="flex h-5 overflow-hidden rounded bg-neutral-950">
+                  <div className="flex h-5 overflow-hidden rounded bg-background">
                     {Object.entries(w.byChannel).map(([ch, n]) => {
                       const pct = (n / trendMax) * 100;
                       const bg =
@@ -317,12 +317,12 @@ export default async function InsightsPage() {
                     })}
                   </div>
                 </div>
-                <span className="w-10 text-right text-neutral-400">{total}</span>
+                <span className="w-10 text-right text-muted-foreground">{total}</span>
               </div>
             );
           })}
         </div>
-        <div className="flex flex-wrap gap-3 pt-1 text-[10px] text-neutral-500">
+        <div className="flex flex-wrap gap-3 pt-1 text-[10px] text-muted">
           <span className="flex items-center gap-1">
             <span className="inline-block h-2 w-2 bg-emerald-800"></span> 원티드
             긱스
@@ -334,13 +334,13 @@ export default async function InsightsPage() {
       </section>
 
       {/* §3 · 사업 아이템 요약 (Top 5) */}
-      <section className="space-y-3 rounded-xl border border-neutral-800 bg-neutral-900/30 p-5">
+      <section className="space-y-3 rounded-xl border border-[color:var(--border)]/70 bg-surface/30 p-5">
         <div className="flex items-center justify-between">
           <div>
-            <h2 className="text-sm font-medium text-neutral-300">
+            <h2 className="text-sm font-medium text-foreground/85">
               🔥 사업 아이템 요약 (A·B 등급 Top 5)
             </h2>
-            <p className="mt-1 text-[11px] text-neutral-500">
+            <p className="mt-1 text-[11px] text-muted">
               전체 큐레이션 →{" "}
               <Link
                 href="/radar/business-ideas"
@@ -352,11 +352,11 @@ export default async function InsightsPage() {
           </div>
         </div>
         {topIdeas.length === 0 ? (
-          <p className="rounded-md border border-dashed border-neutral-800 bg-neutral-950/40 p-4 text-xs text-neutral-500">
+          <p className="rounded-md border border-dashed border-[color:var(--border)]/70 bg-background/40 p-4 text-xs text-muted">
             사업화 분석 완료된 A·B 등급 프로젝트 없음
           </p>
         ) : (
-          <ul className="divide-y divide-neutral-800/60">
+          <ul className="divide-y divide-[color:var(--border)]/70/60">
             {topIdeas.map((a) => {
               const p = a.projects;
               if (!p) return null;
@@ -378,21 +378,21 @@ export default async function InsightsPage() {
                       </span>
                     )}
                     {a.sprint_status && (
-                      <span className="rounded border border-neutral-700 bg-neutral-950 px-1.5 py-0.5 text-[10px] text-neutral-300">
+                      <span className="rounded border border-[color:var(--border)] bg-background px-1.5 py-0.5 text-[10px] text-foreground/85">
                         {SPRINT_LABEL[a.sprint_status] ?? a.sprint_status}
                       </span>
                     )}
-                    <span className="text-[10px] uppercase tracking-wide text-neutral-500">
+                    <span className="text-[10px] uppercase tracking-wide text-muted">
                       {CHANNEL_LABEL[p.channel] ?? p.channel}
                     </span>
                   </div>
                   <Link
                     href={`/radar/project/${a.project_id}`}
-                    className="mt-1 block truncate text-sm text-neutral-100 hover:text-white"
+                    className="mt-1 block truncate text-sm text-foreground hover:text-white"
                   >
                     {p.title}
                   </Link>
-                  <p className="mt-1 text-[11px] text-neutral-500">
+                  <p className="mt-1 text-[11px] text-muted">
                     {p.category ?? "카테고리 -"} · 분석{" "}
                     {formatDate(a.insight_generated_at)}
                   </p>
@@ -404,17 +404,17 @@ export default async function InsightsPage() {
       </section>
 
       {/* §3.5 · 최근 IT 트렌드 launches (Product Hunt 등) */}
-      <section className="space-y-3 rounded-xl border border-neutral-800 bg-neutral-900/30 p-5">
+      <section className="space-y-3 rounded-xl border border-[color:var(--border)]/70 bg-surface/30 p-5">
         <div>
-          <h2 className="text-sm font-medium text-neutral-300">
+          <h2 className="text-sm font-medium text-foreground/85">
             🌟 최근 IT 트렌드 (지난 7일)
           </h2>
-          <p className="mt-1 text-[11px] text-neutral-500">
+          <p className="mt-1 text-[11px] text-muted">
             Product Hunt 등 원천 자동 수집 · Wiki `Thoughts/Trends/` 저장 · 원본 링크 포함
           </p>
         </div>
         {(trends ?? []).length === 0 ? (
-          <p className="rounded-md border border-dashed border-neutral-800 bg-neutral-950/40 p-4 text-xs text-neutral-500">
+          <p className="rounded-md border border-dashed border-[color:var(--border)]/70 bg-background/40 p-4 text-xs text-muted">
             트렌드 launch 없음 · 크롤러 09:30 KST 자동 실행 대기
           </p>
         ) : (
@@ -422,10 +422,10 @@ export default async function InsightsPage() {
             {(trends ?? []).map((t) => (
               <li
                 key={t.id}
-                className="rounded-lg border border-neutral-800 bg-neutral-950/40 p-3 transition hover:border-neutral-600"
+                className="rounded-lg border border-[color:var(--border)]/70 bg-background/40 p-3 transition hover:border-[color:var(--accent)]"
               >
                 <div className="flex flex-wrap items-center gap-2">
-                  <span className="rounded bg-neutral-800 px-1.5 py-0.5 text-[10px] text-neutral-300">
+                  <span className="rounded bg-[color:var(--muted)]/20 px-1.5 py-0.5 text-[10px] text-foreground/85">
                     {SOURCE_LABEL[t.source] ?? t.source}
                   </span>
                   {t.llm_business_grade && (
@@ -440,7 +440,7 @@ export default async function InsightsPage() {
                       💡 Ideas 승격
                     </span>
                   )}
-                  <span className="text-[10px] text-neutral-600">
+                  <span className="text-[10px] text-muted/70">
                     {formatDate(t.published_at)}
                   </span>
                 </div>
@@ -448,17 +448,17 @@ export default async function InsightsPage() {
                   href={t.external_url}
                   target="_blank"
                   rel="noreferrer noopener"
-                  className="mt-1.5 block truncate text-sm font-medium text-neutral-100 hover:text-white"
+                  className="mt-1.5 block truncate text-sm font-medium text-foreground hover:text-white"
                 >
                   {t.title}
                 </a>
                 {t.tagline && (
-                  <p className="mt-1 line-clamp-2 text-[11px] text-neutral-400">
+                  <p className="mt-1 line-clamp-2 text-[11px] text-muted-foreground">
                     {t.tagline}
                   </p>
                 )}
                 {t.author && (
-                  <p className="mt-1 text-[10px] text-neutral-600">
+                  <p className="mt-1 text-[10px] text-muted/70">
                     by {t.author}
                   </p>
                 )}
@@ -469,17 +469,17 @@ export default async function InsightsPage() {
       </section>
 
       {/* §3.6 · IT 채용 시장 요구 (Q4 · Wanted 채용공고 signal · 28 규칙 · C안 적용) */}
-      <section className="space-y-4 rounded-xl border border-neutral-700 bg-neutral-900/30 p-6">
+      <section className="space-y-4 rounded-xl border border-[color:var(--border)] bg-surface/30 p-6">
         <div>
-          <h2 className="text-base font-medium text-neutral-200">
+          <h2 className="text-base font-medium text-foreground">
             💼 IT 채용 시장 요구 (지난 7일 · A/B/C 등급)
           </h2>
-          <p className="mt-1 text-sm text-neutral-500">
+          <p className="mt-1 text-sm text-muted">
             채용공고 주요업무 = 기업이 지금 필요로 하는 것 · LLM 판정 사용자 자산 매치 signal
           </p>
         </div>
         {(jobs ?? []).length === 0 ? (
-          <p className="rounded-md border border-dashed border-neutral-700 bg-neutral-950/40 p-4 text-sm text-neutral-500">
+          <p className="rounded-md border border-dashed border-[color:var(--border)] bg-background/40 p-4 text-sm text-muted">
             매치 채용공고 없음 · 크롤러 09:45 KST · 판정 배치 10:05 KST 대기
           </p>
         ) : (
@@ -487,10 +487,10 @@ export default async function InsightsPage() {
             {(jobs ?? []).map((j) => (
               <li
                 key={j.id}
-                className="rounded-lg border border-neutral-700 bg-neutral-950/40 p-5 transition hover:border-neutral-500"
+                className="rounded-lg border border-[color:var(--border)] bg-background/40 p-5 transition hover:border-[color:var(--accent)]"
               >
                 <div className="flex flex-wrap items-center gap-2">
-                  <span className="rounded bg-neutral-800 px-2 py-0.5 text-xs text-neutral-300">
+                  <span className="rounded bg-[color:var(--muted)]/20 px-2 py-0.5 text-xs text-foreground/85">
                     {JOB_SOURCE_LABEL[j.source] ?? j.source}
                   </span>
                   {j.llm_business_grade && (
@@ -500,14 +500,14 @@ export default async function InsightsPage() {
                       등급 {j.llm_business_grade}
                     </span>
                   )}
-                  <span className="text-sm text-neutral-400">
+                  <span className="text-sm text-muted-foreground">
                     {j.company}
                     {j.company_industry && (
-                      <span className="text-neutral-600"> · {j.company_industry}</span>
+                      <span className="text-muted/70"> · {j.company_industry}</span>
                     )}
                   </span>
                   {j.annual_from != null && j.annual_to != null && (
-                    <span className="text-xs text-neutral-600">
+                    <span className="text-xs text-muted/70">
                       {j.annual_from}~{j.annual_to}만원
                     </span>
                   )}
@@ -516,20 +516,20 @@ export default async function InsightsPage() {
                   href={j.external_url}
                   target="_blank"
                   rel="noreferrer noopener"
-                  className="mt-3 block text-base font-medium text-neutral-100 hover:text-white"
+                  className="mt-3 block text-base font-medium text-foreground hover:text-white"
                 >
                   {j.title}
                 </a>
                 <div className="mt-3 max-w-3xl space-y-2">
                   {j.llm_market_signal && (
-                    <p className="text-sm leading-6 text-neutral-300">
-                      <span className="text-neutral-500">시장 signal · </span>
+                    <p className="text-sm leading-6 text-foreground/85">
+                      <span className="text-muted">시장 signal · </span>
                       {j.llm_market_signal}
                     </p>
                   )}
                   {j.llm_user_asset_match && (
-                    <p className="text-sm leading-6 text-neutral-400">
-                      <span className="text-neutral-500">자산 매치 · </span>
+                    <p className="text-sm leading-6 text-muted-foreground">
+                      <span className="text-muted">자산 매치 · </span>
                       {j.llm_user_asset_match}
                     </p>
                   )}
@@ -539,13 +539,13 @@ export default async function InsightsPage() {
                     {j.skill_tags.slice(0, 8).map((tag) => (
                       <span
                         key={tag}
-                        className="rounded bg-neutral-800/60 px-2 py-0.5 text-xs text-neutral-300"
+                        className="rounded bg-[color:var(--muted)]/30 px-2 py-0.5 text-xs text-foreground/85"
                       >
                         {tag}
                       </span>
                     ))}
                     {j.skill_tags.length > 8 && (
-                      <span className="text-xs text-neutral-600">
+                      <span className="text-xs text-muted/70">
                         +{j.skill_tags.length - 8}
                       </span>
                     )}
@@ -558,12 +558,12 @@ export default async function InsightsPage() {
       </section>
 
       {/* §4 · 카테고리 분포 (Top 10) */}
-      <section className="space-y-3 rounded-xl border border-neutral-800 bg-neutral-900/30 p-5">
+      <section className="space-y-3 rounded-xl border border-[color:var(--border)]/70 bg-surface/30 p-5">
         <div>
-          <h2 className="text-sm font-medium text-neutral-300">
+          <h2 className="text-sm font-medium text-foreground/85">
             🏷 카테고리 분포 (Top 10)
           </h2>
-          <p className="mt-1 text-[11px] text-neutral-500">
+          <p className="mt-1 text-[11px] text-muted">
             프로젝트 수 · A/B 등급 표시 · 다양성 관찰
           </p>
         </div>
@@ -573,13 +573,13 @@ export default async function InsightsPage() {
             return (
               <div key={c.cat} className="flex items-center gap-3 text-xs">
                 <span
-                  className="w-32 truncate text-neutral-400"
+                  className="w-32 truncate text-muted-foreground"
                   title={c.cat}
                 >
                   {c.cat}
                 </span>
                 <div className="flex-1">
-                  <div className="flex h-5 overflow-hidden rounded bg-neutral-950">
+                  <div className="flex h-5 overflow-hidden rounded bg-background">
                     <div
                       className="flex items-center justify-end bg-neutral-700 pr-1 text-[10px] text-white"
                       style={{ width: `${pct}%` }}
@@ -588,7 +588,7 @@ export default async function InsightsPage() {
                     </div>
                   </div>
                 </div>
-                <span className="w-14 text-right text-[10px] text-neutral-500">
+                <span className="w-14 text-right text-[10px] text-muted">
                   {c.a > 0 && <span className="text-emerald-400">A{c.a} </span>}
                   {c.b > 0 && <span className="text-sky-400">B{c.b}</span>}
                 </span>
@@ -598,7 +598,7 @@ export default async function InsightsPage() {
         </div>
       </section>
 
-      <p className="text-[11px] text-neutral-600">
+      <p className="text-[11px] text-muted/70">
         후속: 시장 pain LLM 판정 · Wiki `Trends/`·`Ideas/` 노트 연계 · Phase 확장
       </p>
     </div>
@@ -619,10 +619,10 @@ function Kpi({
       ? "text-emerald-300"
       : tone === "sky"
         ? "text-sky-300"
-        : "text-neutral-100";
+        : "text-foreground";
   return (
-    <div className="rounded-xl border border-neutral-800 bg-neutral-900/30 p-4">
-      <p className="text-[10px] uppercase tracking-wide text-neutral-500">
+    <div className="rounded-xl border border-[color:var(--border)]/70 bg-surface/30 p-4">
+      <p className="text-[10px] uppercase tracking-wide text-muted">
         {label}
       </p>
       <p className={`mt-1 text-2xl font-semibold ${toneClass}`}>{value}</p>

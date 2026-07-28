@@ -16,8 +16,8 @@ export default async function RadarLayout({
   } = await supabase.auth.getUser();
 
   return (
-    <main className="min-h-screen bg-neutral-950 text-neutral-100">
-      <header className="sticky top-0 z-40 border-b border-neutral-800/60 bg-neutral-950/80 backdrop-blur">
+    <main className="min-h-screen bg-background text-foreground">
+      <header className="sticky top-0 z-40 border-b border-[color:var(--border)]/70/60 bg-background/80 backdrop-blur">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
           <div className="flex items-center gap-6">
             <Link
@@ -27,45 +27,45 @@ export default async function RadarLayout({
               Sprint Radar
             </Link>
             {user && (
-              <nav className="flex items-center gap-4 text-sm text-neutral-400">
-                <Link href="/radar" className="hover:text-neutral-100">
+              <nav className="flex items-center gap-4 text-sm text-muted-foreground">
+                <Link href="/radar" className="hover:text-foreground">
                   대시보드
                 </Link>
                 <Link
                   href="/radar/projects"
-                  className="hover:text-neutral-100"
+                  className="hover:text-foreground"
                 >
                   프로젝트
                 </Link>
                 <Link
                   href="/radar/business-ideas"
-                  className="hover:text-neutral-100"
+                  className="hover:text-foreground"
                 >
                   🎯 사업 아이템
                 </Link>
                 <Link
                   href="/radar/insights"
-                  className="hover:text-neutral-100"
+                  className="hover:text-foreground"
                 >
                   🔍 인사이트
                 </Link>
                 <Link
                   href="/radar/analytics"
-                  className="hover:text-neutral-100"
+                  className="hover:text-foreground"
                 >
                   분석
                 </Link>
               </nav>
             )}
           </div>
-          <div className="text-sm text-neutral-400">
+          <div className="text-sm text-muted-foreground">
             {user ? (
               <div className="flex items-center gap-4">
                 <span className="hidden sm:inline">{user.email}</span>
                 <form action="/auth/signout" method="post">
                   <button
                     type="submit"
-                    className="rounded-md border border-neutral-700 px-3 py-1.5 text-xs text-neutral-300 hover:border-neutral-500 hover:text-neutral-100"
+                    className="rounded-md border border-[color:var(--border)] px-3 py-1.5 text-xs text-foreground/85 hover:border-[color:var(--accent)] hover:text-foreground"
                   >
                     로그아웃
                   </button>
@@ -74,7 +74,7 @@ export default async function RadarLayout({
             ) : (
               <Link
                 href="/radar/login"
-                className="rounded-md border border-neutral-700 px-3 py-1.5 text-xs hover:border-neutral-500"
+                className="rounded-md border border-[color:var(--border)] px-3 py-1.5 text-xs hover:border-[color:var(--accent)]"
               >
                 로그인
               </Link>

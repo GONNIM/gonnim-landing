@@ -128,7 +128,7 @@ export default async function RadarHome() {
         <h1 className="text-2xl font-semibold tracking-tight">
           오늘의 프로젝트 레이더
         </h1>
-        <p className="mt-1 text-sm text-neutral-400">
+        <p className="mt-1 text-sm text-muted-foreground">
           정합도 상위 10건 · 재직 병행 조건 (외주·원격) 우선 노출
         </p>
       </section>
@@ -160,18 +160,18 @@ export default async function RadarHome() {
       </section>
 
       {/* Channels */}
-      <section className="rounded-xl border border-neutral-800 bg-neutral-900/40 p-6">
-        <h2 className="text-sm font-medium text-neutral-300">채널 최근 크롤</h2>
+      <section className="rounded-xl border border-[color:var(--border)]/70 bg-surface/40 p-6">
+        <h2 className="text-sm font-medium text-foreground/85">채널 최근 크롤</h2>
         <div className="mt-3 grid gap-3 sm:grid-cols-3">
           {Object.entries(CHANNEL_LABEL).map(([key, label]) => {
             const c = latestByChannel.get(key);
             return (
               <div
                 key={key}
-                className="rounded-lg border border-neutral-800/70 bg-neutral-950 p-3"
+                className="rounded-lg border border-[color:var(--border)]/70/70 bg-background p-3"
               >
-                <p className="text-xs text-neutral-500">{label}</p>
-                <p className="mt-1 text-sm text-neutral-200">
+                <p className="text-xs text-muted">{label}</p>
+                <p className="mt-1 text-sm text-foreground">
                   {c ? (
                     <>
                       +{c.new_projects} · {formatRelativeDate(c.ended_at)}
@@ -180,7 +180,7 @@ export default async function RadarHome() {
                     "미실행"
                   )}
                 </p>
-                <p className="mt-1 text-[10px] uppercase tracking-wide text-neutral-500">
+                <p className="mt-1 text-[10px] uppercase tracking-wide text-muted">
                   {c?.status ?? "waiting"}
                 </p>
               </div>
@@ -193,21 +193,21 @@ export default async function RadarHome() {
       <section className="space-y-3">
         <h2 className="text-lg font-medium">오늘의 프로젝트 Top 10</h2>
         {rows.length === 0 ? (
-          <div className="rounded-xl border border-dashed border-neutral-800 p-8 text-center text-sm text-neutral-500">
+          <div className="rounded-xl border border-dashed border-[color:var(--border)]/70 p-8 text-center text-sm text-muted">
             아직 수집된 프로젝트가 없습니다.<br />
-            <span className="text-neutral-600">
+            <span className="text-muted/70">
               GET /api/cron/crawl-wishket 을 실행해 초기 데이터를 채워주세요.
             </span>
           </div>
         ) : (
-          <ul className="divide-y divide-neutral-800/60 rounded-xl border border-neutral-800 bg-neutral-900/30">
+          <ul className="divide-y divide-[color:var(--border)]/70/60 rounded-xl border border-[color:var(--border)]/70 bg-surface/30">
             {rows.map((p) => (
               <li key={p.id} className="p-4">
                 <div className="flex items-start justify-between gap-4">
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">
                       <ScoreBadge score={p.relevance} />
-                      <span className="text-xs uppercase tracking-wide text-neutral-500">
+                      <span className="text-xs uppercase tracking-wide text-muted">
                         {CHANNEL_LABEL[p.channel] ?? p.channel}
                       </span>
                       {p.contract_type && (
@@ -215,7 +215,7 @@ export default async function RadarHome() {
                           className={`rounded px-1.5 py-0.5 text-[10px] uppercase tracking-wide ${
                             p.contract_type === "outsourcing"
                               ? "bg-emerald-950 text-emerald-300"
-                              : "bg-neutral-800 text-neutral-400"
+                              : "bg-[color:var(--muted)]/20 text-muted-foreground"
                           }`}
                         >
                           {CONTRACT_LABEL[p.contract_type] ?? p.contract_type}
@@ -224,11 +224,11 @@ export default async function RadarHome() {
                     </div>
                     <Link
                       href={`/radar/project/${p.id}`}
-                      className="mt-1 block truncate text-base font-medium text-neutral-100 hover:text-white"
+                      className="mt-1 block truncate text-base font-medium text-foreground hover:text-white"
                     >
                       {p.title}
                     </Link>
-                    <p className="mt-1 text-xs text-neutral-500">
+                    <p className="mt-1 text-xs text-muted">
                       {p.category ?? "카테고리 -"} · 예산 {formatKRW(p.budget_min)}
                       {p.budget_max && p.budget_max !== p.budget_min
                         ? ` ~ ${formatKRW(p.budget_max)}`
@@ -241,7 +241,7 @@ export default async function RadarHome() {
                     href={p.external_url}
                     target="_blank"
                     rel="noreferrer noopener"
-                    className="shrink-0 rounded-md border border-neutral-700 px-3 py-1.5 text-xs text-neutral-300 hover:border-neutral-500 hover:text-neutral-100"
+                    className="shrink-0 rounded-md border border-[color:var(--border)] px-3 py-1.5 text-xs text-foreground/85 hover:border-[color:var(--accent)] hover:text-foreground"
                   >
                     원 페이지 ↗
                   </a>
@@ -262,10 +262,10 @@ export default async function RadarHome() {
           {Object.entries(FUNNEL_LABEL).map(([key, label]) => (
             <div
               key={key}
-              className="rounded-lg border border-neutral-800/70 bg-neutral-950 p-3"
+              className="rounded-lg border border-[color:var(--border)]/70/70 bg-background p-3"
             >
-              <p className="text-xs text-neutral-500">{label}</p>
-              <p className="mt-1 text-lg font-semibold text-neutral-100">
+              <p className="text-xs text-muted">{label}</p>
+              <p className="mt-1 text-lg font-semibold text-foreground">
                 {funnel[key]}
               </p>
             </div>
@@ -286,10 +286,10 @@ function Card({
   hint: string;
 }) {
   return (
-    <div className="rounded-xl border border-neutral-800 bg-neutral-900/40 p-5">
-      <p className="text-xs uppercase tracking-wide text-neutral-500">{label}</p>
-      <p className="mt-2 text-2xl font-semibold text-neutral-100">{value}</p>
-      <p className="mt-1 line-clamp-1 text-xs text-neutral-500">{hint}</p>
+    <div className="rounded-xl border border-[color:var(--border)]/70 bg-surface/40 p-5">
+      <p className="text-xs uppercase tracking-wide text-muted">{label}</p>
+      <p className="mt-2 text-2xl font-semibold text-foreground">{value}</p>
+      <p className="mt-1 line-clamp-1 text-xs text-muted">{hint}</p>
     </div>
   );
 }
@@ -300,7 +300,7 @@ function ScoreBadge({ score }: { score: number }) {
       ? "bg-emerald-500/20 text-emerald-300"
       : score >= 4
         ? "bg-amber-500/20 text-amber-300"
-        : "bg-neutral-800 text-neutral-400";
+        : "bg-[color:var(--muted)]/20 text-muted-foreground";
   return (
     <span
       className={`inline-flex items-center rounded px-1.5 py-0.5 text-[11px] font-semibold ${tone}`}

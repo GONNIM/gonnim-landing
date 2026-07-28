@@ -36,7 +36,7 @@ const GRADE_STYLE: Record<string, string> = {
   A: "bg-emerald-950 text-emerald-300",
   B: "bg-sky-950 text-sky-300",
   C: "bg-amber-950 text-amber-300",
-  D: "bg-neutral-800 text-neutral-400",
+  D: "bg-[color:var(--muted)]/20 text-muted-foreground",
 };
 
 const COMPETITION_STYLE: Record<string, string> = {
@@ -91,7 +91,7 @@ export default async function BusinessIdeasPage({
     return (
       <div className="mx-auto max-w-2xl space-y-3">
         <h1 className="text-lg font-semibold text-red-300">DB 오류</h1>
-        <p className="text-sm text-neutral-400">{error.message}</p>
+        <p className="text-sm text-muted-foreground">{error.message}</p>
       </div>
     );
   }
@@ -128,7 +128,7 @@ export default async function BusinessIdeasPage({
         <h1 className="text-2xl font-semibold tracking-tight">
           🎯 사업 아이템 후보
         </h1>
-        <p className="mt-1 text-sm text-neutral-400">
+        <p className="mt-1 text-sm text-muted-foreground">
           자동 분석 완료된 A·B 등급 프로젝트 큐레이션 · 표시 {rows.length}건 (A{" "}
           {totalA} · B {totalB}) · Sprint 진행중 {totalPursuing}건
         </p>
@@ -141,11 +141,11 @@ export default async function BusinessIdeasPage({
       />
 
       {rows.length === 0 ? (
-        <div className="rounded-xl border border-dashed border-neutral-700 bg-neutral-900/30 p-8 text-center">
-          <p className="text-sm text-neutral-400">
+        <div className="rounded-xl border border-dashed border-[color:var(--border)] bg-surface/30 p-8 text-center">
+          <p className="text-sm text-muted-foreground">
             조건에 맞는 사업 아이템이 없습니다.
           </p>
-          <p className="mt-2 text-sm text-neutral-500">
+          <p className="mt-2 text-sm text-muted">
             자동 분석 배치가 매일 15:00 KST 실행됩니다. 개별 프로젝트에서 수동
             분석도 가능합니다.
           </p>
@@ -157,7 +157,7 @@ export default async function BusinessIdeasPage({
             return (
               <li
                 key={r.id}
-                className="rounded-xl border border-neutral-700 bg-neutral-900/40 p-5 transition hover:border-neutral-500"
+                className="rounded-xl border border-[color:var(--border)] bg-surface/40 p-5 transition hover:border-[color:var(--accent)]"
               >
                 <div className="flex flex-wrap items-center gap-2">
                   {r.business_grade && (
@@ -175,18 +175,18 @@ export default async function BusinessIdeasPage({
                     </span>
                   )}
                   {r.sprint_status && (
-                    <span className="rounded bg-neutral-800/60 px-2 py-0.5 text-xs text-neutral-300">
+                    <span className="rounded bg-[color:var(--muted)]/30 px-2 py-0.5 text-xs text-foreground/85">
                       {SPRINT_STATUS_LABEL[r.sprint_status] ?? r.sprint_status}
                     </span>
                   )}
                 </div>
                 <Link
                   href={`/radar/project/${p.id}`}
-                  className="mt-3 block text-base font-medium text-neutral-100 hover:text-white"
+                  className="mt-3 block text-base font-medium text-foreground hover:text-white"
                 >
                   {p.title}
                 </Link>
-                <p className="mt-2 max-w-xl text-sm leading-6 text-neutral-500">
+                <p className="mt-2 max-w-xl text-sm leading-6 text-muted">
                   {CHANNEL_LABEL[p.channel] ?? p.channel} ·{" "}
                   {p.category ?? "카테고리 -"} · 예산{" "}
                   {p.budget_min
@@ -197,7 +197,7 @@ export default async function BusinessIdeasPage({
                     : ""}{" "}
                   · {p.duration_days ?? "-"}일
                 </p>
-                <p className="mt-2 text-xs text-neutral-600">
+                <p className="mt-2 text-xs text-muted/70">
                   분석 완료 {formatDate(r.insight_generated_at)}
                   {r.sprint_decided_at
                     ? ` · Sprint 결정 ${formatDate(r.sprint_decided_at)}`
@@ -225,7 +225,7 @@ function FilterBar({
     <form
       action="/radar/business-ideas"
       method="get"
-      className="grid gap-3 rounded-xl border border-neutral-800 bg-neutral-900/40 p-4 sm:grid-cols-2 lg:grid-cols-4"
+      className="grid gap-3 rounded-xl border border-[color:var(--border)]/70 bg-surface/40 p-4 sm:grid-cols-2 lg:grid-cols-4"
     >
       <Select name="grade" label="사업화 등급" value={gradeFilter ?? ""}>
         <option value="">A + B (기본)</option>
@@ -252,7 +252,7 @@ function FilterBar({
       <div className="flex items-end">
         <button
           type="submit"
-          className="w-full rounded-md bg-neutral-100 px-4 py-2 text-xs font-medium text-neutral-900 hover:bg-white"
+          className="w-full rounded-md bg-foreground px-4 py-2 text-xs font-medium text-background hover:bg-foreground/90"
         >
           적용
         </button>
@@ -274,13 +274,13 @@ function Select({
 }) {
   return (
     <label className="block">
-      <span className="text-xs uppercase tracking-wide text-neutral-500">
+      <span className="text-xs uppercase tracking-wide text-muted">
         {label}
       </span>
       <select
         name={name}
         defaultValue={value}
-        className="mt-1 w-full rounded-md border border-neutral-800 bg-neutral-950 px-3 py-2 text-sm text-neutral-100 outline-none focus:border-neutral-500"
+        className="mt-1 w-full rounded-md border border-[color:var(--border)]/70 bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-neutral-500"
       >
         {children}
       </select>

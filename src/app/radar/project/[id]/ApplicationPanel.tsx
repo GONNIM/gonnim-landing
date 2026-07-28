@@ -198,9 +198,9 @@ export function ApplicationPanel({
   }
 
   return (
-    <section className="space-y-6 rounded-xl border border-neutral-700 bg-neutral-900/30 p-5">
+    <section className="space-y-6 rounded-xl border border-[color:var(--border)] bg-surface/30 p-5">
       <div>
-        <h2 className="text-sm font-medium text-neutral-300">Funnel 상태</h2>
+        <h2 className="text-sm font-medium text-foreground/85">Funnel 상태</h2>
         <div className="mt-3 flex flex-wrap gap-2">
           {APPLICATION_STATUS_ORDER.map((s) => (
             <button
@@ -210,8 +210,8 @@ export function ApplicationPanel({
               onClick={() => run(() => onChangeStatus(s))}
               className={`rounded px-3 py-1.5 text-xs ${
                 status === s
-                  ? "bg-neutral-100 text-neutral-900"
-                  : "border border-neutral-700 text-neutral-300 hover:border-neutral-500 hover:text-neutral-100"
+                  ? "bg-foreground text-background"
+                  : "border border-[color:var(--border)] text-foreground/85 hover:border-[color:var(--accent)] hover:text-foreground"
               }`}
             >
               {APPLICATION_STATUS[s]}
@@ -223,11 +223,11 @@ export function ApplicationPanel({
       <div>
         <div className="flex items-center justify-between">
           <div>
-            <h2 className="text-sm font-medium text-neutral-300">
+            <h2 className="text-sm font-medium text-foreground/85">
               🔍 사업화 타당성 리포트
             </h2>
             {insightGeneratedAt && (
-              <p className="mt-1 text-xs text-neutral-500">
+              <p className="mt-1 text-xs text-muted">
                 마지막 생성 · {new Date(insightGeneratedAt).toLocaleString("ko-KR")}
               </p>
             )}
@@ -273,7 +273,7 @@ export function ApplicationPanel({
                       ? "bg-sky-950 text-sky-300"
                       : businessGrade === "C"
                         ? "bg-amber-950 text-amber-300"
-                        : "bg-neutral-800 text-neutral-400"
+                        : "bg-[color:var(--muted)]/20 text-muted-foreground"
                 }`}
               >
                 사업화 등급 {businessGrade}
@@ -286,17 +286,17 @@ export function ApplicationPanel({
                       : " · 제외"}
               </span>
             )}
-            <span className="text-xs text-neutral-500">
+            <span className="text-xs text-muted">
               마켓 검증 · 유사 솔루션 · 차별화 각도 종합 판정
             </span>
           </div>
         )}
         {insightReport ? (
-          <pre className="mt-3 max-h-[600px] overflow-y-auto whitespace-pre-wrap rounded-md border border-neutral-700 bg-neutral-950 p-4 text-sm leading-6 text-neutral-100">
+          <pre className="mt-3 max-h-[600px] overflow-y-auto whitespace-pre-wrap rounded-md border border-[color:var(--border)] bg-background p-4 text-sm leading-6 text-foreground">
             {insightReport}
           </pre>
         ) : (
-          <p className="mt-3 rounded-md border border-dashed border-neutral-700 bg-neutral-950/40 p-4 text-xs text-neutral-500">
+          <p className="mt-3 rounded-md border border-dashed border-[color:var(--border)] bg-background/40 p-4 text-xs text-muted">
             🔍 위 버튼을 누르면 이 프로젝트를 사업 아이템 후보로 정밀 분석합니다.
             프로젝트 인사이트 → 마켓 검증 · 레드오션 여부 → 사업화 모델 3가지 →
             파일럿 실행 계획까지 7섹션 리포트. 사전 판단·전략 노트가 있으면 자동
@@ -309,11 +309,11 @@ export function ApplicationPanel({
         <div>
           <div className="flex items-center justify-between">
             <div>
-              <h2 className="text-sm font-medium text-neutral-300">
+              <h2 className="text-sm font-medium text-foreground/85">
                 🚀 Sprint 진행 결정
               </h2>
               {sprintDecidedAt && (
-                <p className="mt-1 text-xs text-neutral-500">
+                <p className="mt-1 text-xs text-muted">
                   결정 시각 · {new Date(sprintDecidedAt).toLocaleString("ko-KR")}
                 </p>
               )}
@@ -336,7 +336,7 @@ export function ApplicationPanel({
                     ? "border-sky-700/60 bg-sky-950/40 text-sky-200 hover:border-sky-500"
                     : btn.tone === "red"
                       ? "border-red-700/60 bg-red-950/40 text-red-200 hover:border-red-500"
-                      : "border-neutral-700 bg-neutral-950 text-neutral-300 hover:border-neutral-500";
+                      : "border-[color:var(--border)] bg-background text-foreground/85 hover:border-[color:var(--accent)]";
               const activeClass =
                 btn.tone === "emerald"
                   ? "bg-emerald-800 text-emerald-50"
@@ -362,7 +362,7 @@ export function ApplicationPanel({
               );
             })}
           </div>
-          <p className="mt-3 text-xs text-neutral-500">
+          <p className="mt-3 text-xs text-muted">
             🚀 킥오프 결정 시 로컬 cron (매일 22:00 KST) 이 Kickoff.md §7 사업
             아이템 섹션에 자동 편입합니다. Sprint-Radar-Spec 매출 트리에 반영.
           </p>
@@ -371,7 +371,7 @@ export function ApplicationPanel({
 
       <div>
         <div className="flex items-center justify-between">
-          <h2 className="text-sm font-medium text-neutral-300">지원 초안</h2>
+          <h2 className="text-sm font-medium text-foreground/85">지원 초안</h2>
           <button
             type="button"
             disabled={generating || isPending}
@@ -383,7 +383,7 @@ export function ApplicationPanel({
         </div>
         <div className="mt-3 grid gap-3 sm:grid-cols-2">
           <label className="block sm:col-span-2">
-            <span className="text-xs uppercase tracking-wide text-neutral-500">
+            <span className="text-xs uppercase tracking-wide text-muted">
               제안서 초안
             </span>
             <textarea
@@ -391,11 +391,11 @@ export function ApplicationPanel({
               value={draft}
               onChange={(e) => setDraft(e.target.value)}
               placeholder="🪄 위의 AI 초안 생성 버튼을 누르면 사용자 자산을 인용한 맞춤형 제안서 초안이 채워집니다. 필요 시 자유 편집 후 저장."
-              className="mt-1 w-full rounded-md border border-neutral-700 bg-neutral-950 px-3 py-2 text-sm text-neutral-100 outline-none focus:border-neutral-500"
+              className="mt-1 w-full rounded-md border border-[color:var(--border)] bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-neutral-500"
             />
           </label>
           <label className="block">
-            <span className="text-xs uppercase tracking-wide text-neutral-500">
+            <span className="text-xs uppercase tracking-wide text-muted">
               견적 (원)
             </span>
             <input
@@ -403,11 +403,11 @@ export function ApplicationPanel({
               min={0}
               value={budget}
               onChange={(e) => setBudget(e.target.value)}
-              className="mt-1 w-full rounded-md border border-neutral-700 bg-neutral-950 px-3 py-2 text-sm text-neutral-100 outline-none focus:border-neutral-500"
+              className="mt-1 w-full rounded-md border border-[color:var(--border)] bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-neutral-500"
             />
           </label>
           <label className="block">
-            <span className="text-xs uppercase tracking-wide text-neutral-500">
+            <span className="text-xs uppercase tracking-wide text-muted">
               기간 (일)
             </span>
             <input
@@ -415,11 +415,11 @@ export function ApplicationPanel({
               min={0}
               value={duration}
               onChange={(e) => setDuration(e.target.value)}
-              className="mt-1 w-full rounded-md border border-neutral-700 bg-neutral-950 px-3 py-2 text-sm text-neutral-100 outline-none focus:border-neutral-500"
+              className="mt-1 w-full rounded-md border border-[color:var(--border)] bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-neutral-500"
             />
           </label>
           <label className="block sm:col-span-2">
-            <span className="text-xs uppercase tracking-wide text-neutral-500">
+            <span className="text-xs uppercase tracking-wide text-muted">
               메모 · 사전 판단·전략 노트
             </span>
             <textarea
@@ -427,7 +427,7 @@ export function ApplicationPanel({
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               placeholder="이 프로젝트만의 어필 포인트·차별화 각도·주의 사항을 남기세요 (예: '개인정보 강조 · AI 홍변 v3 매칭'). AI 초안 생성 시 자동 반영됩니다."
-              className="mt-1 w-full rounded-md border border-neutral-700 bg-neutral-950 px-3 py-2 text-sm text-neutral-100 outline-none focus:border-neutral-500"
+              className="mt-1 w-full rounded-md border border-[color:var(--border)] bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-neutral-500"
             />
           </label>
         </div>
@@ -437,7 +437,7 @@ export function ApplicationPanel({
             type="button"
             disabled={isPending}
             onClick={() => run(onSaveDraft)}
-            className="rounded-md bg-neutral-100 px-4 py-2 text-sm font-medium text-neutral-900 hover:bg-white disabled:opacity-60"
+            className="rounded-md bg-foreground px-4 py-2 text-sm font-medium text-background hover:bg-foreground/90 disabled:opacity-60"
           >
             {isPending ? "저장 중..." : "저장"}
           </button>

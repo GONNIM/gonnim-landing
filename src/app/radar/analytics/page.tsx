@@ -159,31 +159,31 @@ export default async function AnalyticsPage() {
     <div className="space-y-8">
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">분석</h1>
-        <p className="mt-1 text-sm text-neutral-400">
+        <p className="mt-1 text-sm text-muted-foreground">
           Sprint W{Math.ceil(sprintDays / 7)} · Day {sprintDays} · Q1 마감까지{" "}
           {daysToDeadline}일 남음
         </p>
       </div>
 
       {/* Revenue tree */}
-      <section className="rounded-xl border border-neutral-700 bg-neutral-900/40 p-6">
+      <section className="rounded-xl border border-[color:var(--border)] bg-surface/40 p-6">
         <div className="flex items-baseline justify-between">
-          <h2 className="text-sm font-medium text-neutral-300">
+          <h2 className="text-sm font-medium text-foreground/85">
             Q1 매출 트리 (2026-10-06 마감)
           </h2>
-          <span className="text-xs text-neutral-500">
+          <span className="text-xs text-muted">
             목표 {formatKRW(Q1_TARGET_WON)}
           </span>
         </div>
         <div className="mt-3 flex items-baseline gap-3">
-          <span className="text-3xl font-semibold text-neutral-100">
+          <span className="text-3xl font-semibold text-foreground">
             {formatKRW(contractedRevenue)}
           </span>
-          <span className="text-sm text-neutral-500">
+          <span className="text-sm text-muted">
             누적 계약 · {q1Progress}% · 남은 목표 {formatKRW(Math.max(0, Q1_TARGET_WON - contractedRevenue))}
           </span>
         </div>
-        <div className="mt-3 h-2 w-full rounded-full bg-neutral-800">
+        <div className="mt-3 h-2 w-full rounded-full bg-[color:var(--muted)]/20">
           <div
             className="h-2 rounded-full bg-emerald-500"
             style={{ width: `${q1Progress}%` }}
@@ -198,10 +198,10 @@ export default async function AnalyticsPage() {
           {APPLICATION_STATUS_ORDER.map((s) => (
             <div
               key={s}
-              className="rounded-lg border border-neutral-700/70 bg-neutral-950 p-3"
+              className="rounded-lg border border-[color:var(--border)]/70 bg-background p-3"
             >
-              <p className="text-xs text-neutral-500">{APPLICATION_STATUS[s]}</p>
-              <p className="mt-1 text-lg font-semibold text-neutral-100">
+              <p className="text-xs text-muted">{APPLICATION_STATUS[s]}</p>
+              <p className="mt-1 text-lg font-semibold text-foreground">
                 {funnel[s]}
               </p>
             </div>
@@ -218,9 +218,9 @@ export default async function AnalyticsPage() {
       {/* Channel breakdown */}
       <section className="space-y-3">
         <h2 className="text-lg font-medium">채널별 통계</h2>
-        <div className="overflow-x-auto rounded-xl border border-neutral-700">
-          <table className="min-w-full divide-y divide-neutral-800 text-sm">
-            <thead className="bg-neutral-900/60 text-xs uppercase tracking-wide text-neutral-500">
+        <div className="overflow-x-auto rounded-xl border border-[color:var(--border)]">
+          <table className="min-w-full divide-y divide-[color:var(--border)]/70 text-sm">
+            <thead className="bg-surface/60 text-xs uppercase tracking-wide text-muted">
               <tr>
                 <th className="px-4 py-3 text-left">채널</th>
                 <th className="px-4 py-3 text-right">총 프로젝트</th>
@@ -232,16 +232,16 @@ export default async function AnalyticsPage() {
                 <th className="px-4 py-3 text-right">계약</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-neutral-800/60">
+            <tbody className="divide-y divide-[color:var(--border)]/70/60">
               {Object.entries(byChannel).length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="px-4 py-6 text-center text-neutral-500">
+                  <td colSpan={8} className="px-4 py-6 text-center text-muted">
                     아직 수집된 프로젝트가 없습니다.
                   </td>
                 </tr>
               ) : (
                 Object.entries(byChannel).map(([channel, stat]) => (
-                  <tr key={channel} className="text-neutral-200">
+                  <tr key={channel} className="text-foreground">
                     <td className="px-4 py-3">
                       {CHANNEL_LABEL[channel] ?? channel}
                     </td>
@@ -249,7 +249,7 @@ export default async function AnalyticsPage() {
                     <td className="px-4 py-3 text-right text-emerald-300">
                       {stat.outsourcing}
                     </td>
-                    <td className="px-4 py-3 text-right text-neutral-500">
+                    <td className="px-4 py-3 text-right text-muted">
                       {stat.contractor}
                     </td>
                     <td className="px-4 py-3 text-right">
@@ -274,7 +274,7 @@ export default async function AnalyticsPage() {
       <section className="space-y-3">
         <h2 className="text-lg font-medium">최근 활동 (12건)</h2>
         {activity.length === 0 ? (
-          <div className="rounded-xl border border-dashed border-neutral-700 p-8 text-center text-sm text-neutral-500">
+          <div className="rounded-xl border border-dashed border-[color:var(--border)] p-8 text-center text-sm text-muted">
             지원 활동 이력이 아직 없습니다. 프로젝트 상세에서 Funnel 상태를 조작하면 여기에 기록됩니다.
           </div>
         ) : (
@@ -286,22 +286,22 @@ export default async function AnalyticsPage() {
               return (
                 <li
                   key={`${e.app.id}-${e.label}-${i}`}
-                  className="flex items-center justify-between rounded-lg border border-neutral-700/70 bg-neutral-950/70 px-4 py-3"
+                  className="flex items-center justify-between rounded-lg border border-[color:var(--border)]/70 bg-background/70 px-4 py-3"
                 >
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2 text-xs">
-                      <span className="rounded bg-neutral-800 px-1.5 py-0.5 text-neutral-300">
+                      <span className="rounded bg-[color:var(--muted)]/20 px-1.5 py-0.5 text-foreground/85">
                         {e.label}
                       </span>
-                      <span className="text-neutral-500">
+                      <span className="text-muted">
                         {CHANNEL_LABEL[proj?.channel ?? ""] ?? proj?.channel ?? "-"}
                       </span>
-                      <span className="text-neutral-600">·</span>
-                      <span className="text-neutral-500">{formatDate(e.at)}</span>
+                      <span className="text-muted/70">·</span>
+                      <span className="text-muted">{formatDate(e.at)}</span>
                     </div>
                     <Link
                       href={`/radar/project/${e.app.project_id}`}
-                      className="mt-1 block truncate text-sm text-neutral-100 hover:text-white"
+                      className="mt-1 block truncate text-sm text-foreground hover:text-white"
                     >
                       {proj?.title ?? "프로젝트"}
                     </Link>
@@ -326,10 +326,10 @@ function RateCard({
   note: string;
 }) {
   return (
-    <div className="rounded-lg border border-neutral-700 bg-neutral-950 p-4">
-      <p className="text-xs text-neutral-500">{label}</p>
-      <p className="mt-1 text-2xl font-semibold text-neutral-100">{value}%</p>
-      <p className="mt-1 text-xs text-neutral-500">{note}</p>
+    <div className="rounded-lg border border-[color:var(--border)] bg-background p-4">
+      <p className="text-xs text-muted">{label}</p>
+      <p className="mt-1 text-2xl font-semibold text-foreground">{value}%</p>
+      <p className="mt-1 text-xs text-muted">{note}</p>
     </div>
   );
 }

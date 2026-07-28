@@ -128,22 +128,22 @@ function LoginForm() {
 
   return (
     <>
-      <div className="mx-auto mt-16 max-w-sm rounded-xl border border-neutral-800 bg-neutral-900/40 p-8">
+      <div className="mx-auto mt-16 max-w-sm rounded-xl border border-[color:var(--border)]/70 bg-surface/40 p-8">
         <h1 className="text-lg font-semibold">Sprint Radar 로그인</h1>
-        <p className="mt-1 text-sm text-neutral-400">
+        <p className="mt-1 text-sm text-muted-foreground">
           {mode === "magic"
             ? "관리자 이메일로 Magic Link를 전송합니다."
             : "이메일 · 비밀번호로 즉시 로그인합니다."}
         </p>
 
-        <div className="mt-4 flex gap-1 rounded-md border border-neutral-800 bg-neutral-950 p-1 text-xs">
+        <div className="mt-4 flex gap-1 rounded-md border border-[color:var(--border)]/70 bg-background p-1 text-xs">
           <button
             type="button"
             onClick={() => setMode("magic")}
             className={`flex-1 rounded py-1.5 ${
               mode === "magic"
-                ? "bg-neutral-800 text-neutral-100"
-                : "text-neutral-500 hover:text-neutral-300"
+                ? "bg-[color:var(--muted)]/20 text-foreground"
+                : "text-muted hover:text-foreground/85"
             }`}
           >
             Magic Link
@@ -153,8 +153,8 @@ function LoginForm() {
             onClick={() => setMode("password")}
             className={`flex-1 rounded py-1.5 ${
               mode === "password"
-                ? "bg-neutral-800 text-neutral-100"
-                : "text-neutral-500 hover:text-neutral-300"
+                ? "bg-[color:var(--muted)]/20 text-foreground"
+                : "text-muted hover:text-foreground/85"
             }`}
           >
             비밀번호
@@ -165,7 +165,7 @@ function LoginForm() {
           <div>
             <label
               htmlFor="email"
-              className="text-xs uppercase tracking-wide text-neutral-500"
+              className="text-xs uppercase tracking-wide text-muted"
             >
               이메일
             </label>
@@ -176,7 +176,7 @@ function LoginForm() {
               autoComplete="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="mt-2 w-full rounded-md border border-neutral-800 bg-neutral-950 px-3 py-2 text-sm text-neutral-100 outline-none focus:border-neutral-500"
+              className="mt-2 w-full rounded-md border border-[color:var(--border)]/70 bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-neutral-500"
             />
           </div>
 
@@ -184,7 +184,7 @@ function LoginForm() {
             <div>
               <label
                 htmlFor="password"
-                className="text-xs uppercase tracking-wide text-neutral-500"
+                className="text-xs uppercase tracking-wide text-muted"
               >
                 비밀번호
               </label>
@@ -195,7 +195,7 @@ function LoginForm() {
                 autoComplete="current-password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="mt-2 w-full rounded-md border border-neutral-800 bg-neutral-950 px-3 py-2 text-sm text-neutral-100 outline-none focus:border-neutral-500"
+                className="mt-2 w-full rounded-md border border-[color:var(--border)]/70 bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-neutral-500"
               />
             </div>
           )}
@@ -203,7 +203,7 @@ function LoginForm() {
           <button
             type="submit"
             disabled={sending}
-            className="w-full rounded-md bg-neutral-100 py-2 text-sm font-medium text-neutral-900 hover:bg-white disabled:opacity-60"
+            className="w-full rounded-md bg-foreground py-2 text-sm font-medium text-background hover:bg-foreground/90 disabled:opacity-60"
           >
             {sending
               ? "처리 중..."
@@ -216,7 +216,7 @@ function LoginForm() {
         {message && <p className="mt-4 text-xs text-emerald-400">{message}</p>}
         {error && <p className="mt-4 text-xs text-red-400">{error}</p>}
 
-        <div className="mt-6 border-t border-neutral-800 pt-4 text-center text-xs text-neutral-500">
+        <div className="mt-6 border-t border-[color:var(--border)]/70 pt-4 text-center text-xs text-muted">
           계정이 없으신가요?{" "}
           <button
             type="button"
@@ -226,7 +226,7 @@ function LoginForm() {
               setSignupError(null);
               setSignupInfo(null);
             }}
-            className="text-neutral-200 underline hover:text-white"
+            className="text-foreground underline hover:text-white"
           >
             가입
           </button>
@@ -235,19 +235,19 @@ function LoginForm() {
 
       {signupOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
-          <div className="w-full max-w-sm rounded-xl border border-neutral-800 bg-neutral-950 p-6 shadow-2xl">
+          <div className="w-full max-w-sm rounded-xl border border-[color:var(--border)]/70 bg-background p-6 shadow-2xl">
             <div className="flex items-start justify-between">
               <h2 className="text-base font-semibold">Radar 관리자 가입</h2>
               <button
                 type="button"
                 onClick={() => setSignupOpen(false)}
-                className="text-neutral-500 hover:text-neutral-300"
+                className="text-muted hover:text-foreground/85"
                 aria-label="닫기"
               >
                 ✕
               </button>
             </div>
-            <p className="mt-1 text-xs text-neutral-400">
+            <p className="mt-1 text-xs text-muted-foreground">
               허용 이메일만 가입 가능 · 이미 있으면 비밀번호 갱신
             </p>
 
@@ -255,7 +255,7 @@ function LoginForm() {
               <div>
                 <label
                   htmlFor="signup-email"
-                  className="text-xs uppercase tracking-wide text-neutral-500"
+                  className="text-xs uppercase tracking-wide text-muted"
                 >
                   이메일
                 </label>
@@ -266,14 +266,14 @@ function LoginForm() {
                   autoComplete="email"
                   value={signupEmail}
                   onChange={(e) => setSignupEmail(e.target.value)}
-                  className="mt-1 w-full rounded-md border border-neutral-800 bg-neutral-900 px-3 py-2 text-sm text-neutral-100 outline-none focus:border-neutral-500"
+                  className="mt-1 w-full rounded-md border border-[color:var(--border)]/70 bg-surface px-3 py-2 text-sm text-foreground outline-none focus:border-neutral-500"
                 />
               </div>
 
               <div>
                 <label
                   htmlFor="signup-password"
-                  className="text-xs uppercase tracking-wide text-neutral-500"
+                  className="text-xs uppercase tracking-wide text-muted"
                 >
                   비밀번호 (8자 이상)
                 </label>
@@ -285,14 +285,14 @@ function LoginForm() {
                   autoComplete="new-password"
                   value={signupPassword}
                   onChange={(e) => setSignupPassword(e.target.value)}
-                  className="mt-1 w-full rounded-md border border-neutral-800 bg-neutral-900 px-3 py-2 text-sm text-neutral-100 outline-none focus:border-neutral-500"
+                  className="mt-1 w-full rounded-md border border-[color:var(--border)]/70 bg-surface px-3 py-2 text-sm text-foreground outline-none focus:border-neutral-500"
                 />
               </div>
 
               <div>
                 <label
                   htmlFor="signup-password2"
-                  className="text-xs uppercase tracking-wide text-neutral-500"
+                  className="text-xs uppercase tracking-wide text-muted"
                 >
                   비밀번호 확인
                 </label>
@@ -304,14 +304,14 @@ function LoginForm() {
                   autoComplete="new-password"
                   value={signupPassword2}
                   onChange={(e) => setSignupPassword2(e.target.value)}
-                  className="mt-1 w-full rounded-md border border-neutral-800 bg-neutral-900 px-3 py-2 text-sm text-neutral-100 outline-none focus:border-neutral-500"
+                  className="mt-1 w-full rounded-md border border-[color:var(--border)]/70 bg-surface px-3 py-2 text-sm text-foreground outline-none focus:border-neutral-500"
                 />
               </div>
 
               <button
                 type="submit"
                 disabled={signupBusy}
-                className="mt-2 w-full rounded-md bg-neutral-100 py-2 text-sm font-medium text-neutral-900 hover:bg-white disabled:opacity-60"
+                className="mt-2 w-full rounded-md bg-foreground py-2 text-sm font-medium text-background hover:bg-foreground/90 disabled:opacity-60"
               >
                 {signupBusy ? "처리 중..." : "가입 · 자동 로그인"}
               </button>
@@ -334,7 +334,7 @@ export default function LoginPage() {
   return (
     <Suspense
       fallback={
-        <div className="mx-auto mt-16 max-w-sm text-neutral-400">로딩...</div>
+        <div className="mx-auto mt-16 max-w-sm text-muted-foreground">로딩...</div>
       }
     >
       <LoginForm />
