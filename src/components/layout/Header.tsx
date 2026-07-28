@@ -1,6 +1,3 @@
-"use client";
-
-import { usePathname } from "next/navigation";
 import { MobileNav } from "@/components/layout/MobileNav";
 
 const NAV_LINKS = [
@@ -11,12 +8,6 @@ const NAV_LINKS = [
 ];
 
 const GITHUB_URL = "https://github.com/GONNIM";
-
-// Sprint Radar 페이지에서는 랜딩 Header 숨김 (Radar 자체 nav 사용)
-function shouldHide(pathname: string | null): boolean {
-  if (!pathname) return false;
-  return pathname.startsWith("/radar") || pathname.startsWith("/auth");
-}
 
 function GitHubMark() {
   return (
@@ -36,8 +27,6 @@ function GitHubMark() {
 }
 
 export function Header() {
-  const pathname = usePathname();
-  if (shouldHide(pathname)) return null;
   return (
     <header className="sticky top-0 z-40 border-b border-[color:var(--color-border)]/70 bg-[color:var(--color-background)]/80 backdrop-blur-md">
       <div className="mx-auto flex h-14 w-full max-w-6xl items-center gap-4 px-6 md:px-8">

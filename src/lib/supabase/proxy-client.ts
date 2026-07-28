@@ -10,6 +10,11 @@ export async function updateSession(request: NextRequest) {
   const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
   const path = request.nextUrl.pathname;
 
+  // Server component 에서 · 현재 pathname 을 읽을 수 있도록 · custom header inject.
+  // Root layout · Header/Footer conditional 조건에 사용 (SSR 시 정확 판정 · flicker 없음).
+  supabaseResponse.headers.set("x-pathname", path);
+  request.headers.set("x-pathname", path);
+
   // Supabase env 부재 시 — landing 등 공용 라우트는 통과, /radar 는 login으로.
   if (!url || !anon) {
     const isRadar =

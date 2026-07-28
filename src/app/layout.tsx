@@ -1,10 +1,17 @@
 import type { Metadata } from "next";
+import { headers } from "next/headers";
 import { Analytics } from "@vercel/analytics/next";
 import { Geist_Mono } from "next/font/google";
 import localFont from "next/font/local";
 import { Footer } from "@/components/layout/Footer";
 import { Header } from "@/components/layout/Header";
 import "./globals.css";
+
+// Sprint Radar · Auth 경로 시 · 랜딩 Header/Footer 숨김
+// proxy.ts 가 x-pathname header 세팅 (SSR 시 정확 판정 · flicker 없음)
+function isRadarPath(pathname: string): boolean {
+  return pathname.startsWith("/radar") || pathname.startsWith("/auth");
+}
 
 const pretendard = localFont({
   src: "./fonts/PretendardVariable.woff2",
@@ -62,11 +69,15 @@ export const metadata: Metadata = {
   },
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const h = await headers();
+  const pathname = h.get("x-pathname") || "";
+  const hideChrome = isRadarPath(pathname);
+
   return (
     <html
       lang="ko"
@@ -79,9 +90,9 @@ export default function RootLayout({
         >
           본문으로 건너뛰기
         </a>
-        <Header />
+        {!hideChrome && <Header />}
         {children}
-        <Footer />
+        {!hideChrome && <Footer />}
         <Analytics />
       </body>
     </html>
