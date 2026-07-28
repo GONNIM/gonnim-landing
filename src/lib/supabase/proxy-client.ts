@@ -4,16 +4,17 @@ import { NextResponse, type NextRequest } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 
 export async function updateSession(request: NextRequest) {
-  let supabaseResponse = NextResponse.next({ request });
-
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
   const path = request.nextUrl.pathname;
 
-  // Server component 에서 · 현재 pathname 을 읽을 수 있도록 · custom header inject.
-  // Root layout · Header/Footer conditional 조건에 사용 (SSR 시 정확 판정 · flicker 없음).
-  supabaseResponse.headers.set("x-pathname", path);
-  request.headers.set("x-pathname", path);
+  // Next.js 공식 패턴 · request headers clone · x-pathname 삽입 · server component 에서 headers().get("x-pathname") 로 읽음.
+  const requestHeaders = new Headers(request.headers);
+  requestHeaders.set("x-pathname", path);
+
+  let supabaseResponse = NextResponse.next({
+    request: { headers: requestHeaders },
+  });
 
   // Supabase env 부재 시 — landing 등 공용 라우트는 통과, /radar 는 login으로.
   if (!url || !anon) {
@@ -40,7 +41,10 @@ export async function updateSession(request: NextRequest) {
           for (const { name, value } of cookiesToSet) {
             request.cookies.set(name, value);
           }
-          supabaseResponse = NextResponse.next({ request });
+          // Response 재생성 시 · requestHeaders (x-pathname 포함) 유지
+          supabaseResponse = NextResponse.next({
+            request: { headers: requestHeaders },
+          });
           for (const { name, value, options } of cookiesToSet) {
             supabaseResponse.cookies.set(name, value, options);
           }
