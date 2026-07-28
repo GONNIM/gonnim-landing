@@ -1,7 +1,13 @@
 // Sprint Radar · Database Types
 // Manually maintained to match Supabase schema (§4 Sprint-Radar-Spec)
 
-export type Channel = "wanted-gigs" | "wishket" | "kmong" | "upwork" | "toptal";
+export type Channel =
+  | "wanted-gigs"
+  | "wishket"
+  | "kmong"
+  | "upwork"
+  | "toptal"
+  | "freemoa";
 export type ContractType = "outsourcing" | "contractor" | "part-time";
 export type WorkType = "remote" | "onsite" | "hybrid";
 export type ProjectStatus = "active" | "closed" | "expired";

@@ -6,6 +6,7 @@ export const CHANNEL_LABEL: Record<string, string> = {
   kmong: "크몽",
   upwork: "Upwork",
   toptal: "Toptal",
+  freemoa: "프리모아",
 };
 
 export const CONTRACT_LABEL: Record<string, string> = {
