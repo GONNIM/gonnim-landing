@@ -5,6 +5,7 @@
 import Link from "next/link";
 import { getServerAuthClient } from "@/lib/supabase/ssr-client";
 import { CHANNEL_LABEL, formatDate } from "@/lib/radar-format";
+import wikiIdeasData from "@/data/wiki-ideas.json";
 
 export const dynamic = "force-dynamic";
 
@@ -56,6 +57,42 @@ const SPRINT_STATUS_LABEL: Record<string, string> = {
   pursuing: "▶ 진행중",
   "kicked-off": "🚀 킥오프",
   dropped: "✗ 제외",
+};
+
+type WikiIdea = {
+  slug: string;
+  title: string;
+  type: string;
+  status: string;
+  confidence: string;
+  domain: string[];
+  tags: string[];
+  source_created: string | null;
+  ingested_at: string | null;
+  summary: string;
+  obsidian_uri: string;
+};
+
+const WIKI_IDEA_TYPE_STYLE: Record<string, string> = {
+  evergreen: "bg-emerald-950 text-emerald-300",
+  "fact-table": "bg-emerald-950 text-emerald-300",
+  "how-to": "bg-sky-950 text-sky-300",
+  reference: "bg-sky-950 text-sky-300",
+  inbox: "bg-[color:var(--muted)]/20 text-muted-foreground",
+  journal: "bg-[color:var(--muted)]/20 text-muted-foreground",
+};
+
+const WIKI_IDEA_STATUS_LABEL: Record<string, string> = {
+  open: "▶ 진행중",
+  active: "▶ 진행중",
+  draft: "◯ 초안",
+  archived: "✗ 보관",
+};
+
+const WIKI_IDEA_CONF_STYLE: Record<string, string> = {
+  high: "text-emerald-300",
+  medium: "text-amber-300",
+  low: "text-muted",
 };
 
 function firstValue(v: string | string[] | undefined): string | undefined {
@@ -150,7 +187,9 @@ export default async function BusinessIdeasPage({
             분석도 가능합니다.
           </p>
         </div>
-      ) : (
+      ) : null}
+
+      {rows.length > 0 && (
         <ul className="grid gap-4 sm:grid-cols-2">
           {rows.map((r) => {
             const p = r.projects!;
@@ -208,7 +247,76 @@ export default async function BusinessIdeasPage({
           })}
         </ul>
       )}
+
+      <WikiIdeasSection ideas={wikiIdeasData.ideas as WikiIdea[]} />
     </div>
+  );
+}
+
+function WikiIdeasSection({ ideas }: { ideas: WikiIdea[] }) {
+  if (ideas.length === 0) return null;
+  return (
+    <section className="space-y-4 pt-6">
+      <div className="border-t border-[color:var(--border)]/70 pt-6">
+        <h2 className="text-lg font-semibold tracking-tight">
+          🧠 Wiki Ideas · 자체 기획
+        </h2>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Sprint Radar 크롤 소스 외 · Obsidian vault 개인 아이디어 {ideas.length}
+          건 (LLM 판정 없음 · 수동 검토)
+        </p>
+      </div>
+      <ul className="grid gap-4 sm:grid-cols-2">
+        {ideas.map((idea) => (
+          <li
+            key={idea.slug}
+            className="rounded-xl border border-[color:var(--border)] bg-surface/40 p-5 transition hover:border-[color:var(--accent)]"
+          >
+            <div className="flex flex-wrap items-center gap-2">
+              <span
+                className={`inline-flex items-center rounded px-2 py-0.5 text-xs font-semibold ${WIKI_IDEA_TYPE_STYLE[idea.type] ?? WIKI_IDEA_TYPE_STYLE.inbox}`}
+              >
+                {idea.type}
+              </span>
+              <span className="rounded bg-[color:var(--muted)]/30 px-2 py-0.5 text-xs text-foreground/85">
+                {WIKI_IDEA_STATUS_LABEL[idea.status] ?? idea.status}
+              </span>
+              <span
+                className={`text-xs ${WIKI_IDEA_CONF_STYLE[idea.confidence] ?? "text-muted"}`}
+                title={`confidence: ${idea.confidence}`}
+              >
+                ● {idea.confidence}
+              </span>
+            </div>
+            <a
+              href={idea.obsidian_uri}
+              className="mt-3 block text-base font-medium text-foreground hover:text-white"
+            >
+              {idea.title} ↗
+            </a>
+            {idea.summary && (
+              <p className="mt-2 line-clamp-3 text-sm leading-6 text-muted">
+                {idea.summary}
+              </p>
+            )}
+            <div className="mt-3 flex flex-wrap gap-1.5">
+              {idea.domain.slice(0, 4).map((d) => (
+                <span
+                  key={d}
+                  className="rounded bg-[color:var(--muted)]/20 px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-muted-foreground"
+                >
+                  {d}
+                </span>
+              ))}
+            </div>
+            <p className="mt-2 text-xs text-muted/70">
+              vault 원본 · {idea.source_created ?? "날짜 미기록"} · Obsidian
+              에서 열기
+            </p>
+          </li>
+        ))}
+      </ul>
+    </section>
   );
 }
 

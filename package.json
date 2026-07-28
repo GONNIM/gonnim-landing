@@ -6,7 +6,8 @@
     "dev": "next dev -p 1004",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "sync:wiki-ideas": "tsx scripts/sync-wiki-ideas.ts"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.0",

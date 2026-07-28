@@ -1,0 +1,90 @@
+{
+  "generated_at": "2026-07-28T13:24:47.742Z",
+  "ideas": [
+    {
+      "slug": "idea-rag-voice-assistant",
+      "title": "RAG 기반 음성 위키 앱 아이디어",
+      "type": "evergreen",
+      "status": "open",
+      "confidence": "medium",
+      "domain": [
+        "rag",
+        "voice",
+        "agent"
+      ],
+      "tags": [
+        "thought",
+        "idea",
+        "llm",
+        "mcp",
+        "voice",
+        "rag",
+        "agent"
+      ],
+      "source_created": "2026-06-21",
+      "ingested_at": "2026-06-21 15:18:30",
+      "summary": "## 트리거 오늘 카페에서 작업하다가 떠오름.",
+      "obsidian_uri": "obsidian://open?vault=GON-LLM-Wiki&file=Thoughts%2FIdeas%2Fidea-rag-voice-assistant.md"
+    },
+    {
+      "slug": "electronic-litigation-guide",
+      "title": "BIZ - 전자소송 가이드라인",
+      "type": "inbox",
+      "status": "draft",
+      "confidence": "low",
+      "domain": [
+        "legal",
+        "litigation"
+      ],
+      "tags": [
+        "legal",
+        "litigation",
+        "notes-app"
+      ],
+      "source_created": null,
+      "ingested_at": "2026-06-22 14:15:00",
+      "summary": "## 연결 - [[../_INDEX]] - [[bankruptcy-auction]] - [[../../Works/Paused/Project-AI-Hongbyun]]",
+      "obsidian_uri": "obsidian://open?vault=GON-LLM-Wiki&file=Thoughts%2FIdeas%2Felectronic-litigation-guide.md"
+    },
+    {
+      "slug": "bankruptcy-auction",
+      "title": "BIZ - 파산공매 하는법",
+      "type": "inbox",
+      "status": "draft",
+      "confidence": "low",
+      "domain": [
+        "finance",
+        "auction"
+      ],
+      "tags": [
+        "finance",
+        "auction",
+        "notes-app"
+      ],
+      "source_created": null,
+      "ingested_at": "2026-06-22 14:15:00",
+      "summary": "(2026-05-29) 아빠윤의 경매로 분유값 벌기 님의 동영상을 확인하세요! #TikTok Lite > ￼",
+      "obsidian_uri": "obsidian://open?vault=GON-LLM-Wiki&file=Thoughts%2FIdeas%2Fbankruptcy-auction.md"
+    },
+    {
+      "slug": "tiktok-reporting-info",
+      "title": "BIZ - TikTok, Information",
+      "type": "inbox",
+      "status": "draft",
+      "confidence": "low",
+      "domain": [
+        "passive-income",
+        "reporting"
+      ],
+      "tags": [
+        "passive-income",
+        "reporting",
+        "notes-app"
+      ],
+      "source_created": null,
+      "ingested_at": "2026-06-22 14:15:00",
+      "summary": "(2026-05-31) 신고하면 돈 버는 포상금 총정리 https://www.tiktok.com/@seongjisucheop/video/7624363622415781121?_r=1&_t=ZS-96oSOVTHFYq",
+      "obsidian_uri": "obsidian://open?vault=GON-LLM-Wiki&file=Thoughts%2FIdeas%2Ftiktok-reporting-info.md"
+    }
+  ]
+}
