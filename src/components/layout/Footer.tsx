@@ -1,9 +1,21 @@
+"use client";
+
+import { usePathname } from "next/navigation";
+
 const YEAR = 2026;
 const EMAIL = "hi@gonnim.dev";
 const GITHUB_URL = "https://github.com/GONNIM";
 const LINKEDIN_URL = "https://www.linkedin.com/in/gonnim";
 
+// Sprint Radar 페이지에서는 랜딩 Footer 숨김
+function shouldHide(pathname: string | null): boolean {
+  if (!pathname) return false;
+  return pathname.startsWith("/radar") || pathname.startsWith("/auth");
+}
+
 export function Footer() {
+  const pathname = usePathname();
+  if (shouldHide(pathname)) return null;
   return (
     <footer className="mt-auto border-t border-[color:var(--color-border)] bg-[color:var(--color-surface)]/50">
       <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-6 py-10 text-sm md:flex-row md:items-center md:justify-between md:px-8">

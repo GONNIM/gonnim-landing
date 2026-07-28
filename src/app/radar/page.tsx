@@ -2,16 +2,9 @@
 
 import Link from "next/link";
 import { getServerAuthClient } from "@/lib/supabase/ssr-client";
+import { CHANNEL_LABEL } from "@/lib/radar-format";
 
 export const dynamic = "force-dynamic";
-
-const CHANNEL_LABEL: Record<string, string> = {
-  "wanted-gigs": "원티드 긱스",
-  wishket: "위시켓",
-  kmong: "크몽",
-  upwork: "Upwork",
-  toptal: "Toptal",
-};
 
 const CONTRACT_LABEL: Record<string, string> = {
   outsourcing: "외주(도급)",
