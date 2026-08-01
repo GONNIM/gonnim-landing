@@ -11,7 +11,7 @@ type Stage = "idle" | "processing" | "result" | "saving" | "saved" | "error";
 
 export function IngestForm() {
   const [input, setInput] = useState("");
-  const [useVision, setUseVision] = useState(false);
+  const [useVision, setUseVision] = useState(true);
   const [stage, setStage] = useState<Stage>("idle");
   const [error, setError] = useState<string | null>(null);
   const [content, setContent] = useState<ExtractedContent | null>(null);
