@@ -7,10 +7,14 @@ import { Footer } from "@/components/layout/Footer";
 import { Header } from "@/components/layout/Header";
 import "./globals.css";
 
-// Sprint Radar · Auth 경로 시 · 랜딩 Header/Footer 숨김
+// 인증 필요 앱 경로 (Radar · Auth · Ingest) 시 · 랜딩 Header/Footer 숨김
 // proxy.ts 가 x-pathname header 세팅 (SSR 시 정확 판정 · flicker 없음)
-function isRadarPath(pathname: string): boolean {
-  return pathname.startsWith("/radar") || pathname.startsWith("/auth");
+function shouldHideChrome(pathname: string): boolean {
+  return (
+    pathname.startsWith("/radar") ||
+    pathname.startsWith("/auth") ||
+    pathname.startsWith("/ingest")
+  );
 }
 
 const pretendard = localFont({
@@ -76,7 +80,7 @@ export default async function RootLayout({
 }>) {
   const h = await headers();
   const pathname = h.get("x-pathname") || "";
-  const hideChrome = isRadarPath(pathname);
+  const hideChrome = shouldHideChrome(pathname);
 
   return (
     <html
