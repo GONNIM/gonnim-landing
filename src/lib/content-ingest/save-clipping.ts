@@ -160,15 +160,51 @@ function truncate(s: string, n: number): string {
   return s.slice(0, n) + "\n... (원문 " + s.length + "자 · " + n + "자로 발췌)";
 }
 
-function pad2(n: number): string {
-  return n.toString().padStart(2, "0");
+// Vercel 서버는 UTC · 사용자 vault 는 KST 정합 필요 → Intl 로 Asia/Seoul 강제
+const KST_PARTS_FMT = new Intl.DateTimeFormat("en-CA", {
+  timeZone: "Asia/Seoul",
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+  hour: "2-digit",
+  minute: "2-digit",
+  second: "2-digit",
+  hour12: false,
+});
+
+function kstParts(d: Date): {
+  year: string;
+  month: string;
+  day: string;
+  hour: string;
+  minute: string;
+  second: string;
+} {
+  const parts = KST_PARTS_FMT.formatToParts(d);
+  const get = (type: string) =>
+    parts.find((p) => p.type === type)?.value ?? "00";
+  // Intl 에서 hour "24" 로 나오는 경우 있음 (자정) → "00" 정규화
+  const hourRaw = get("hour");
+  const hour = hourRaw === "24" ? "00" : hourRaw;
+  return {
+    year: get("year"),
+    month: get("month"),
+    day: get("day"),
+    hour,
+    minute: get("minute"),
+    second: get("second"),
+  };
 }
+
 function formatDate(d: Date): string {
-  return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+  const p = kstParts(d);
+  return `${p.year}-${p.month}-${p.day}`;
 }
 function formatTime(d: Date): string {
-  return `${pad2(d.getHours())}${pad2(d.getMinutes())}${pad2(d.getSeconds())}`;
+  const p = kstParts(d);
+  return `${p.hour}${p.minute}${p.second}`;
 }
 function formatDateTime(d: Date): string {
-  return `${formatDate(d)} ${pad2(d.getHours())}:${pad2(d.getMinutes())}:${pad2(d.getSeconds())}`;
+  const p = kstParts(d);
+  return `${p.year}-${p.month}-${p.day} ${p.hour}:${p.minute}:${p.second}`;
 }
