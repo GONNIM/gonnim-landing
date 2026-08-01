@@ -64,12 +64,35 @@ export function IngestForm() {
       if (!res.ok) {
         throw new Error(json?.error || `저장 실패 (${res.status})`);
       }
-      setSaved(json.saved);
+      if (json.mode === "download") {
+        triggerDownload(json.filename, json.markdown);
+        setSaved({
+          path: `Downloads/${json.filename}`,
+          filename: json.filename,
+          slug: json.filename.replace(/\.md$/, ""),
+          createdAt: json.createdAt,
+        });
+      } else {
+        setSaved(json.saved);
+      }
       setStage("saved");
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
       setStage("error");
     }
+  }
+
+  function triggerDownload(filename: string, markdown: string): void {
+    const blob = new Blob([markdown], { type: "text/markdown;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    // 500ms 후 blob URL 해제 (다운로드 시작 시간 확보)
+    setTimeout(() => URL.revokeObjectURL(url), 500);
   }
 
   function handleReset() {
@@ -186,11 +209,16 @@ export function IngestForm() {
           <div className="flex items-center justify-between border-t border-[color:var(--border)]/40 pt-4">
             {saved ? (
               <div className="text-xs text-emerald-400">
-                ✓ 저장됨 · <code>{saved.filename}</code>
+                ✓ {saved.path.startsWith("Downloads/") ? "다운로드됨" : "저장됨"} · <code>{saved.filename}</code>
+                {saved.path.startsWith("Downloads/") && (
+                  <span className="ml-2 text-muted-foreground">
+                    · Downloads/ → Obsidian Clippings/summaries/ 로 이동
+                  </span>
+                )}
               </div>
             ) : (
               <div className="text-xs text-muted-foreground">
-                확인 후 Obsidian 저장 가능
+                확인 후 Obsidian 저장 (로컬) / 다운로드 (프로덕션)
               </div>
             )}
             <button
@@ -199,7 +227,7 @@ export function IngestForm() {
               disabled={stage === "saving" || stage === "saved"}
               className="rounded border border-emerald-700 bg-emerald-950 px-4 py-1 text-xs font-medium text-emerald-300 hover:bg-emerald-900 disabled:opacity-40"
             >
-              {stage === "saving" ? "💾 저장 중…" : stage === "saved" ? "✓ 저장 완료" : "💾 Obsidian 저장"}
+              {stage === "saving" ? "💾 저장 중…" : stage === "saved" ? "✓ 완료" : "💾 저장 · 다운로드"}
             </button>
           </div>
         </div>

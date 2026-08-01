@@ -19,31 +19,45 @@ export type SaveOptions = {
   now?: Date;
 };
 
+export type RenderedClipping = {
+  filename: string;
+  slug: string;
+  markdown: string;
+  createdAt: string;
+};
+
+// 파일 쓰기 없이 markdown + 파일명만 생성 (Vercel 다운로드 fallback 용)
+export function renderClipping(
+  content: ExtractedContent,
+  summary: SummarizeResult,
+  options: Pick<SaveOptions, "now"> = {},
+): RenderedClipping {
+  const now = options.now ?? new Date();
+  const dateStr = formatDate(now);
+  const timeStr = formatTime(now);
+  const slug = buildSlug(content, summary);
+  const filename = `${dateStr}-${timeStr}-${slug}.md`;
+  const markdown = renderMarkdown(content, summary, now);
+  return { filename, slug, markdown, createdAt: now.toISOString() };
+}
+
 export async function saveClipping(
   content: ExtractedContent,
   summary: SummarizeResult,
   options: SaveOptions = {},
 ): Promise<SavedClipping> {
   const dir = options.clippingsDir || process.env.INGEST_CLIPPINGS_DIR || DEFAULT_CLIPPINGS_DIR;
-  const now = options.now ?? new Date();
+  const rendered = renderClipping(content, summary, { now: options.now });
 
   await fs.mkdir(dir, { recursive: true });
-
-  const dateStr = formatDate(now);
-  const timeStr = formatTime(now);
-  const slug = buildSlug(content, summary);
-  const filename = `${dateStr}-${timeStr}-${slug}.md`;
-  const filePath = path.join(dir, filename);
-
-  const body = renderMarkdown(content, summary, now);
-
-  await fs.writeFile(filePath, body, "utf8");
+  const filePath = path.join(dir, rendered.filename);
+  await fs.writeFile(filePath, rendered.markdown, "utf8");
 
   return {
     path: filePath,
-    filename,
-    slug,
-    createdAt: now.toISOString(),
+    filename: rendered.filename,
+    slug: rendered.slug,
+    createdAt: rendered.createdAt,
   };
 }
 
