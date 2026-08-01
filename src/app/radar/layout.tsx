@@ -20,6 +20,14 @@ export default async function RadarLayout({
       <header className="sticky top-0 z-40 border-b border-[color:var(--border)]/70/60 bg-background/80 backdrop-blur">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
           <div className="flex items-center gap-6">
+            {user && (
+              <Link
+                href="/app"
+                className="hidden text-xs text-muted-foreground hover:text-foreground sm:inline"
+              >
+                ← My Apps
+              </Link>
+            )}
             <Link
               href="/radar"
               className="text-lg font-semibold tracking-tight"

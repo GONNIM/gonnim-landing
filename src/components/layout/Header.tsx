@@ -1,4 +1,6 @@
+import Link from "next/link";
 import { MobileNav } from "@/components/layout/MobileNav";
+import { getServerAuthClient } from "@/lib/supabase/ssr-client";
 
 const NAV_LINKS = [
   { href: "#about", label: "About" },
@@ -26,7 +28,12 @@ function GitHubMark() {
   );
 }
 
-export function Header() {
+export async function Header() {
+  const supabase = await getServerAuthClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
   return (
     <header className="sticky top-0 z-40 border-b border-[color:var(--color-border)]/70 bg-[color:var(--color-background)]/80 backdrop-blur-md">
       <div className="mx-auto flex h-14 w-full max-w-6xl items-center gap-4 px-6 md:px-8">
@@ -62,6 +69,22 @@ export function Header() {
           >
             <GitHubMark />
           </a>
+          {user ? (
+            <Link
+              href="/app"
+              className="inline-flex h-9 items-center gap-1.5 rounded-full border border-[color:var(--color-border)] bg-[color:var(--color-surface)] px-4 text-sm font-semibold text-[color:var(--color-foreground)] transition-colors hover:bg-[color:var(--color-muted)]/40"
+              title={user.email ?? undefined}
+            >
+              🚀 My Apps
+            </Link>
+          ) : (
+            <Link
+              href="/radar/login?next=/app"
+              className="inline-flex h-9 items-center rounded-full border border-[color:var(--color-border)] px-4 text-sm font-medium text-[color:var(--color-muted-foreground)] transition-colors hover:bg-[color:var(--color-surface)] hover:text-[color:var(--color-foreground)]"
+            >
+              로그인
+            </Link>
+          )}
           <a
             href="#contact"
             className="inline-flex h-9 items-center gap-1.5 rounded-full bg-[color:var(--color-accent)] px-4 text-sm font-semibold text-[color:var(--color-accent-foreground)] shadow-sm transition-transform hover:scale-[1.02]"

@@ -22,17 +22,22 @@ export default async function IngestPage() {
     <main className="min-h-screen bg-background text-foreground">
       <header className="sticky top-0 z-40 border-b border-[color:var(--border)]/60 bg-background/80 backdrop-blur">
         <div className="mx-auto flex max-w-4xl items-center justify-between px-6 py-4">
-          <Link
-            href="/ingest"
-            className="text-lg font-semibold tracking-tight"
-          >
-            Content Ingest
-          </Link>
-          <div className="text-xs text-muted-foreground">
-            {user.email} ·{" "}
-            <Link href="/radar" className="underline hover:text-foreground">
-              Sprint Radar
+          <div className="flex items-center gap-4">
+            <Link
+              href="/app"
+              className="hidden text-xs text-muted-foreground hover:text-foreground sm:inline"
+            >
+              ← My Apps
             </Link>
+            <Link
+              href="/ingest"
+              className="text-lg font-semibold tracking-tight"
+            >
+              Content Ingest
+            </Link>
+          </div>
+          <div className="text-xs text-muted-foreground">
+            {user.email}
           </div>
         </div>
       </header>

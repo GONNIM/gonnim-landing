@@ -13,7 +13,8 @@ function shouldHideChrome(pathname: string): boolean {
   return (
     pathname.startsWith("/radar") ||
     pathname.startsWith("/auth") ||
-    pathname.startsWith("/ingest")
+    pathname.startsWith("/ingest") ||
+    pathname.startsWith("/app")
   );
 }
 
