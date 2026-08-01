@@ -20,6 +20,7 @@ config({ path: path.resolve(__dirname, "..", ".env.local") });
 type Args = {
   mode: "url" | "stdin" | "file";
   value: string | null;
+  useVision: boolean;
 };
 
 async function main(): Promise<void> {
@@ -46,10 +47,11 @@ async function main(): Promise<void> {
 }
 
 async function loadContent(args: Args): Promise<ExtractedContent> {
+  const extractOpts = { useVision: args.useVision };
   if (args.mode === "url") {
     if (!args.value) throw new Error("URL 이 비어 있습니다");
-    log(`→ URL fetch: ${args.value}`);
-    return extractFromUrl(args.value);
+    log(`→ URL fetch: ${args.value}${args.useVision ? " (vision on)" : ""}`);
+    return extractFromUrl(args.value, extractOpts);
   }
   if (args.mode === "file") {
     if (!args.value) throw new Error("--file 경로가 비어 있습니다");
@@ -63,8 +65,8 @@ async function loadContent(args: Args): Promise<ExtractedContent> {
   // stdin 이 URL 하나면 URL 모드로 처리
   const trimmed = text.trim();
   if (/^https?:\/\/\S+$/.test(trimmed)) {
-    log(`→ stdin URL 감지: ${trimmed}`);
-    return extractFromUrl(trimmed);
+    log(`→ stdin URL 감지: ${trimmed}${args.useVision ? " (vision on)" : ""}`);
+    return extractFromUrl(trimmed, extractOpts);
   }
   return extractFromText(text);
 }
@@ -72,6 +74,7 @@ async function loadContent(args: Args): Promise<ExtractedContent> {
 function parseArgs(argv: string[]): Args {
   let mode: Args["mode"] = "url";
   let value: string | null = null;
+  let useVision = false;
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === "--stdin") {
@@ -81,6 +84,8 @@ function parseArgs(argv: string[]): Args {
       mode = "file";
       value = argv[i + 1] || null;
       i++;
+    } else if (a === "--vision") {
+      useVision = true;
     } else if (a === "--help" || a === "-h") {
       printUsage();
       process.exit(0);
@@ -94,7 +99,7 @@ function parseArgs(argv: string[]): Args {
     printUsage();
     process.exit(1);
   }
-  return { mode, value };
+  return { mode, value, useVision };
 }
 
 function printUsage(): void {
@@ -104,6 +109,10 @@ function printUsage(): void {
   pnpm ingest:personal "https://..."
   pbpaste | pnpm ingest:personal --stdin
   pnpm ingest:personal --file ~/Downloads/article.txt
+  pnpm ingest:personal --vision "https://www.threads.com/..."   # 이미지 텍스트 추출 (Threads 등)
+
+옵션:
+  --vision                  이미지 게시물 (Threads/Instagram) 이미지 텍스트 추출 (z.ai GLM-4.6V)
 
 환경변수:
   ZAI_API_KEY               필수 · z.ai GLM-5.2 API 키

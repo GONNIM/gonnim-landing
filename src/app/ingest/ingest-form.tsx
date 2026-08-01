@@ -11,6 +11,7 @@ type Stage = "idle" | "processing" | "result" | "saving" | "saved" | "error";
 
 export function IngestForm() {
   const [input, setInput] = useState("");
+  const [useVision, setUseVision] = useState(false);
   const [stage, setStage] = useState<Stage>("idle");
   const [error, setError] = useState<string | null>(null);
   const [content, setContent] = useState<ExtractedContent | null>(null);
@@ -20,6 +21,7 @@ export function IngestForm() {
   const trimmed = input.trim();
   const isUrl = /^https?:\/\/\S+$/.test(trimmed);
   const canSubmit = trimmed.length > 0 && stage !== "processing";
+  const isThreadsOrInsta = /^https?:\/\/(www\.)?(threads\.(com|net)|instagram\.com)/.test(trimmed);
 
   async function handleSummarize() {
     if (!canSubmit) return;
@@ -29,7 +31,9 @@ export function IngestForm() {
     setSummary(null);
     setSaved(null);
 
-    const body = isUrl ? { url: trimmed } : { text: trimmed };
+    const body = isUrl
+      ? { url: trimmed, useVision }
+      : { text: trimmed };
 
     try {
       const res = await fetch("/api/ingest", {
@@ -140,6 +144,21 @@ export function IngestForm() {
               {stage === "processing" ? "🌀 요약 중… (~5초)" : "🚀 요약하기"}
             </button>
           </div>
+        </div>
+
+        <div className="mt-3 flex items-center gap-2 text-xs">
+          <label className="flex items-center gap-2 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={useVision}
+              onChange={(e) => setUseVision(e.target.checked)}
+              disabled={stage === "processing" || stage === "saving"}
+              className="h-3.5 w-3.5 cursor-pointer accent-emerald-500"
+            />
+            <span className={isThreadsOrInsta ? "text-foreground" : "text-muted-foreground"}>
+              🖼️ 이미지 텍스트 추출 (Threads/Instagram · z.ai GLM-4.6V · 추가 5~10초)
+            </span>
+          </label>
         </div>
       </div>
 

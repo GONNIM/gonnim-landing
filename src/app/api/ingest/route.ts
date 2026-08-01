@@ -23,7 +23,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
 
-  let body: { url?: string; text?: string };
+  let body: { url?: string; text?: string; useVision?: boolean };
   try {
     body = await req.json();
   } catch {
@@ -32,6 +32,7 @@ export async function POST(req: NextRequest) {
 
   const url = typeof body.url === "string" ? body.url.trim() : "";
   const text = typeof body.text === "string" ? body.text.trim() : "";
+  const useVision = body.useVision === true;
 
   if (!url && !text) {
     return NextResponse.json(
@@ -41,7 +42,9 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const content = url ? await extractFromUrl(url) : extractFromText(text);
+    const content = url
+      ? await extractFromUrl(url, { useVision })
+      : extractFromText(text);
     const summary = await summarize(content);
     return NextResponse.json({ content, summary });
   } catch (err) {

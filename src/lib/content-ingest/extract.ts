@@ -8,8 +8,15 @@
 
 import * as cheerio from "cheerio";
 import { fetchTikTokMeta } from "./tiktok-api";
+import { fetchThreadsMeta } from "./threads-api";
 import { transcribeFromUrl } from "./transcript";
+import { extractTextFromImage } from "./vision";
 import type { ExtractedContent } from "./types";
+
+export type ExtractOptions = {
+  // Threads/Instagram 등 이미지 게시물에서 z.ai Vision 으로 이미지 텍스트 추출
+  useVision?: boolean;
+};
 
 const USER_AGENT =
   "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0 Safari/537.36";
@@ -17,10 +24,16 @@ const USER_AGENT =
 const FETCH_TIMEOUT_MS = 15_000;
 const MAX_TEXT_CHARS = 40_000;
 
-export async function extractFromUrl(url: string): Promise<ExtractedContent> {
+export async function extractFromUrl(
+  url: string,
+  options: ExtractOptions = {},
+): Promise<ExtractedContent> {
   const parsed = new URL(url);
   if (parsed.hostname.endsWith("tiktok.com")) {
     return extractFromTikTok(parsed.toString());
+  }
+  if (parsed.hostname.endsWith("threads.com") || parsed.hostname.endsWith("threads.net")) {
+    return extractFromThreads(parsed.toString(), options);
   }
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
@@ -146,6 +159,68 @@ function labelSource(s: "caption" | "stt" | "none"): string {
   if (s === "caption") return "TikTok 자체 자막";
   if (s === "stt") return "Groq Whisper STT (오디오 → 텍스트)";
   return "없음";
+}
+
+// Threads URL → 소셜 봇 UA og:* 추출 · useVision 옵션 시 og:image → z.ai Vision
+async function extractFromThreads(
+  url: string,
+  options: ExtractOptions,
+): Promise<ExtractedContent> {
+  const meta = await fetchThreadsMeta(url);
+
+  let imageText = "";
+  let imageTextKind: "text" | "description" | "none" = "none";
+
+  if (options.useVision && meta.imageUrl) {
+    try {
+      const vision = await extractTextFromImage(meta.imageUrl);
+      imageText = vision.text;
+      imageTextKind = vision.kind;
+    } catch (err) {
+      // Vision 실패는 fatal 아님 · og:* 만으로 계속 진행
+      imageText = `[Vision 추출 실패: ${err instanceof Error ? err.message : String(err)}]`;
+      imageTextKind = "none";
+    }
+  }
+
+  const header: string[] = [];
+  if (meta.title) header.push(`제목: ${meta.title}`);
+  if (meta.imageUrl) header.push(`이미지: ${meta.imageUrl}`);
+  header.push(`이미지 텍스트 출처: ${labelThreadsSource(options.useVision, imageTextKind)}`);
+
+  const bodyParts: string[] = [];
+  if (imageText) {
+    bodyParts.push(imageTextKind === "text" ? "[이미지 텍스트]" : "[이미지 설명]");
+    bodyParts.push(imageText);
+  } else if (options.useVision) {
+    bodyParts.push("[이미지 텍스트 없음]");
+  } else {
+    bodyParts.push(
+      "[본문 텍스트는 Threads 링크 미리보기에 노출되지 않음 · 필요 시 Threads 앱에서 텍스트 복사 후 재입력 또는 이미지 텍스트 추출 옵션 활성]",
+    );
+  }
+
+  const text = `${header.join("\n")}\n\n${bodyParts.join("\n")}`.trim();
+
+  return {
+    source: "web",
+    url,
+    title: meta.title,
+    author: null,
+    published: null,
+    text,
+    fetchedAt: new Date().toISOString(),
+  };
+}
+
+function labelThreadsSource(
+  useVision: boolean | undefined,
+  kind: "text" | "description" | "none",
+): string {
+  if (!useVision) return "미사용 (og:* meta 만)";
+  if (kind === "text") return "z.ai GLM-4.6V (이미지 텍스트 OCR)";
+  if (kind === "description") return "z.ai GLM-4.6V (텍스트 없어 이미지 묘사)";
+  return "실패 or 없음";
 }
 
 export function extractFromText(text: string): ExtractedContent {
