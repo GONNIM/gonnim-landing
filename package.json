@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "sync:wiki-ideas": "tsx scripts/sync-wiki-ideas.ts"
+    "sync:wiki-ideas": "tsx scripts/sync-wiki-ideas.ts",
+    "ingest:personal": "tsx scripts/ingest-personal.ts"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.0",
