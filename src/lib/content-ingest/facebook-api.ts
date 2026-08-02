@@ -20,6 +20,7 @@ const FETCH_TIMEOUT_MS = 20_000;
 export type FacebookMeta = {
   url: string;
   decodedTitle: string | null; // og:url path 디코드 결과 (Facebook 은 여기에 제목 인코딩)
+  caption: string | null; // Facebook 공식 임베드 위젯 "더 보기" 전체 캡션 (SSR 렌더링)
   imageUrl: string | null;
   videoUrl: string | null; // og:video:secure_url · mp4 · Groq Whisper STT 입력
   siteName: string | null;
@@ -27,19 +28,25 @@ export type FacebookMeta = {
 
 export async function fetchFacebookMeta(url: string): Promise<FacebookMeta> {
   const mobileUrl = normalizeToMobile(url);
+  const desktopUrl = normalizeToDesktop(url);
+  const embedUrl = buildEmbedUrl(desktopUrl);
 
-  // 1. mobile · iPhone UA 로 og:video 확보 시도
-  const mobileHtml = await fetchHtml(mobileUrl, MOBILE_UA);
-  const $m = cheerio.load(mobileHtml);
+  // 병렬 3-way fetch: mobile (og:video) + desktop (og:url 제목·이미지) + embed (전체 캡션)
+  // embed 는 짧은 UA 만 SSR 반환 · Chrome UA 는 봇 감지 걸림
+  const [mobileHtml, desktopHtml, embedHtml] = await Promise.all([
+    fetchHtml(mobileUrl, MOBILE_UA).catch(() => ""),
+    fetchHtml(desktopUrl, SOCIAL_BOT_UA).catch(() => ""),
+    fetchHtml(embedUrl, SOCIAL_BOT_UA).catch(() => ""),
+  ]);
+
+  const $m = cheerio.load(mobileHtml || "<html></html>");
+  const $d = cheerio.load(desktopHtml || "<html></html>");
+
   const videoUrl =
     $m('meta[property="og:video:secure_url"]').attr("content")?.trim() ||
     $m('meta[property="og:video"]').attr("content")?.trim() ||
     null;
 
-  // 2. desktop · facebookexternalhit UA 로 og:url path 인코딩 제목 확보 시도
-  const desktopUrl = normalizeToDesktop(url);
-  const desktopHtml = await fetchHtml(desktopUrl, SOCIAL_BOT_UA);
-  const $d = cheerio.load(desktopHtml);
   const ogUrl = $d('meta[property="og:url"]').attr("content")?.trim() || null;
   const desktopImage =
     $d('meta[property="og:image"]').attr("content")?.trim() || null;
@@ -52,12 +59,30 @@ export async function fetchFacebookMeta(url: string): Promise<FacebookMeta> {
 
   const decodedTitle = ogUrl ? decodeTitleFromOgUrl(ogUrl) : null;
   const imageUrl = desktopImage || mobileImage;
+  const caption = embedHtml ? extractCaptionFromEmbed(embedHtml) : null;
 
-  if (!decodedTitle && !imageUrl && !videoUrl) {
-    throw new Error("Facebook 페이지에서 유효한 og:* meta 를 찾을 수 없음");
+  if (!decodedTitle && !imageUrl && !videoUrl && !caption) {
+    throw new Error("Facebook 페이지에서 유효한 데이터를 확보할 수 없음");
   }
 
-  return { url, decodedTitle, imageUrl, videoUrl, siteName };
+  return { url, decodedTitle, caption, imageUrl, videoUrl, siteName };
+}
+
+// Facebook 공식 임베드 위젯 · show_text=true 시 "더 보기" 전체 캡션 SSR 렌더링
+function buildEmbedUrl(originalUrl: string): string {
+  const encoded = encodeURIComponent(originalUrl);
+  return `https://www.facebook.com/plugins/post.php?href=${encoded}&show_text=true`;
+}
+
+// Facebook 임베드 위젯의 .text_exposed_root 안 텍스트 (전체 캡션 · "더 보기" 포함)
+function extractCaptionFromEmbed(html: string): string | null {
+  const $ = cheerio.load(html);
+  // 임베드 UI 컨트롤 · "..." · "더 보기" 링크 · 계정 정보 등 노이즈 제거
+  $(".text_exposed_hide, .text_exposed_link, script, style").remove();
+  const root = $(".text_exposed_root").first();
+  if (root.length === 0) return null;
+  const text = root.text().replace(/[\s​]+/g, " ").trim();
+  return text.length > 20 ? text : null;
 }
 
 async function fetchHtml(url: string, ua: string): Promise<string> {

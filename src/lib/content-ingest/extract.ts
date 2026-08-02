@@ -235,6 +235,7 @@ function labelThreadsSource(
 }
 
 // Facebook (Reel/Video/Watch) URL → 종합 데이터 수집
+// - Facebook 임베드 위젯 (plugins/post.php?show_text=true) → 전체 캡션 ("더 보기" 포함) · 최우선 소스
 // - mobile UA fetch → og:video mp4 → Groq Whisper STT (자동)
 // - desktop 소셜 봇 UA → og:url path 디코드 (제목)
 // - useVision 옵션 → og:image → z.ai Vision (썸네일 텍스트)
@@ -245,7 +246,10 @@ async function extractFromFacebook(
   const meta = await fetchFacebookMeta(url);
 
   // 병렬: STT + Vision (독립적 · 지연 절반)
-  const sttPrompt = meta.decodedTitle
+  // caption 이 이미 있으면 STT 프롬프트 힌트로 활용 (Whisper 정확도 향상)
+  const sttPrompt = meta.caption
+    ? `게시글 본문 참고: ${meta.caption.slice(0, 200)}`
+    : meta.decodedTitle
     ? `이 영상 주제 힌트: ${meta.decodedTitle}`
     : undefined;
   const [stt, vision] = await Promise.all([
@@ -286,10 +290,14 @@ async function extractFromFacebook(
   if (meta.videoUrl) header.push(`비디오: ${meta.videoUrl.split("?")[0]}`);
   if (meta.imageUrl) header.push(`썸네일: ${meta.imageUrl.split("?")[0]}`);
   header.push(
-    `스크립트 출처: ${labelFacebookSource(sttOk, options.useVision, visionKind)}`,
+    `데이터 출처: ${labelFacebookSource(Boolean(meta.caption), sttOk, options.useVision, visionKind)}`,
   );
 
   const bodyParts: string[] = [];
+  if (meta.caption) {
+    bodyParts.push("[게시글 본문 · Facebook 임베드 위젯 · '더 보기' 포함]");
+    bodyParts.push(meta.caption);
+  }
   if (sttOk) {
     bodyParts.push("[비디오 스크립트 · Groq Whisper STT]");
     bodyParts.push(sttText);
@@ -300,9 +308,9 @@ async function extractFromFacebook(
     );
     bodyParts.push(visionText);
   }
-  if (!sttOk && !visionText) {
+  if (!meta.caption && !sttOk && !visionText) {
     bodyParts.push(
-      "[Facebook 비디오/썸네일 데이터를 확보할 수 없음 · Facebook 앱에서 자막·본문 복사 후 텍스트 붙여넣기]",
+      "[Facebook 데이터를 확보할 수 없음 · Facebook 앱에서 자막·본문 복사 후 텍스트 붙여넣기]",
     );
   }
 
@@ -320,13 +328,15 @@ async function extractFromFacebook(
 }
 
 function labelFacebookSource(
+  captionOk: boolean,
   sttOk: boolean,
   useVision: boolean | undefined,
   visionKind: "text" | "description" | "none",
 ): string {
   const parts: string[] = [];
-  parts.push("og:url 디코드");
-  if (sttOk) parts.push("Groq Whisper STT (비디오)");
+  if (captionOk) parts.push("임베드 위젯 본문 (게시글 캡션)");
+  parts.push("og:url 디코드 (제목)");
+  if (sttOk) parts.push("Groq Whisper STT (비디오 음성)");
   if (useVision && visionKind === "text") parts.push("z.ai Vision (썸네일 텍스트)");
   if (useVision && visionKind === "description") parts.push("z.ai Vision (썸네일 묘사)");
   return parts.join(" + ");
