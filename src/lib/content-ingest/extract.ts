@@ -112,24 +112,42 @@ export async function extractFromUrl(
   };
 }
 
-// TikTok URL → tikwm.com (메타 + mp3 URL) + Groq Whisper STT (자막 없을 시)
-// 자막 있으면 STT 스킵 (비용·시간 절감)
+// TikTok URL → tikwm.com (메타 + mp3 URL) + Groq Whisper STT
+// 캡션이 길면 (>100자) STT 스킵 (비용·시간 절감)
+// 캡션 짧거나 없으면 STT 병행 (실 대화 확보)
+const TIKTOK_CAPTION_MIN_CHARS = 100;
+
 async function extractFromTikTok(url: string): Promise<ExtractedContent> {
   const meta = await fetchTikTokMeta(url);
 
-  // 우선순위: content_desc (TikTok 자체 자막) > mp3 → Groq STT
-  let transcript = "";
-  let transcriptSource: "caption" | "stt" | "none" = "none";
+  const captionText = meta.captions.join("\n").trim();
+  const captionLong = captionText.length >= TIKTOK_CAPTION_MIN_CHARS;
+  const needStt = !captionLong && Boolean(meta.audioUrl);
 
-  if (meta.captions.length > 0) {
-    transcript = meta.captions.join("\n").trim();
+  let sttText = "";
+  if (needStt && meta.audioUrl) {
+    const hintParts: string[] = [];
+    if (meta.title) hintParts.push(meta.title);
+    if (captionText) hintParts.push(captionText);
+    const prompt = hintParts.length > 0 ? `이 영상 주제 힌트: ${hintParts.join(" · ")}` : undefined;
+    try {
+      const stt = await transcribeFromUrl(meta.audioUrl, { language: "ko", prompt });
+      sttText = stt.text;
+    } catch {
+      sttText = "";
+    }
+  }
+
+  let transcript = "";
+  let transcriptSource: "caption" | "stt" | "both" | "none" = "none";
+  if (captionText && sttText) {
+    transcript = `${captionText}\n\n---\n\n${sttText}`;
+    transcriptSource = "both";
+  } else if (captionText) {
+    transcript = captionText;
     transcriptSource = "caption";
-  } else if (meta.audioUrl) {
-    const stt = await transcribeFromUrl(meta.audioUrl, {
-      language: "ko",
-      prompt: meta.title ? `이 영상 주제 힌트: ${meta.title}` : undefined,
-    });
-    transcript = stt.text;
+  } else if (sttText) {
+    transcript = sttText;
     transcriptSource = "stt";
   }
 
@@ -170,9 +188,10 @@ async function extractFromTikTok(url: string): Promise<ExtractedContent> {
   };
 }
 
-function labelSource(s: "caption" | "stt" | "none"): string {
+function labelSource(s: "caption" | "stt" | "both" | "none"): string {
   if (s === "caption") return "TikTok 자체 자막";
   if (s === "stt") return "Groq Whisper STT (오디오 → 텍스트)";
+  if (s === "both") return "TikTok 자막 + Groq Whisper STT (짧은 캡션 보완)";
   return "없음";
 }
 
