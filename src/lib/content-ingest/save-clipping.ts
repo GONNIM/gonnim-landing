@@ -66,6 +66,7 @@ export async function saveClipping(
     filename: rendered.filename,
     slug: rendered.slug,
     createdAt: rendered.createdAt,
+    folder: rendered.suggestedFolder,
   };
 }
 

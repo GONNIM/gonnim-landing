@@ -76,6 +76,7 @@ export function IngestForm() {
           filename: json.filename,
           slug: json.filename.replace(/\.md$/, ""),
           createdAt: json.createdAt,
+          folder,
         });
       } else {
         setSaved(json.saved);
@@ -228,12 +229,20 @@ export function IngestForm() {
 
           <div className="flex items-center justify-between border-t border-[color:var(--border)]/40 pt-4">
             {saved ? (
-              <div className="text-xs text-emerald-400">
-                ✓ {saved.path.startsWith("Downloads/") ? "다운로드됨" : "저장됨"} · <code>{saved.filename}</code>
+              <div className="text-xs text-emerald-400 space-y-1">
+                <div>
+                  ✓ {saved.path.startsWith("Downloads/") ? "다운로드됨" : "저장됨"}
+                </div>
+                <div className="font-mono text-[11px] text-muted-foreground">
+                  📁 <code>Clippings/summaries/{saved.folder}/</code>
+                </div>
+                <div className="font-mono text-[11px] text-muted-foreground">
+                  📄 <code>{saved.filename}</code>
+                </div>
                 {saved.path.startsWith("Downloads/") && (
-                  <span className="ml-2 text-muted-foreground">
-                    · 이동 대상: <code>{saved.path.split(" → ")[1] || "Clippings/summaries/misc/"}</code>
-                  </span>
+                  <div className="text-[11px] text-muted-foreground">
+                    Downloads/ 에서 위 폴더로 이동 필요
+                  </div>
                 )}
               </div>
             ) : (

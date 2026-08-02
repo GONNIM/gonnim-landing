@@ -28,4 +28,5 @@ export type SavedClipping = {
   filename: string;
   slug: string;
   createdAt: string;
+  folder: string; // 도메인 폴더명 (예: "trading", "business", "misc")
 };
