@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "eslint",
     "sync:wiki-ideas": "tsx scripts/sync-wiki-ideas.ts",
-    "ingest:personal": "tsx scripts/ingest-personal.ts"
+    "ingest:personal": "tsx scripts/ingest-personal.ts",
+    "ingest:reorganize": "tsx scripts/ingest-reorganize.ts"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.0",

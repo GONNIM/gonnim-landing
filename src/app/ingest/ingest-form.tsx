@@ -70,8 +70,9 @@ export function IngestForm() {
       }
       if (json.mode === "download") {
         triggerDownload(json.filename, json.markdown);
+        const folder = json.suggestedFolder || "misc";
         setSaved({
-          path: `Downloads/${json.filename}`,
+          path: `Downloads/${json.filename} → Clippings/summaries/${folder}/`,
           filename: json.filename,
           slug: json.filename.replace(/\.md$/, ""),
           createdAt: json.createdAt,
@@ -231,7 +232,7 @@ export function IngestForm() {
                 ✓ {saved.path.startsWith("Downloads/") ? "다운로드됨" : "저장됨"} · <code>{saved.filename}</code>
                 {saved.path.startsWith("Downloads/") && (
                   <span className="ml-2 text-muted-foreground">
-                    · Downloads/ → Obsidian Clippings/summaries/ 로 이동
+                    · 이동 대상: <code>{saved.path.split(" → ")[1] || "Clippings/summaries/misc/"}</code>
                   </span>
                 )}
               </div>

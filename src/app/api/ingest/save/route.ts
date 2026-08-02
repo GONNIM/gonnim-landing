@@ -53,6 +53,7 @@ export async function POST(req: NextRequest) {
       filename: rendered.filename,
       markdown: rendered.markdown,
       createdAt: rendered.createdAt,
+      suggestedFolder: rendered.suggestedFolder,
     });
   }
 

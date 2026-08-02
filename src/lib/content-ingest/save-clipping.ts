@@ -24,6 +24,7 @@ export type RenderedClipping = {
   slug: string;
   markdown: string;
   createdAt: string;
+  suggestedFolder: string; // 도메인 폴더명 (Vercel 다운로드 시 사용자 이동 힌트)
 };
 
 // 파일 쓰기 없이 markdown + 파일명만 생성 (Vercel 다운로드 fallback 용)
@@ -38,7 +39,13 @@ export function renderClipping(
   const slug = buildSlug(content, summary);
   const filename = `${dateStr}-${timeStr}-${slug}.md`;
   const markdown = renderMarkdown(content, summary, now);
-  return { filename, slug, markdown, createdAt: now.toISOString() };
+  return {
+    filename,
+    slug,
+    markdown,
+    createdAt: now.toISOString(),
+    suggestedFolder: sanitizeFolder(summary.domain),
+  };
 }
 
 export async function saveClipping(
@@ -46,11 +53,12 @@ export async function saveClipping(
   summary: SummarizeResult,
   options: SaveOptions = {},
 ): Promise<SavedClipping> {
-  const dir = options.clippingsDir || process.env.INGEST_CLIPPINGS_DIR || DEFAULT_CLIPPINGS_DIR;
+  const rootDir = options.clippingsDir || process.env.INGEST_CLIPPINGS_DIR || DEFAULT_CLIPPINGS_DIR;
   const rendered = renderClipping(content, summary, { now: options.now });
+  const domainDir = path.join(rootDir, rendered.suggestedFolder);
 
-  await fs.mkdir(dir, { recursive: true });
-  const filePath = path.join(dir, rendered.filename);
+  await fs.mkdir(domainDir, { recursive: true });
+  const filePath = path.join(domainDir, rendered.filename);
   await fs.writeFile(filePath, rendered.markdown, "utf8");
 
   return {
@@ -59,6 +67,12 @@ export async function saveClipping(
     slug: rendered.slug,
     createdAt: rendered.createdAt,
   };
+}
+
+// 도메인 문자열 → 폴더명 (misc 폴백 · 소문자 · 특수문자 제거)
+function sanitizeFolder(domain: string): string {
+  const clean = (domain || "").toLowerCase().replace(/[^a-z0-9-]/g, "");
+  return clean || "misc";
 }
 
 function renderMarkdown(
