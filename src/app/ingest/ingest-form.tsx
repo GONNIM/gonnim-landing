@@ -21,7 +21,7 @@ export function IngestForm() {
   const trimmed = input.trim();
   const isUrl = /^https?:\/\/\S+$/.test(trimmed);
   const canSubmit = trimmed.length > 0 && stage !== "processing";
-  const isThreadsOrInsta = /^https?:\/\/(www\.)?(threads\.(com|net)|instagram\.com)/.test(trimmed);
+  const isImageAware = /^https?:\/\/(www\.)?(threads\.(com|net)|instagram\.com|facebook\.com|m\.facebook\.com|fb\.watch)/.test(trimmed);
 
   async function handleSummarize() {
     if (!canSubmit) return;
@@ -155,8 +155,8 @@ export function IngestForm() {
               disabled={stage === "processing" || stage === "saving"}
               className="h-3.5 w-3.5 cursor-pointer accent-emerald-500"
             />
-            <span className={isThreadsOrInsta ? "text-foreground" : "text-muted-foreground"}>
-              🖼️ 이미지 텍스트 추출 (Threads/Instagram · z.ai GLM-4.6V · 추가 5~10초)
+            <span className={isImageAware ? "text-foreground" : "text-muted-foreground"}>
+              🖼️ 이미지 텍스트 추출 (Threads/Instagram/Facebook · z.ai GLM-4.6V · 추가 5~10초)
             </span>
           </label>
         </div>

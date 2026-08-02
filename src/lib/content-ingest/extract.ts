@@ -10,6 +10,7 @@ import * as cheerio from "cheerio";
 import { fetchTikTokMeta } from "./tiktok-api";
 import { fetchThreadsMeta } from "./threads-api";
 import { fetchFacebookMeta } from "./facebook-api";
+import { fetchInstagramMeta } from "./instagram-api";
 import { transcribeFromUrl } from "./transcript";
 import { extractTextFromImage } from "./vision";
 import type { ExtractedContent } from "./types";
@@ -42,6 +43,9 @@ export async function extractFromUrl(
     parsed.hostname.endsWith("fb.com")
   ) {
     return extractFromFacebook(parsed.toString(), options);
+  }
+  if (parsed.hostname.endsWith("instagram.com")) {
+    return extractFromInstagram(parsed.toString(), options);
   }
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
@@ -325,6 +329,77 @@ async function extractFromFacebook(
     text,
     fetchedAt: new Date().toISOString(),
   };
+}
+
+// Instagram (Post/Reel/IGTV) URL → 공식 embed/captioned 캡션 + og:image · useVision 시 Vision
+async function extractFromInstagram(
+  url: string,
+  options: ExtractOptions,
+): Promise<ExtractedContent> {
+  const meta = await fetchInstagramMeta(url);
+
+  let visionText = "";
+  let visionKind: "text" | "description" | "none" = "none";
+
+  if (options.useVision && meta.imageUrl) {
+    try {
+      const vision = await extractTextFromImage(meta.imageUrl);
+      visionText = vision.text;
+      visionKind = vision.kind;
+    } catch (err) {
+      visionText = `[Vision 추출 실패: ${err instanceof Error ? err.message : String(err)}]`;
+      visionKind = "none";
+    }
+  }
+
+  const header: string[] = [];
+  if (meta.title) header.push(`제목: ${meta.title}`);
+  if (meta.imageUrl) header.push(`이미지: ${meta.imageUrl.split("?")[0]}`);
+  header.push(
+    `데이터 출처: ${labelInstagramSource(Boolean(meta.caption), options.useVision, visionKind)}`,
+  );
+
+  const bodyParts: string[] = [];
+  if (meta.caption) {
+    bodyParts.push("[게시글 본문 · Instagram 공식 임베드]");
+    bodyParts.push(meta.caption);
+  }
+  if (visionText) {
+    bodyParts.push(
+      visionKind === "description" ? "[이미지 묘사]" : "[이미지 텍스트]",
+    );
+    bodyParts.push(visionText);
+  }
+  if (!meta.caption && !visionText) {
+    bodyParts.push(
+      "[Instagram 데이터를 확보할 수 없음 · 게시물이 비공개이거나 삭제됐거나 임베드 selector 변경 · Instagram 앱에서 본문 복사 후 텍스트 붙여넣기]",
+    );
+  }
+
+  const text = `${header.join("\n")}\n\n${bodyParts.join("\n")}`.trim();
+
+  return {
+    source: "web",
+    url,
+    title: meta.title,
+    author: null,
+    published: null,
+    text,
+    fetchedAt: new Date().toISOString(),
+  };
+}
+
+function labelInstagramSource(
+  captionOk: boolean,
+  useVision: boolean | undefined,
+  visionKind: "text" | "description" | "none",
+): string {
+  const parts: string[] = [];
+  if (captionOk) parts.push("공식 임베드 캡션");
+  parts.push("og:* meta");
+  if (useVision && visionKind === "text") parts.push("z.ai Vision (이미지 텍스트)");
+  if (useVision && visionKind === "description") parts.push("z.ai Vision (이미지 묘사)");
+  return parts.join(" + ");
 }
 
 function labelFacebookSource(
