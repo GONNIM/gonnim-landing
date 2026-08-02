@@ -9,6 +9,7 @@
 import * as cheerio from "cheerio";
 import { fetchTikTokMeta } from "./tiktok-api";
 import { fetchThreadsMeta } from "./threads-api";
+import { fetchFacebookMeta } from "./facebook-api";
 import { transcribeFromUrl } from "./transcript";
 import { extractTextFromImage } from "./vision";
 import type { ExtractedContent } from "./types";
@@ -34,6 +35,13 @@ export async function extractFromUrl(
   }
   if (parsed.hostname.endsWith("threads.com") || parsed.hostname.endsWith("threads.net")) {
     return extractFromThreads(parsed.toString(), options);
+  }
+  if (
+    parsed.hostname.endsWith("facebook.com") ||
+    parsed.hostname === "fb.watch" ||
+    parsed.hostname.endsWith("fb.com")
+  ) {
+    return extractFromFacebook(parsed.toString(), options);
   }
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
@@ -221,6 +229,66 @@ function labelThreadsSource(
   if (kind === "text") return "z.ai GLM-4.6V (이미지 텍스트 OCR)";
   if (kind === "description") return "z.ai GLM-4.6V (텍스트 없어 이미지 묘사)";
   return "실패 or 없음";
+}
+
+// Facebook (Reel/Video/Watch) URL → 소셜 봇 UA og:* · useVision 시 썸네일 → z.ai Vision
+async function extractFromFacebook(
+  url: string,
+  options: ExtractOptions,
+): Promise<ExtractedContent> {
+  const meta = await fetchFacebookMeta(url);
+
+  let imageText = "";
+  let imageTextKind: "text" | "description" | "none" = "none";
+
+  if (options.useVision && meta.imageUrl) {
+    try {
+      const vision = await extractTextFromImage(meta.imageUrl);
+      imageText = vision.text;
+      imageTextKind = vision.kind;
+    } catch (err) {
+      imageText = `[Vision 추출 실패: ${err instanceof Error ? err.message : String(err)}]`;
+      imageTextKind = "none";
+    }
+  }
+
+  const header: string[] = [];
+  if (meta.decodedTitle) header.push(`제목: ${meta.decodedTitle}`);
+  if (meta.imageUrl) header.push(`썸네일: ${meta.imageUrl}`);
+  header.push(`텍스트 출처: ${labelFacebookSource(options.useVision, imageTextKind)}`);
+
+  const bodyParts: string[] = [];
+  if (imageText) {
+    bodyParts.push(imageTextKind === "text" ? "[썸네일 텍스트]" : "[썸네일 묘사]");
+    bodyParts.push(imageText);
+  }
+  if (!imageText || imageTextKind === "description") {
+    bodyParts.push(
+      "[Facebook 은 비디오 자막·음성을 링크 미리보기에 노출하지 않음 · 실 스크립트 필요 시 Facebook 앱에서 자막/설명 복사 후 텍스트 붙여넣기]",
+    );
+  }
+
+  const text = `${header.join("\n")}\n\n${bodyParts.join("\n")}`.trim();
+
+  return {
+    source: "web",
+    url,
+    title: meta.decodedTitle,
+    author: null,
+    published: null,
+    text,
+    fetchedAt: new Date().toISOString(),
+  };
+}
+
+function labelFacebookSource(
+  useVision: boolean | undefined,
+  kind: "text" | "description" | "none",
+): string {
+  if (!useVision) return "og:url 디코드 (제목만)";
+  if (kind === "text") return "og:url + z.ai GLM-4.6V (썸네일 텍스트 OCR)";
+  if (kind === "description") return "og:url + z.ai GLM-4.6V (썸네일 묘사)";
+  return "og:url 디코드 (Vision 실패)";
 }
 
 export function extractFromText(text: string): ExtractedContent {
