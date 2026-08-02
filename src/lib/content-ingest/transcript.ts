@@ -9,13 +9,16 @@
 const GROQ_TRANSCRIPTION_ENDPOINT =
   "https://api.groq.com/openai/v1/audio/transcriptions";
 
-const DEFAULT_MODEL = "whisper-large-v3-turbo";
+// large-v3-turbo 는 빠르나 짧은 영상·노이즈 환경에서 hallucination 발생.
+// 정확도 우선 · large-v3 를 기본으로 사용.
+const DEFAULT_MODEL = "whisper-large-v3";
 const FETCH_TIMEOUT_MS = 60_000;
 
 export type TranscribeOptions = {
   model?: string;
   language?: string; // ISO-639-1 (ko, en, ja 등)
-  prompt?: string;
+  prompt?: string; // 도메인 컨텍스트 힌트 (제목·주제) · Whisper 정확도 향상
+  temperature?: number; // 0 = deterministic · hallucination 감소
 };
 
 export type TranscribeResult = {
@@ -45,6 +48,7 @@ export async function transcribeFromUrl(
   form.append("model", model);
   form.append("language", language);
   form.append("response_format", "text");
+  form.append("temperature", String(options.temperature ?? 0));
   if (options.prompt) form.append("prompt", options.prompt);
 
   const controller = new AbortController();

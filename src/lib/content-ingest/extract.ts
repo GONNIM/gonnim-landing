@@ -121,7 +121,10 @@ async function extractFromTikTok(url: string): Promise<ExtractedContent> {
     transcript = meta.captions.join("\n").trim();
     transcriptSource = "caption";
   } else if (meta.audioUrl) {
-    const stt = await transcribeFromUrl(meta.audioUrl, { language: "ko" });
+    const stt = await transcribeFromUrl(meta.audioUrl, {
+      language: "ko",
+      prompt: meta.title ? `이 영상 주제 힌트: ${meta.title}` : undefined,
+    });
     transcript = stt.text;
     transcriptSource = "stt";
   }
@@ -231,40 +234,75 @@ function labelThreadsSource(
   return "실패 or 없음";
 }
 
-// Facebook (Reel/Video/Watch) URL → 소셜 봇 UA og:* · useVision 시 썸네일 → z.ai Vision
+// Facebook (Reel/Video/Watch) URL → 종합 데이터 수집
+// - mobile UA fetch → og:video mp4 → Groq Whisper STT (자동)
+// - desktop 소셜 봇 UA → og:url path 디코드 (제목)
+// - useVision 옵션 → og:image → z.ai Vision (썸네일 텍스트)
 async function extractFromFacebook(
   url: string,
   options: ExtractOptions,
 ): Promise<ExtractedContent> {
   const meta = await fetchFacebookMeta(url);
 
-  let imageText = "";
-  let imageTextKind: "text" | "description" | "none" = "none";
+  // 병렬: STT + Vision (독립적 · 지연 절반)
+  const sttPrompt = meta.decodedTitle
+    ? `이 영상 주제 힌트: ${meta.decodedTitle}`
+    : undefined;
+  const [stt, vision] = await Promise.all([
+    meta.videoUrl
+      ? transcribeFromUrl(meta.videoUrl, {
+          language: "ko",
+          prompt: sttPrompt,
+        }).catch(
+          (err: unknown): { text: string; error: string } => ({
+            text: "",
+            error: err instanceof Error ? err.message : String(err),
+          }),
+        )
+      : Promise.resolve(null),
+    options.useVision && meta.imageUrl
+      ? extractTextFromImage(meta.imageUrl).catch(
+          (err: unknown): { text: string; kind: "none"; error: string } => ({
+            text: "",
+            kind: "none",
+            error: err instanceof Error ? err.message : String(err),
+          }),
+        )
+      : Promise.resolve(null),
+  ]);
 
-  if (options.useVision && meta.imageUrl) {
-    try {
-      const vision = await extractTextFromImage(meta.imageUrl);
-      imageText = vision.text;
-      imageTextKind = vision.kind;
-    } catch (err) {
-      imageText = `[Vision 추출 실패: ${err instanceof Error ? err.message : String(err)}]`;
-      imageTextKind = "none";
-    }
-  }
+  const sttText = stt && "text" in stt ? stt.text : "";
+  const sttOk = Boolean(sttText);
+  const visionText = vision && "text" in vision ? vision.text : "";
+  const visionKind =
+    vision && "kind" in vision && vision.kind === "description"
+      ? "description"
+      : visionText
+      ? "text"
+      : "none";
 
   const header: string[] = [];
   if (meta.decodedTitle) header.push(`제목: ${meta.decodedTitle}`);
-  if (meta.imageUrl) header.push(`썸네일: ${meta.imageUrl}`);
-  header.push(`텍스트 출처: ${labelFacebookSource(options.useVision, imageTextKind)}`);
+  if (meta.videoUrl) header.push(`비디오: ${meta.videoUrl.split("?")[0]}`);
+  if (meta.imageUrl) header.push(`썸네일: ${meta.imageUrl.split("?")[0]}`);
+  header.push(
+    `스크립트 출처: ${labelFacebookSource(sttOk, options.useVision, visionKind)}`,
+  );
 
   const bodyParts: string[] = [];
-  if (imageText) {
-    bodyParts.push(imageTextKind === "text" ? "[썸네일 텍스트]" : "[썸네일 묘사]");
-    bodyParts.push(imageText);
+  if (sttOk) {
+    bodyParts.push("[비디오 스크립트 · Groq Whisper STT]");
+    bodyParts.push(sttText);
   }
-  if (!imageText || imageTextKind === "description") {
+  if (visionText) {
     bodyParts.push(
-      "[Facebook 은 비디오 자막·음성을 링크 미리보기에 노출하지 않음 · 실 스크립트 필요 시 Facebook 앱에서 자막/설명 복사 후 텍스트 붙여넣기]",
+      visionKind === "description" ? "[썸네일 묘사]" : "[썸네일 텍스트]",
+    );
+    bodyParts.push(visionText);
+  }
+  if (!sttOk && !visionText) {
+    bodyParts.push(
+      "[Facebook 비디오/썸네일 데이터를 확보할 수 없음 · Facebook 앱에서 자막·본문 복사 후 텍스트 붙여넣기]",
     );
   }
 
@@ -282,13 +320,16 @@ async function extractFromFacebook(
 }
 
 function labelFacebookSource(
+  sttOk: boolean,
   useVision: boolean | undefined,
-  kind: "text" | "description" | "none",
+  visionKind: "text" | "description" | "none",
 ): string {
-  if (!useVision) return "og:url 디코드 (제목만)";
-  if (kind === "text") return "og:url + z.ai GLM-4.6V (썸네일 텍스트 OCR)";
-  if (kind === "description") return "og:url + z.ai GLM-4.6V (썸네일 묘사)";
-  return "og:url 디코드 (Vision 실패)";
+  const parts: string[] = [];
+  parts.push("og:url 디코드");
+  if (sttOk) parts.push("Groq Whisper STT (비디오)");
+  if (useVision && visionKind === "text") parts.push("z.ai Vision (썸네일 텍스트)");
+  if (useVision && visionKind === "description") parts.push("z.ai Vision (썸네일 묘사)");
+  return parts.join(" + ");
 }
 
 export function extractFromText(text: string): ExtractedContent {
