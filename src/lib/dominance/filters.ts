@@ -24,6 +24,17 @@ const RULES: { code: string; label: string; re: RegExp }[] = [
     label: "인용 — 대사·가사·원문 직접 인용",
     re: /[“"][^”"]{40,}[”"]/,
   },
+  {
+    // 2026-09-25 실측: 초안에 "전염 차단 interventions의 표심이 어긋난다" 가 나왔다.
+    // 모델이 단어 하나를 번역하지 않고 넘긴 것이고, 기존 규칙 셋은 잡지 못했다.
+    //
+    // 소문자만으로 이어진 3자 이상을 잡는다. 고유명사와 약어는 대문자를 품기
+    // 때문에(medRxiv · VECTRI-ABM · DNA · COVID-19) 걸리지 않는다. 그래서 오탐이
+    // 적고, 걸렸다면 대개 번역이 빠진 것이다.
+    code: "untranslated",
+    label: "미번역 — 영어 단어가 그대로 남음",
+    re: /(?<![A-Za-z])[a-z]{3,}(?![A-Za-z])/,
+  },
 ];
 
 export function flagBlock(block: LetterBlock): string[] {

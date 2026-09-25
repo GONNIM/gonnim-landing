@@ -31,6 +31,16 @@ const LOOKBACK_DAYS = 14;
 /** 한 건당 LLM 에 보내는 초록 길이. 전부 보내면 한 번에 들어가지 않는다. */
 const ABSTRACT_CHARS = 700;
 
+/**
+ * 제목이 한국어로 바뀌었는지 보는 검사.
+ *
+ * 모델은 지시를 받고도 영어 원제를 그대로 돌려주는 일이 있다. 2026-09-25 실측에서
+ * 20건 중 11건이 그랬고 전부 점수 하위였다. 그대로 두면 사용자가 매일 열한 건을
+ * 손으로 제외해야 한다. 매일 해야 하는 일을 만들지 않는 것이 이 제품의 조건이므로
+ * 번역이 안 된 건은 후보로 만들지 않는다.
+ */
+const HANGUL = /[가-힣]/;
+
 export type BuildReport = {
   candidateDate: string;
   scanned: number;
@@ -174,7 +184,7 @@ function parseVerdicts(raw: string, pool: Scored[]): Map<number, Verdict> {
     if (!Number.isInteger(n) || n < 1 || n > pool.length) continue;
 
     const headline = typeof r.headline === "string" ? r.headline.trim() : "";
-    if (!headline) continue;
+    if (!headline || !HANGUL.test(headline)) continue;
 
     const hook = typeof r.hook === "string" ? r.hook.trim() : "";
     const paradox =
@@ -299,6 +309,16 @@ export async function buildCandidates(
 
   // 판정이 없는 건은 넣지 않는다. 논문 제목은 영어이므로 한국어 제목이 없으면
   // 콘솔에 영어 제목이 그대로 올라간다. 후보가 0건인 편이 그것보다 낫다.
+  //
+  // 떨어진 수를 보고에 남긴다. 조용히 줄어들면 "원천이 없었다" 와 "번역이 안 됐다"
+  // 를 구별할 수 없고, 후보가 계속 모자란 원인을 찾을 근거가 사라진다.
+  const droppedByLlm = pool.length - verdicts.size;
+  if (droppedByLlm > 0) {
+    errors.push(
+      `${pool.length}건 중 ${droppedByLlm}건은 한국어 제목을 받지 못해 제외했습니다`,
+    );
+  }
+
   const finals = pool
     .map((s, i) => ({ source: s, verdict: verdicts.get(i) }))
     .filter((x): x is { source: Scored; verdict: Verdict } => x.verdict !== undefined)
