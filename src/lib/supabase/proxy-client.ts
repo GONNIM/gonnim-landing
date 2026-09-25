@@ -3,6 +3,17 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 
+// 인증이 필요한 앱 경로. /radar/login 이 공용 로그인 화면이므로 새 앱은 여기만 추가한다.
+const PROTECTED_PREFIXES = ["/radar", "/dominance"];
+const LOGIN_PATH = "/radar/login";
+
+function isProtectedPath(path: string) {
+  return (
+    PROTECTED_PREFIXES.some((prefix) => path.startsWith(prefix)) &&
+    !path.startsWith(LOGIN_PATH)
+  );
+}
+
 export async function updateSession(request: NextRequest) {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -16,13 +27,11 @@ export async function updateSession(request: NextRequest) {
     request: { headers: requestHeaders },
   });
 
-  // Supabase env 부재 시 — landing 등 공용 라우트는 통과, /radar 는 login으로.
+  // Supabase env 부재 시 — landing 등 공용 라우트는 통과, 보호 경로는 login으로.
   if (!url || !anon) {
-    const isRadar =
-      path.startsWith("/radar") && !path.startsWith("/radar/login");
-    if (isRadar) {
+    if (isProtectedPath(path)) {
       const to = request.nextUrl.clone();
-      to.pathname = "/radar/login";
+      to.pathname = LOGIN_PATH;
       to.searchParams.set("error", "supabase-not-configured");
       return NextResponse.redirect(to);
     }
@@ -63,16 +72,14 @@ export async function updateSession(request: NextRequest) {
     user = null;
   }
 
-  // Gate: /radar/* except /radar/login and /auth/*
-  const isProtected =
-    path.startsWith("/radar") && !path.startsWith("/radar/login");
+  // Gate: PROTECTED_PREFIXES except the login page and /auth/*
   const isAuthCallback = path.startsWith("/auth");
 
-  if (isProtected && !user && !isAuthCallback) {
-    const url = request.nextUrl.clone();
-    url.pathname = "/radar/login";
-    url.searchParams.set("next", path);
-    return NextResponse.redirect(url);
+  if (isProtectedPath(path) && !user && !isAuthCallback) {
+    const to = request.nextUrl.clone();
+    to.pathname = LOGIN_PATH;
+    to.searchParams.set("next", path);
+    return NextResponse.redirect(to);
   }
 
   return supabaseResponse;

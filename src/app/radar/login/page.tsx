@@ -8,9 +8,19 @@ import { getBrowserClient } from "@/lib/supabase/browser";
 
 type Mode = "magic" | "password";
 
+// 로그인 후 이동할 경로는 같은 사이트 안이어야 한다.
+// 검사 없이 넘기면 ?next=https://외부주소 로 오픈 리다이렉트가 된다.
+// "//evil.com" 과 "/\evil.com" 은 브라우저가 외부 주소로 해석하므로 함께 막는다.
+function safeNext(raw: string | null): string {
+  if (!raw) return "/radar";
+  if (!raw.startsWith("/")) return "/radar";
+  if (raw.startsWith("//") || raw.startsWith("/\\")) return "/radar";
+  return raw;
+}
+
 function LoginForm() {
   const search = useSearchParams();
-  const next = search.get("next") ?? "/radar";
+  const next = safeNext(search.get("next"));
 
   const [mode, setMode] = useState<Mode>("magic");
   const [email, setEmail] = useState("hi@gonnim.dev");

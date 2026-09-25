@@ -35,6 +35,14 @@ export const APPS: AppEntry[] = [
     description: "위시켓·프리모아·원티드 크롤 → 사업화 판정 → 인사이트 리포트",
     status: "active",
   },
+  {
+    id: "dominance",
+    href: "/dominance",
+    emoji: "🧬",
+    label: "지배상식",
+    description: "연구·보건 원천 수집 → 이슈 선택 → 글 작성·검수 → 발행일 지정 → 웹·레터·앱 발행",
+    status: "wip",
+  },
 ];
 
 export const STATUS_STYLE: Record<AppStatus, string> = {

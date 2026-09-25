@@ -3,6 +3,10 @@
     {
       "path": "/api/cron/crawl-wishket",
       "schedule": "0 23 * * *"
+    },
+    {
+      "path": "/api/cron/dominance",
+      "schedule": "0 22 * * *"
     }
   ]
 }
