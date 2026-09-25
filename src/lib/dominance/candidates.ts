@@ -144,7 +144,7 @@ const SYSTEM_INSTRUCTIONS = `당신은 한국어 연구·보건 뉴스레터의 
 다른 설명 없이 JSON 만 반환한다. 받은 건수와 같은 개수를 같은 번호로 반환한다.
 {"items":[{"n":1,"headline":"...","hook":"...","paradox_line":null,"counterintuitive":false}]}`;
 
-function renderPool(pool: Scored[]): string {
+function renderPool(pool: Scored[], retry: boolean): string {
   const blocks = pool
     .map((s, i) => {
       const body = s.abstract
@@ -158,7 +158,11 @@ function renderPool(pool: Scored[]): string {
     })
     .join("\n\n");
 
-  return `다음 ${pool.length}건을 각각 판정하시오.\n\n${blocks}`;
+  const head = retry
+    ? `앞선 응답에서 아래 ${pool.length}건은 headline 을 한국어로 받지 못했다. headline 을 반드시 한국어로 다시 쓰고, ${pool.length}건 전부를 반환하시오.`
+    : `다음 ${pool.length}건을 각각 판정하시오.`;
+
+  return `${head}\n\n${blocks}`;
 }
 
 function parseVerdicts(raw: string, pool: Scored[]): Map<number, Verdict> {
@@ -204,7 +208,10 @@ function parseVerdicts(raw: string, pool: Scored[]): Map<number, Verdict> {
 }
 
 /** 상위 후보를 한 번에 물어본다. 키가 없거나 실패하면 글자 점수만으로 진행한다. */
-async function askParadox(pool: Scored[]): Promise<Map<number, Verdict>> {
+async function askParadox(
+  pool: Scored[],
+  retry = false,
+): Promise<Map<number, Verdict>> {
   const apiKey = process.env.ZAI_API_KEY;
   if (!apiKey) throw new Error("ZAI_API_KEY 없음 · 역설 판정을 건너뜁니다");
 
@@ -220,7 +227,7 @@ async function askParadox(pool: Scored[]): Promise<Map<number, Verdict>> {
     response_format: { type: "json_object" },
     messages: [
       { role: "system", content: SYSTEM_INSTRUCTIONS },
-      { role: "user", content: renderPool(pool) },
+      { role: "user", content: renderPool(pool, retry) },
     ],
     // @ts-expect-error z.ai 확장 파라미터 · OpenAI SDK 타입에는 없으나 서버는 수용
     thinking: { type: "disabled" },
@@ -307,6 +314,33 @@ export async function buildCandidates(
     }
   }
 
+  // 못 받은 건만 한 번 더 물어본다. 2026-09-25 실측에서 24건을 보내 20건이 돌아왔고
+  // 그중 11건은 제목이 영어였다. 되묻지 않으면 그날 후보는 9건이 되어 하루 10건을
+  // 채우지 못한다. 호출 한 번의 값으로 하루 분량을 지킨다. 두 번은 하지 않는다 —
+  // 두 번 실패하는 건은 세 번째에도 실패할 가능성이 높고, 크론이 그만큼 길어진다.
+  if (pool.length > 0 && verdicts.size < limit) {
+    const missing = pool
+      .map((source, index) => ({ source, index }))
+      .filter((x) => !verdicts.has(x.index));
+
+    if (missing.length > 0) {
+      try {
+        const second = await askParadox(
+          missing.map((m) => m.source),
+          true,
+        );
+        for (const [subIndex, verdict] of second) {
+          const origin = missing[subIndex];
+          if (origin) verdicts.set(origin.index, verdict);
+        }
+      } catch (err) {
+        errors.push(
+          `제목 재요청 실패: ${err instanceof Error ? err.message : String(err)}`,
+        );
+      }
+    }
+  }
+
   // 판정이 없는 건은 넣지 않는다. 논문 제목은 영어이므로 한국어 제목이 없으면
   // 콘솔에 영어 제목이 그대로 올라간다. 후보가 0건인 편이 그것보다 낫다.
   //
@@ -315,7 +349,7 @@ export async function buildCandidates(
   const droppedByLlm = pool.length - verdicts.size;
   if (droppedByLlm > 0) {
     errors.push(
-      `${pool.length}건 중 ${droppedByLlm}건은 한국어 제목을 받지 못해 제외했습니다`,
+      `${pool.length}건 중 ${droppedByLlm}건은 다시 물어본 뒤에도 한국어 제목을 받지 못해 제외했습니다`,
     );
   }
 
