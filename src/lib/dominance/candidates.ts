@@ -70,22 +70,41 @@ type Verdict = {
   counterintuitive: boolean;
 };
 
+/** 다시 후보로 올리지 않는 상태. 제외도 막는다 — 제외 버튼이 사유를 남기는 이유가 그것이다. */
+export const USED_STATES = ["open", "drafted", "used", "excluded"] as const;
+
+/** 원천 창 14일에 7일 여유를 더한다. 이보다 오래된 후보의 원천은 창 밖이라 다시 뽑힐 일이 없다. */
+const USED_LOOKBACK_DAYS = LOOKBACK_DAYS + 7;
+
+type UsedRow = { paper_id: string | null; gov_press_id: string | null; state: string };
+
+/** 후보 행에서 막을 원천 ID 를 모은다. 조회와 분리해 손으로 사례를 확인할 수 있게 한다. */
+export function collectUsedIds(rows: UsedRow[]): { papers: Set<string>; press: Set<string> } {
+  const blocking = new Set<string>(USED_STATES);
+  const papers = new Set<string>();
+  const press = new Set<string>();
+  for (const r of rows) {
+    if (!blocking.has(r.state)) continue;
+    if (r.paper_id) papers.add(r.paper_id);
+    if (r.gov_press_id) press.add(r.gov_press_id);
+  }
+  return { papers, press };
+}
+
+// 표 전체를 읽으면 PostgREST 행 상한(Supabase 기본 1,000행)에 걸려 오래된 쪽이 조용히
+// 잘린다. 하루 10건이면 약 100일 뒤부터 같은 논문이 다시 올라온다. 그래서 원천 창에
+// 닿을 수 있는 기간만 읽는다.
 async function loadUsedIds(
   db: SupabaseClient,
 ): Promise<{ papers: Set<string>; press: Set<string> }> {
   const { data, error } = await db
     .from("ds_candidates")
-    .select("paper_id, gov_press_id");
+    .select("paper_id, gov_press_id, state")
+    .gte("candidate_date", kstDateAfter(-USED_LOOKBACK_DAYS));
 
   if (error) throw new Error(`기존 후보를 읽지 못했습니다: ${error.message}`);
 
-  const papers = new Set<string>();
-  const press = new Set<string>();
-  for (const r of data ?? []) {
-    if (r.paper_id) papers.add(r.paper_id as string);
-    if (r.gov_press_id) press.add(r.gov_press_id as string);
-  }
-  return { papers, press };
+  return collectUsedIds((data ?? []) as UsedRow[]);
 }
 
 async function loadSources(db: SupabaseClient, since: string): Promise<Source[]> {

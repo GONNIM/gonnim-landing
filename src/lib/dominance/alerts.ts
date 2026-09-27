@@ -23,6 +23,8 @@ export type Alert = {
   code: "step" | "collect" | "stale_review" | "empty_pipeline" | "dead_link";
   title: string;
   detail: string;
+  /** 이 경보를 처리할 콘솔 화면. 비우면 code 별 기본 화면으로 간다 (ALERT_PATH). */
+  path?: string;
 };
 
 type SourceReport = { source: string; found: number; errors: string[] };
@@ -107,6 +109,8 @@ async function emptyPipelineAlerts(db: SupabaseClient): Promise<Alert[]> {
         waiting > 0
           ? `리뷰를 통과한 글 ${waiting}편이 날짜를 기다립니다. 발행 달력에서 날짜를 붙이십시오.`
           : "리뷰를 통과한 글도 없습니다. 이슈 목록에서 글을 시작하십시오.",
+      // 날짜만 붙이면 되는 글이 있으면 달력으로, 없으면 글을 시작할 곳으로 보낸다.
+      path: waiting > 0 ? "/dominance/schedule" : "/dominance/candidates",
     },
   ];
 }
@@ -187,8 +191,33 @@ const NEXT_STEP: Record<Alert["code"], string> = {
   dead_link: "발행한 글의 근거가 열리지 않습니다. 정정이 필요한지 확인하십시오.",
 };
 
-const CONSOLE_URL = "https://gonnim.dev/dominance";
-const RUNS_URL = "https://gonnim.dev/dominance/runs";
+const SITE_URL = "https://gonnim.dev";
+const CONSOLE_URL = `${SITE_URL}/dominance`;
+const RUNS_URL = `${SITE_URL}/dominance/runs`;
+
+// 경보를 읽은 다음 바로 갈 화면. 메일 하단의 공통 버튼만 있으면 어디서 무엇을 해야
+// 하는지 다시 찾아야 한다.
+const ALERT_PATH: Record<Alert["code"], string> = {
+  step: "/dominance/runs",
+  collect: "/dominance/runs",
+  stale_review: "/dominance/review",
+  empty_pipeline: "/dominance/candidates",
+  // 기록 검색 화면(/dominance/archive)이 생기면 그쪽으로 바꾼다.
+  dead_link: "/dominance/letters",
+};
+
+const SCREEN_LABEL: Record<string, string> = {
+  "/dominance/runs": "실행 기록",
+  "/dominance/review": "리뷰",
+  "/dominance/schedule": "발행 달력",
+  "/dominance/candidates": "이슈 목록",
+  "/dominance/letters": "글 목록",
+};
+
+function alertLink(alert: Alert): { url: string; label: string } {
+  const path = alert.path ?? ALERT_PATH[alert.code];
+  return { url: `${SITE_URL}${path}`, label: SCREEN_LABEL[path] ?? "콘솔" };
+}
 
 // 경보 본문에는 원천이 준 오류 문구와 주소가 그대로 들어온다. 바깥에서 온 글자를
 // HTML 에 그대로 넣으면 메일이 깨지거나 태그가 주입된다. 그래서 먼저 막는다.
@@ -226,6 +255,7 @@ function detailHtml(detail: string): string {
 
 function alertCard(alert: Alert, broken: boolean): string {
   const accent = broken ? "#dc2626" : "#d97706";
+  const link = alertLink(alert);
 
   return `<tr><td style="padding:0 0 12px 0;">
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"
@@ -235,6 +265,7 @@ function alertCard(alert: Alert, broken: boolean): string {
       <div style="margin:6px 0 8px 0;font-size:16px;font-weight:700;color:#0f172a;line-height:1.45;">${escapeHtml(alert.title)}</div>
       ${detailHtml(alert.detail)}
       <div style="margin-top:10px;padding-top:10px;border-top:1px solid #f1f5f9;font-size:13px;color:#64748b;">${escapeHtml(NEXT_STEP[alert.code])}</div>
+      <div style="margin-top:8px;font-size:13px;"><a href="${link.url}" style="color:#2563eb;font-weight:600;text-decoration:none;">${escapeHtml(link.label)} 화면 열기 →</a></div>
     </td></tr>
   </table>
 </td></tr>`;
@@ -277,7 +308,7 @@ export function renderAlertEmail(alerts: Alert[], date: string): string {
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#f1f5f9;">
 <tr><td align="center" style="padding:24px 12px;">
   <table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0"
-         style="width:600px;max-width:100%;font-family:-apple-system,BlinkMacSystemFont,'Apple SD Gothic Neo','Malgun Gothic',sans-serif;">
+         style="width:100%;max-width:600px;font-family:-apple-system,BlinkMacSystemFont,'Apple SD Gothic Neo','Malgun Gothic',sans-serif;">
 
     <tr><td style="padding:0 0 16px 0;">
       <div style="font-size:18px;font-weight:800;color:#0f172a;">지배상식 경보</div>
@@ -303,6 +334,28 @@ export function renderAlertEmail(alerts: Alert[], date: string): string {
 </body></html>`;
 }
 
+/** 고장이 0건이면 고장 칸을 쓰지 않는다. 고장이 있으면 할 일 건수도 함께 적는다. */
+export function alertSubject(alerts: Alert[], date: string): string {
+  const brokenCount = alerts.filter((a) => BROKEN_CODES.has(a.code)).length;
+  const todoCount = alerts.length - brokenCount;
+
+  return brokenCount > 0
+    ? `[지배상식] 고장 ${brokenCount}건 · 할 일 ${todoCount}건 · ${date}`
+    : `[지배상식] 할 일 ${todoCount}건 · ${date}`;
+}
+
+// 글자 본문도 함께 보낸다. HTML 을 막아 둔 메일 앱과 알림 미리보기가 이것을 읽는다.
+export function alertText(alerts: Alert[]): string {
+  const body = alerts
+    .map((a) => {
+      const link = alertLink(a);
+      return `[${a.code}] ${a.title}\n${a.detail}\n→ ${NEXT_STEP[a.code]}\n${link.label}: ${link.url}`;
+    })
+    .join("\n\n");
+
+  return `${body}\n\n콘솔: ${CONSOLE_URL}\n실행 기록: ${RUNS_URL}\n`;
+}
+
 /** 관리자에게만 보낸다. 보낼 것이 없으면 아무것도 하지 않는다. */
 export async function sendAlertEmail(
   alerts: Alert[],
@@ -320,16 +373,7 @@ export async function sendAlertEmail(
 
   const date = kstToday();
 
-  // 글자 본문도 함께 보낸다. HTML 을 막아 둔 메일 앱과 알림 미리보기가 이것을 읽는다.
-  const text = alerts
-    .map((a) => `[${a.code}] ${a.title}\n${a.detail}\n→ ${NEXT_STEP[a.code]}`)
-    .join("\n\n");
-
-  const brokenCount = alerts.filter((a) => BROKEN_CODES.has(a.code)).length;
-  const subject =
-    brokenCount > 0
-      ? `[지배상식] 고장 ${brokenCount}건 · ${date}`
-      : `[지배상식] 할 일 ${alerts.length}건 · ${date}`;
+  const subject = alertSubject(alerts, date);
 
   try {
     const { error } = await new Resend(apiKey).emails.send({
@@ -337,7 +381,7 @@ export async function sendAlertEmail(
       to,
       subject,
       html: renderAlertEmail(alerts, date),
-      text: `${text}\n\n콘솔: ${CONSOLE_URL}\n실행 기록: ${RUNS_URL}\n`,
+      text: alertText(alerts),
     });
     if (error) return { sent: false, error: error.message };
   } catch (err) {
