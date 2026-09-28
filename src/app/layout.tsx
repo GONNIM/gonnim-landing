@@ -14,7 +14,9 @@ function shouldHideChrome(pathname: string): boolean {
     pathname.startsWith("/radar") ||
     pathname.startsWith("/auth") ||
     pathname.startsWith("/ingest") ||
-    pathname.startsWith("/app")
+    pathname.startsWith("/app") ||
+    // 지배상식 공개면은 자기 머리 · 꼬리를 쓴다 (D38).
+    pathname.startsWith("/sangsik")
   );
 }
 
