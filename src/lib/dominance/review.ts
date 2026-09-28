@@ -29,11 +29,14 @@ const PARADOX_MARKERS = [
 
 const MAX_SENTENCE_LENGTH = 60;
 
+// 원천 태그 [E1] 는 독자가 읽는 글자가 아니다(발행본에서는 위첨자 번호). 길이에서 뺀다.
+const SOURCE_TAG = /\[[A-Z]{1,2}[0-9]{0,2}\]/g;
+
 export function longSentences(blocks: LetterBlock[]): string[] {
   return blocks
     .flatMap((b) => b.text.split(/(?<=[.!?。])\s+|\n+/))
     .map((s) => s.trim())
-    .filter((s) => s.length > MAX_SENTENCE_LENGTH);
+    .filter((s) => s.replace(SOURCE_TAG, "").length > MAX_SENTENCE_LENGTH);
 }
 
 /**
