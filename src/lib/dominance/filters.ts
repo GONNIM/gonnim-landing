@@ -8,7 +8,24 @@ import type { LetterBlock } from "./types";
 // 사실 문장을 담는 블록. 원천 태그가 없으면 무출처로 본다.
 const FACTUAL_KINDS = new Set(["summary", "research", "mechanism", "industry"]);
 
-const RULES: { code: string; label: string; re: RegExp }[] = [
+// 주소 · 도메인 · 이메일은 소문자로 쓰는 것이 정상이다. 미번역 검사 전에 지운다.
+// 2026-09-28 실측: 초안의 "ClinicalTrials.gov" 가 `gov` 때문에 미번역으로 걸렸다.
+const URL_LIKE = [
+  /https?:\/\/\S+/gi,
+  /[\w.+-]+@[\w-]+(?:\.[\w-]+)+/g,
+  /\b[\w-]+(?:\.[\w-]+)*\.(?:gov|org|com|net|edu|int|io|dev|kr|uk|eu|info|co|ac)\b/gi,
+];
+
+function stripUrlLike(text: string): string {
+  return URL_LIKE.reduce((t, re) => t.replace(re, " "), text);
+}
+
+const RULES: {
+  code: string;
+  label: string;
+  re: RegExp;
+  prepare?: (text: string) => string;
+}[] = [
   {
     code: "assertion",
     label: "단정 — 작품 설정을 사실로 주장",
@@ -34,6 +51,7 @@ const RULES: { code: string; label: string; re: RegExp }[] = [
     code: "untranslated",
     label: "미번역 — 영어 단어가 그대로 남음",
     re: /(?<![A-Za-z])[a-z]{3,}(?![A-Za-z])/,
+    prepare: stripUrlLike,
   },
 ];
 
@@ -41,7 +59,8 @@ export function flagBlock(block: LetterBlock): string[] {
   const flags: string[] = [];
 
   for (const rule of RULES) {
-    if (rule.re.test(block.text)) flags.push(rule.label);
+    const text = rule.prepare ? rule.prepare(block.text) : block.text;
+    if (rule.re.test(text)) flags.push(rule.label);
   }
 
   if (
