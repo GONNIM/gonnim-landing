@@ -14,7 +14,7 @@
 import type { NextRequest } from "next/server";
 
 import { gatherAlerts, sendAlertEmail, type Alert } from "@/lib/dominance/alerts";
-import { fetchBroadcastState } from "@/lib/dominance/broadcast";
+import { fetchBroadcastState, pullResendUnsubscribes } from "@/lib/dominance/broadcast";
 import { buildCandidates } from "@/lib/dominance/candidates";
 import { getDominanceClient } from "@/lib/dominance/db";
 import { pingHeartbeat } from "@/lib/dominance/heartbeat";
@@ -129,6 +129,19 @@ export async function GET(req: NextRequest) {
     failedSteps.push("성과 확인");
     extraAlerts.push(fail("성과 확인", err));
     steps.stats = { error: String(err) };
+  }
+
+  // 4-2. 수신거부 반영 · 발행 메일의 수신거부 링크(Resend)를 원장에 옮긴다. 발행이 없는 날에도 한다.
+  try {
+    const pulled = await pullResendUnsubscribes(db);
+    steps.unsubscribes = pulled;
+    for (const e of pulled.errors) {
+      extraAlerts.push({ code: "step", title: "수신거부 반영 경고", detail: e });
+    }
+  } catch (err) {
+    failedSteps.push("수신거부 반영");
+    extraAlerts.push(fail("수신거부 반영", err));
+    steps.unsubscribes = { error: String(err) };
   }
 
   // 5. 경보

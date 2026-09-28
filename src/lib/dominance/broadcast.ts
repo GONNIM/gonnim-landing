@@ -47,12 +47,59 @@ type SubscriberRow = {
  * 반환하는 count 는 이번에 살아 있다고 확인한 사람 수다. 실제 발송 수는
  * Resend 가 큐를 처리한 뒤에 정해지므로 같다고 볼 수는 없다.
  */
+/**
+ * Resend 쪽 수신거부를 원장으로 가져온다.
+ *
+ * 발행 메일의 수신거부 링크는 Resend 의 {{{RESEND_UNSUBSCRIBE_URL}}} 이다. 독자가 누르면
+ * Resend 연락처만 unsubscribed 가 되고 원장(ds_subscribers)은 모른다. 그대로 두면 다음
+ * syncAudience 가 그 사람을 "살아 있음" 으로 보고 unsubscribed:false 로 되살린다.
+ * 그래서 명단을 밀어 넣기 전에, 그리고 매일 크론에서 먼저 당겨 온다.
+ */
+export async function pullResendUnsubscribes(
+  db: SupabaseClient,
+): Promise<{ checked: number; pulled: number; errors: string[] }> {
+  const resend = client();
+  const errors: string[] = [];
+
+  const { data, error } = await db
+    .from("ds_subscribers")
+    .select("id, resend_contact_id")
+    .is("unsubscribed_at", null)
+    .not("resend_contact_id", "is", null);
+  if (error) throw new Error(`ds_subscribers 읽기 실패: ${error.message}`);
+
+  let pulled = 0;
+  for (const s of (data ?? []) as { id: string; resend_contact_id: string }[]) {
+    try {
+      const res = await resend.contacts.get(s.resend_contact_id);
+      if (res.error) throw new Error(res.error.message);
+      if (res.data?.unsubscribed) {
+        const up = await db
+          .from("ds_subscribers")
+          .update({ unsubscribed_at: new Date().toISOString() })
+          .eq("id", s.id)
+          .is("unsubscribed_at", null);
+        if (up.error) throw new Error(up.error.message);
+        pulled += 1;
+      }
+    } catch (err) {
+      errors.push(`구독자 ${s.id.slice(0, 8)}: ${err instanceof Error ? err.message : String(err)}`);
+    }
+  }
+
+  return { checked: (data ?? []).length, pulled, errors };
+}
+
 export async function syncAudience(
   db: SupabaseClient,
 ): Promise<{ count: number; errors: string[] }> {
   const resend = client();
   const segment = segmentId();
   const errors: string[] = [];
+
+  // Resend 에서 수신거부한 사람을 먼저 원장에 반영한다. 순서를 바꾸면 그 사람을 되살린다.
+  const pulled = await pullResendUnsubscribes(db);
+  errors.push(...pulled.errors);
 
   const { data, error } = await db
     .from("ds_subscribers")

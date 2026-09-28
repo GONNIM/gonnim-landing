@@ -117,7 +117,8 @@ export async function sendTestEmail(
 
   const html = toEmailHtml(payload, {
     webUrl: dominanceLetterUrl(letter.slug),
-    unsubscribeUrl: "https://sangsik.gonnim.dev/unsubscribe",
+    // 테스트 발송은 브로드캐스트가 아니라서 Resend 병합 태그가 바뀌지 않는다. 우리 수신거부 화면을 건다.
+    unsubscribeUrl: "https://gonnim.dev/sangsik/unsubscribe",
   });
 
   try {
@@ -126,7 +127,7 @@ export async function sendTestEmail(
       to: admin.email,
       subject: `[테스트] ${letter.title}`,
       html,
-      text: toPlainText(payload),
+      text: toPlainText(payload, "https://gonnim.dev/sangsik/unsubscribe"),
     });
     if (error) return { error: error.message, to: null };
   } catch (err) {

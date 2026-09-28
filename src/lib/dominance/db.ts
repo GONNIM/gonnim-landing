@@ -5,6 +5,7 @@
 // 그래서 호출 전에 반드시 requireDominanceAdmin() 으로 세션을 확인한다 (guard.ts).
 
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import { letterPageUrl } from "@/lib/sangsik/site";
 
 export function getDominanceClient(): SupabaseClient {
   const url = process.env.DS_SUPABASE_URL;
@@ -21,8 +22,13 @@ export function getDominanceClient(): SupabaseClient {
   });
 }
 
-/** 공개 레터 JSON 의 최종 주소. 발행자와 감시자가 다른 주소를 보지 않게 한 곳에서 만든다. */
+/** 독자가 여는 글 페이지 주소(D38 · gonnim.dev/sangsik). 메일의 "웹에서 보기" 가 이것이다. */
 export function dominanceLetterUrl(slug: string): string {
+  return letterPageUrl(slug);
+}
+
+/** 공개 레터 JSON(Storage) 주소. 글 페이지가 이것을 읽는다. */
+export function letterJsonUrl(slug: string): string {
   const url = process.env.DS_SUPABASE_URL;
   if (!url) throw new Error("DS_SUPABASE_URL 없음");
   return `${url}/storage/v1/object/public/ds-letters/${slug}.json`;

@@ -18,7 +18,9 @@ import { toEmailHtml, toPayload, toPlainText } from "./render";
 import type { LetterBlock } from "./types";
 
 const BUCKET = "ds-letters";
-const UNSUBSCRIBE_URL = "https://sangsik.gonnim.dev/unsubscribe";
+// 수신자마다 Resend 가 자기 수신거부 주소로 바꿔 넣는다(Resend 문서의 병합 태그).
+// 누르면 Resend 연락처가 unsubscribed 가 되고, 크론이 원장으로 당겨 온다(pullResendUnsubscribes).
+const UNSUBSCRIBE_URL = "{{{RESEND_UNSUBSCRIBE_URL}}}";
 
 export type PublishOutcome = {
   letterId: string;
@@ -125,7 +127,7 @@ async function publishOne(
         webUrl: dominanceLetterUrl(letter.slug),
         unsubscribeUrl: UNSUBSCRIBE_URL,
       }),
-      text: toPlainText(payload),
+      text: toPlainText(payload, UNSUBSCRIBE_URL),
     });
 
     const { error } = await db

@@ -5,6 +5,7 @@
 
 import type { BlockKind, LetterBlock } from "./types";
 import type { LoadedSource } from "./letters";
+import { SENDER_LINE } from "@/lib/sangsik/site";
 
 export type LetterPayload = {
   slug: string;
@@ -147,7 +148,8 @@ function sourceLine(s: LetterPayload["sources"][number]): string {
  */
 export function toEmailHtml(
   payload: LetterPayload,
-  options: { webUrl: string; unsubscribeUrl: string },
+  /** webUrl 이 없으면 "웹에서 보기" 를 그리지 않는다(웹 페이지 자신이 이 틀을 쓸 때). */
+  options: { webUrl?: string; unsubscribeUrl: string },
 ): string {
   const urlOf = new Map(
     payload.sources.filter((s) => s.number !== null).map((s) => [s.number as number, s.url]),
@@ -200,16 +202,16 @@ export function toEmailHtml(
     <p style="margin:0 0 8px;font-size:13px;font-weight:600;color:#374151">원천</p>
     <ul style="margin:0 0 20px;padding-left:0">${sources}</ul>
     <p style="margin:0 0 16px;font-size:12px;line-height:1.6;color:#6b7280">${escapeHtml(DISCLAIMER)}</p>
+    <p style="margin:0 0 6px;font-size:12px;color:#9ca3af">${escapeHtml(SENDER_LINE)}</p>
     <p style="margin:0;font-size:12px;color:#9ca3af">
-      <a href="${escapeHtml(options.webUrl)}" style="color:#6b7280">웹에서 보기</a>
-      ·
-      <a href="${escapeHtml(options.unsubscribeUrl)}" style="color:#6b7280">수신거부</a>
+      ${options.webUrl ? `<a href="${escapeHtml(options.webUrl)}" style="color:#6b7280">웹에서 보기</a>
+      · ` : ""}<a href="${escapeHtml(options.unsubscribeUrl)}" style="color:#6b7280">수신거부</a>
     </p>
   </div>
 </body></html>`;
 }
 
-export function toPlainText(payload: LetterPayload): string {
+export function toPlainText(payload: LetterPayload, unsubscribeUrl?: string): string {
   const blocks = payload.blocks
     .map((b) => (b.label ? `[${b.label}]\n${b.text}` : b.text))
     .join("\n\n");
@@ -227,6 +229,9 @@ export function toPlainText(payload: LetterPayload): string {
     sources,
     "",
     DISCLAIMER,
+    "",
+    SENDER_LINE,
+    ...(unsubscribeUrl ? [`수신거부: ${unsubscribeUrl}`] : []),
   ].join("\n");
 }
 
