@@ -65,6 +65,7 @@ export async function requestCrossReview(
   const checks = await runReviewChecks({
     blocks: letter.blocks,
     sourceUrls: sources.map((s) => s.url),
+    sourceTags: sources.map((s) => s.tag),
   });
 
   const snapshot: ReviewChecks = {
@@ -149,6 +150,7 @@ export async function passReview(
   const checks = await runReviewChecks({
     blocks: letter.blocks,
     sourceUrls: sources.map((s) => s.url),
+    sourceTags: sources.map((s) => s.tag),
   });
 
   if (!isReviewPassable(checks)) {

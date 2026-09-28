@@ -51,6 +51,7 @@ export default async function ReviewDetailPage({
   const checks = await runReviewChecks({
     blocks: data.blocks,
     sourceUrls: sources.map((s) => s.url),
+    sourceTags: sources.map((s) => s.tag),
   });
 
   return (

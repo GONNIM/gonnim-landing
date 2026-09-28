@@ -44,6 +44,7 @@ export async function recheckLinks(
   const checks = await runReviewChecks({
     blocks: data.blocks,
     sourceUrls: sources.map((s) => s.url),
+    sourceTags: sources.map((s) => s.tag),
   });
   const links = checks.find((c) => c.code === "links");
 

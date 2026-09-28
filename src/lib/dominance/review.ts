@@ -4,6 +4,7 @@
 // 뒤의 3개(hook·paradox·sentence_length)는 경고만 한다. 글의 됨됨이는 기계 판단이 틀릴 수 있다.
 
 import { countFlags, flagBlocks, hookIsQuestion } from "./filters";
+import { unknownTags } from "./render";
 import {
   BLOCK_ORDER,
   BLOCK_LABEL,
@@ -97,6 +98,8 @@ export async function isLinkAlive(url: string): Promise<boolean> {
 export async function runReviewChecks(input: {
   blocks: LetterBlock[];
   sourceUrls: string[];
+  /** 원천 목록의 태그. 주면 본문 태그 중 짝이 없는 것을 sources 점검에서 막는다 (D36). */
+  sourceTags?: (string | null)[];
 }): Promise<ReviewCheck[]> {
   const blocks = flagBlocks(input.blocks);
   const checks: ReviewCheck[] = [];
@@ -129,13 +132,20 @@ export async function runReviewChecks(input: {
       b.text.trim().length > 0 &&
       (b.sourceIds?.length ?? 0) === 0,
   );
+  // 원천 목록에 없는 태그는 발행 틀이 번호로 바꾸지 못하고 [E9] 처럼 본문에 남는다.
+  const orphanTags = input.sourceTags ? unknownTags(blocks, input.sourceTags) : [];
+  const sourceNotes = [
+    unsourced.length > 0
+      ? `출처 없는 블록: ${unsourced.map((b) => BLOCK_LABEL[b.kind]).join(", ")}`
+      : "",
+    orphanTags.length > 0
+      ? `원천 목록에 없는 태그 ${orphanTags.length}개: ${orphanTags.map((t) => `[${t}]`).join(" ")}`
+      : "",
+  ].filter(Boolean);
   checks.push({
     code: "sources",
-    passed: unsourced.length === 0,
-    detail:
-      unsourced.length === 0
-        ? null
-        : `출처 없는 블록: ${unsourced.map((b) => BLOCK_LABEL[b.kind]).join(", ")}`,
+    passed: sourceNotes.length === 0,
+    detail: sourceNotes.length === 0 ? null : sourceNotes.join(" / "),
   });
 
   // 4. 원천 링크 생존 — 죽은 링크만 막는다. 확인 불가는 경고로 남긴다 (D35).

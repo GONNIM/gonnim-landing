@@ -12,9 +12,30 @@ export type LetterPayload = {
   summary: string | null;
   publishedAt: string | null;
   blocks: { kind: string; label: string; text: string }[];
-  sources: { label: string; title: string; url: string; license: string }[];
+  /** number 는 본문 등장 순서 번호다. 본문에 인용되지 않은 원천은 null 이고 목록 끝에 온다. */
+  sources: { number: number | null; label: string; title: string; url: string; license: string }[];
   corrections: { description: string; resolution: string | null; at: string }[];
 };
+
+// 인라인 원천 태그 [E1] · [V] (D36). 형식은 ds_letter_sources.tag 의 CHECK 와 같다.
+const TAG = /\[([A-Z]{1,2}[0-9]{0,2})\]/g;
+
+/** 본문에 나온 태그를 등장 순서대로 모은다. 같은 태그는 한 번만 센다. */
+export function tagsInOrder(blocks: { text: string }[]): string[] {
+  const seen: string[] = [];
+  for (const b of blocks) {
+    for (const m of b.text.matchAll(TAG)) {
+      if (!seen.includes(m[1])) seen.push(m[1]);
+    }
+  }
+  return seen;
+}
+
+/** 원천 목록에 짝이 없는 본문 태그. 리뷰의 sources 점검이 이것으로 막는다. */
+export function unknownTags(blocks: { text: string }[], sourceTags: (string | null)[]): string[] {
+  const known = new Set(sourceTags.filter((t): t is string => Boolean(t)));
+  return tagsInOrder(blocks).filter((t) => !known.has(t));
+}
 
 const DISCLAIMER =
   "이 글은 연구 결과를 소개합니다. 의학적 조언이 아니며 진단이나 치료를 대신할 수 없습니다.";
@@ -28,20 +49,44 @@ export function toPayload(input: {
   sources: LoadedSource[];
   corrections?: { description: string; resolution: string | null; at: string }[];
 }): LetterPayload {
+  const blocks = input.blocks.filter((b) => b.text.trim());
+
+  // 번호는 본문 등장 순서다. 원천 목록에 없는 태그는 번호를 받지 않고 본문에 그대로 남는다.
+  const byTag = new Map(
+    input.sources.filter((s) => s.tag).map((s) => [s.tag as string, s]),
+  );
+  const numberOf = new Map<string, number>();
+  for (const tag of tagsInOrder(blocks)) {
+    if (byTag.has(tag)) numberOf.set(tag, numberOf.size + 1);
+  }
+
+  const toEntry = (s: LoadedSource, number: number | null) => ({
+    number,
+    label: s.label,
+    title: s.title,
+    url: s.url,
+    license: s.attribution ?? s.licenseLabel,
+  });
+
+  const numbered = [...numberOf.entries()].map(([tag, n]) => toEntry(byTag.get(tag)!, n));
+  const rest = input.sources
+    .filter((s) => !s.tag || !numberOf.has(s.tag))
+    .map((s) => toEntry(s, null));
+
   return {
     slug: input.slug,
     title: input.title,
     summary: input.summary,
     publishedAt: input.publishedAt,
-    blocks: input.blocks
-      .filter((b) => b.text.trim())
-      .map((b) => ({ kind: b.kind, label: BLOCK_LABEL[b.kind], text: b.text })),
-    sources: input.sources.map((s) => ({
-      label: s.label,
-      title: s.title,
-      url: s.url,
-      license: s.attribution ?? s.licenseLabel,
+    // 웹 · 앱 · 이메일이 같은 본문을 쓴다. 태그를 [번호] 로 바꿔 둔다.
+    blocks: blocks.map((b) => ({
+      kind: b.kind,
+      label: BLOCK_LABEL[b.kind],
+      text: b.text.replace(TAG, (whole, tag: string) =>
+        numberOf.has(tag) ? `[${numberOf.get(tag)}]` : whole,
+      ),
     })),
+    sources: [...numbered, ...rest],
     corrections: input.corrections ?? [],
   };
 }
@@ -54,16 +99,30 @@ function escapeHtml(s: string): string {
     .replace(/"/g, "&quot;");
 }
 
-function paragraphs(text: string): string {
+/** [번호] 를 원천 링크가 걸린 위첨자로 바꾼다. 목록에 없는 번호는 건드리지 않는다. */
+function superscripts(escaped: string, urlOf: Map<number, string>): string {
+  return escaped.replace(/\[(\d{1,3})\]/g, (whole, n: string) => {
+    const url = urlOf.get(Number(n));
+    return url
+      ? `<sup style="font-size:11px;line-height:0"><a href="${escapeHtml(url)}" style="color:#1d4ed8;text-decoration:none">${n}</a></sup>`
+      : whole;
+  });
+}
+
+function paragraphs(text: string, urlOf: Map<number, string>): string {
   return text
     .split(/\n+/)
     .map((line) => line.trim())
     .filter(Boolean)
     .map(
       (line) =>
-        `<p style="margin:0 0 12px;font-size:16px;line-height:1.75;color:#1f2328">${escapeHtml(line)}</p>`,
+        `<p style="margin:0 0 12px;font-size:16px;line-height:1.75;color:#1f2328">${superscripts(escapeHtml(line), urlOf)}</p>`,
     )
     .join("");
+}
+
+function sourceLine(s: LetterPayload["sources"][number]): string {
+  return [s.label, s.license].filter(Boolean).join(" · ");
 }
 
 /**
@@ -74,12 +133,16 @@ export function toEmailHtml(
   payload: LetterPayload,
   options: { webUrl: string; unsubscribeUrl: string },
 ): string {
+  const urlOf = new Map(
+    payload.sources.filter((s) => s.number !== null).map((s) => [s.number as number, s.url]),
+  );
+
   const blocks = payload.blocks
     .map(
       (b) => `
       <div style="margin:0 0 28px">
         <p style="margin:0 0 6px;font-size:12px;letter-spacing:.04em;color:#6b7280;text-transform:uppercase">${escapeHtml(b.label)}</p>
-        ${paragraphs(b.text)}
+        ${paragraphs(b.text, urlOf)}
       </div>`,
     )
     .join("");
@@ -87,9 +150,9 @@ export function toEmailHtml(
   const sources = payload.sources
     .map(
       (s) =>
-        `<li style="margin:0 0 6px;font-size:13px;line-height:1.6;color:#4b5563">
-           <a href="${escapeHtml(s.url)}" style="color:#1d4ed8">${escapeHtml(s.title)}</a>
-           · ${escapeHtml(s.label)} · ${escapeHtml(s.license)}
+        `<li style="margin:0 0 6px;font-size:13px;line-height:1.6;color:#4b5563;list-style:none">
+           ${s.number !== null ? `<span style="color:#6b7280">${s.number}.</span> ` : ""}<a href="${escapeHtml(s.url)}" style="color:#1d4ed8;word-break:break-word">${escapeHtml(s.title)}</a>
+           · ${escapeHtml(sourceLine(s))}
          </li>`,
     )
     .join("");
@@ -119,7 +182,7 @@ export function toEmailHtml(
     ${blocks}
     <hr style="border:none;border-top:1px solid #e5e7eb;margin:0 0 20px">
     <p style="margin:0 0 8px;font-size:13px;font-weight:600;color:#374151">원천</p>
-    <ul style="margin:0 0 20px;padding-left:18px">${sources}</ul>
+    <ul style="margin:0 0 20px;padding-left:0">${sources}</ul>
     <p style="margin:0 0 16px;font-size:12px;line-height:1.6;color:#6b7280">${escapeHtml(DISCLAIMER)}</p>
     <p style="margin:0;font-size:12px;color:#9ca3af">
       <a href="${escapeHtml(options.webUrl)}" style="color:#6b7280">웹에서 보기</a>
@@ -135,7 +198,7 @@ export function toPlainText(payload: LetterPayload): string {
     .map((b) => `[${b.label}]\n${b.text}`)
     .join("\n\n");
   const sources = payload.sources
-    .map((s) => `- ${s.title} (${s.label} · ${s.license}) ${s.url}`)
+    .map((s) => `${s.number !== null ? `[${s.number}]` : "-"} ${s.title} (${sourceLine(s)}) ${s.url}`)
     .join("\n");
 
   return [
