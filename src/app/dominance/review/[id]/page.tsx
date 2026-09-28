@@ -52,6 +52,7 @@ export default async function ReviewDetailPage({
     blocks: data.blocks,
     sourceUrls: linkCheckUrls(sources),
     sourceTags: sources.map((s) => s.tag),
+    summary: data.summary,
   });
 
   return (

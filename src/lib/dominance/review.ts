@@ -111,6 +111,8 @@ export async function runReviewChecks(input: {
   sourceUrls: string[];
   /** 원천 목록의 태그. 주면 본문 태그 중 짝이 없는 것을 sources 점검에서 막는다 (D36). */
   sourceTags?: (string | null)[];
+  /** 맨 위 한 문장 요약(ds_letters.summary). 이 태그도 원천 목록과 대조한다. */
+  summary?: string | null;
 }): Promise<ReviewCheck[]> {
   const blocks = flagBlocks(input.blocks);
   const checks: ReviewCheck[] = [];
@@ -144,7 +146,9 @@ export async function runReviewChecks(input: {
       (b.sourceIds?.length ?? 0) === 0,
   );
   // 원천 목록에 없는 태그는 발행 틀이 번호로 바꾸지 못하고 [E9] 처럼 본문에 남는다.
-  const orphanTags = input.sourceTags ? unknownTags(blocks, input.sourceTags) : [];
+  const orphanTags = input.sourceTags
+    ? unknownTags([{ text: input.summary ?? "" }, ...blocks], input.sourceTags)
+    : [];
   const sourceNotes = [
     unsourced.length > 0
       ? `출처 없는 블록: ${unsourced.map((b) => BLOCK_LABEL[b.kind]).join(", ")}`

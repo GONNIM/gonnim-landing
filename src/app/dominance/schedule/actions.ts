@@ -32,9 +32,9 @@ export async function recheckLinks(
 
   const { data } = await db
     .from("ds_letters")
-    .select("id, blocks")
+    .select("id, summary, blocks")
     .eq("id", letterId)
-    .maybeSingle<{ id: string; blocks: LetterBlock[] }>();
+    .maybeSingle<{ id: string; summary: string | null; blocks: LetterBlock[] }>();
 
   if (!data) {
     return { ok: false, detail: "글을 찾지 못했습니다", checkedAt: "" };
@@ -45,6 +45,7 @@ export async function recheckLinks(
     blocks: data.blocks,
     sourceUrls: linkCheckUrls(sources),
     sourceTags: sources.map((s) => s.tag),
+    summary: data.summary,
   });
   const links = checks.find((c) => c.code === "links");
 
