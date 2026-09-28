@@ -3,7 +3,7 @@
 // 웹과 앱은 같은 JSON 을 읽고, 이메일만 HTML 이 필요하다.
 // 원본이 하나여야 세 채널이 갈라지지 않으므로 여기 말고 다른 곳에서 모양을 만들지 않는다.
 
-import { BLOCK_LABEL, type LetterBlock } from "./types";
+import type { BlockKind, LetterBlock } from "./types";
 import type { LoadedSource } from "./letters";
 
 export type LetterPayload = {
@@ -37,6 +37,18 @@ export function unknownTags(blocks: { text: string }[], sourceTags: (string | nu
   return tagsInOrder(blocks).filter((t) => !known.has(t));
 }
 
+// 독자가 보는 블록 이름표. 콘솔의 BLOCK_LABEL(편집자용)과 따로 둔다.
+// 훅과 은유는 이름표 없이 본문만 보인다 — "훅" 은 만드는 쪽의 말이다.
+export const READER_BLOCK_LABEL: Record<BlockKind, string> = {
+  summary: "3줄 요약",
+  hook: "",
+  research: "연구",
+  mechanism: "왜 그런가",
+  industry: "산업",
+  practice: "내 몸",
+  metaphor: "",
+};
+
 const DISCLAIMER =
   "이 글은 연구 결과를 소개합니다. 의학적 조언이 아니며 진단이나 치료를 대신할 수 없습니다.";
 
@@ -55,8 +67,9 @@ export function toPayload(input: {
   const byTag = new Map(
     input.sources.filter((s) => s.tag).map((s) => [s.tag as string, s]),
   );
+  // 한 문장 요약이 본문보다 먼저 보이므로 번호도 요약부터 센다.
   const numberOf = new Map<string, number>();
-  for (const tag of tagsInOrder(blocks)) {
+  for (const tag of tagsInOrder([{ text: input.summary ?? "" }, ...blocks])) {
     if (byTag.has(tag)) numberOf.set(tag, numberOf.size + 1);
   }
 
@@ -73,18 +86,21 @@ export function toPayload(input: {
     .filter((s) => !s.tag || !numberOf.has(s.tag))
     .map((s) => toEntry(s, null));
 
+  const renumber = (text: string) =>
+    text.replace(TAG, (whole, tag: string) =>
+      numberOf.has(tag) ? `[${numberOf.get(tag)}]` : whole,
+    );
+
   return {
     slug: input.slug,
     title: input.title,
-    summary: input.summary,
+    summary: input.summary ? renumber(input.summary) : input.summary,
     publishedAt: input.publishedAt,
     // 웹 · 앱 · 이메일이 같은 본문을 쓴다. 태그를 [번호] 로 바꿔 둔다.
     blocks: blocks.map((b) => ({
       kind: b.kind,
-      label: BLOCK_LABEL[b.kind],
-      text: b.text.replace(TAG, (whole, tag: string) =>
-        numberOf.has(tag) ? `[${numberOf.get(tag)}]` : whole,
-      ),
+      label: READER_BLOCK_LABEL[b.kind],
+      text: renumber(b.text),
     })),
     sources: [...numbered, ...rest],
     corrections: input.corrections ?? [],
@@ -141,7 +157,7 @@ export function toEmailHtml(
     .map(
       (b) => `
       <div style="margin:0 0 28px">
-        <p style="margin:0 0 6px;font-size:12px;letter-spacing:.04em;color:#6b7280;text-transform:uppercase">${escapeHtml(b.label)}</p>
+        ${b.label ? `<p style="margin:0 0 6px;font-size:12px;letter-spacing:.04em;color:#6b7280;text-transform:uppercase">${escapeHtml(b.label)}</p>` : ""}
         ${paragraphs(b.text, urlOf)}
       </div>`,
     )
@@ -176,7 +192,7 @@ export function toEmailHtml(
   <div style="max-width:620px;margin:0 auto;padding:32px 20px;background:#ffffff;font-family:-apple-system,BlinkMacSystemFont,'Apple SD Gothic Neo','Pretendard',sans-serif">
     <p style="margin:0 0 4px;font-size:13px;color:#6b7280">지배상식</p>
     <h1 style="margin:0 0 8px;font-size:24px;line-height:1.4;color:#111827">${escapeHtml(payload.title)}</h1>
-    ${payload.summary ? `<p style="margin:0 0 24px;font-size:15px;line-height:1.7;color:#4b5563">${escapeHtml(payload.summary)}</p>` : ""}
+    ${payload.summary ? `<p style="margin:0 0 24px;font-size:15px;line-height:1.7;color:#4b5563">${superscripts(escapeHtml(payload.summary), urlOf)}</p>` : ""}
     <hr style="border:none;border-top:1px solid #e5e7eb;margin:0 0 28px">
     ${corrections}
     ${blocks}
@@ -195,7 +211,7 @@ export function toEmailHtml(
 
 export function toPlainText(payload: LetterPayload): string {
   const blocks = payload.blocks
-    .map((b) => `[${b.label}]\n${b.text}`)
+    .map((b) => (b.label ? `[${b.label}]\n${b.text}` : b.text))
     .join("\n\n");
   const sources = payload.sources
     .map((s) => `${s.number !== null ? `[${s.number}]` : "-"} ${s.title} (${sourceLine(s)}) ${s.url}`)
