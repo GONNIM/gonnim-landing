@@ -201,6 +201,18 @@ export async function revertToDraft(
   const letter = await loadLetter(db, letterId);
   if (!letter) return { error: "글을 찾지 못했습니다" };
 
+  // 발행된 글은 되돌리지 않는다. 고칠 것이 있으면 정정으로 처리한다.
+  if (letter.status === "published") {
+    return { error: "발행된 글은 되돌릴 수 없습니다. 정정으로 처리하십시오." };
+  }
+  if (letter.status === "draft") {
+    return { error: "이미 쓰는 중인 글입니다." };
+  }
+
+  // 발행 예정 글을 되돌리면 발행일과 승인 기록도 함께 지운다.
+  // 남겨 두면 다시 리뷰를 통과했을 때 옛 발행일이 그대로 붙어 있게 된다.
+  const wasApproved = letter.status === "approved";
+
   const now = new Date().toISOString();
   const { error } = await db
     .from("ds_letters")
@@ -209,10 +221,13 @@ export async function revertToDraft(
       // 리뷰 기록을 지운다. 되돌린 글은 다시 리뷰를 받아야 발행일을 붙일 수 있다.
       reviewed_at: null,
       reviewed_by: null,
+      ...(wasApproved ? { scheduled_for: null, approved_at: null, approved_by: null } : {}),
       revision_count: letter.revision_count + 1,
       updated_at: now,
     })
-    .eq("id", letterId);
+    .eq("id", letterId)
+    // 읽은 뒤 다른 곳에서 발행되었으면 바꾸지 않는다.
+    .eq("status", letter.status);
 
   if (error) return { error: error.message };
 
@@ -220,7 +235,7 @@ export async function revertToDraft(
     letter_id: letterId,
     event: "review_reject",
     passed: false,
-    note: `${admin.email}: ${reason.trim() || "사유 없음"}`,
+    note: `${admin.email}: ${reason.trim() || "사유 없음"}${wasApproved ? " · 발행 예정에서 되돌림(발행일 · 승인 기록 지움)" : ""}`,
   });
 
   revalidatePath("/dominance/review");

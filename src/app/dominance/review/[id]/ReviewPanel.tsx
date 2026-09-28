@@ -324,6 +324,7 @@ export function ReviewPanel({
                   : "통과시키면 발행일을 붙일 수 있습니다."}
           </p>
 
+          {status !== "published" && status !== "draft" && (
           <div className="mt-3 border-t border-[color:var(--border)]/60 pt-3">
             <input
               value={reason}
@@ -339,7 +340,13 @@ export function ReviewPanel({
             >
               수정으로 되돌리기
             </button>
+            {status === "approved" && (
+              <p className="mt-1 text-[11px] text-muted-foreground">
+                발행 예정 글입니다. 되돌리면 발행일과 승인 기록도 지워집니다.
+              </p>
+            )}
           </div>
+          )}
         </section>
 
         {message && (
