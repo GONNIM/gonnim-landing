@@ -86,9 +86,11 @@ export async function GET(req: NextRequest) {
 
   // 3. 발행 · 오늘 날짜가 붙은 승인된 글만
   let publishedCount = 0;
+  let heldForNoAudience = 0;
   try {
     const published = await publishDue(db, today);
     publishedCount = published.published;
+    heldForNoAudience = published.heldForNoAudience ?? 0;
     steps.publish = published;
 
     for (const o of published.outcomes) {
@@ -105,6 +107,13 @@ export async function GET(req: NextRequest) {
 
     for (const e of published.errors) {
       extraAlerts.push({ code: "step", title: "발행 경고", detail: e });
+    }
+    if (published.heldForNoAudience) {
+      extraAlerts.push({
+        code: "no_audience",
+        title: `구독자 0명 · 발행 보류 · 글 ${published.heldForNoAudience}건`,
+        detail: `오늘(${today}) 발행 예정 글을 보내지 않았습니다. 글은 발행 예정(approved) 상태로 남았습니다.`,
+      });
     }
   } catch (err) {
     failedSteps.push("발행");
@@ -139,7 +148,8 @@ export async function GET(req: NextRequest) {
   const summary =
     `수집 ${found}건(신규 ${newRows}) · 후보 ${inserted}건 · 발행 ${publishedCount}편 · 경보 ${alerts.length}건` +
     (failedSteps.length > 0 ? ` · 실패 ${failedSteps.join(", ")}` : "") +
-    (sourcesDead ? " · 원천 전부 0건" : "");
+    (sourcesDead ? " · 원천 전부 0건" : "") +
+    (heldForNoAudience ? ` · 구독자 0명 · 발행 보류 · 글 ${heldForNoAudience}건` : "");
 
   const heartbeat = await pingHeartbeat(healthy, summary);
   const endedAt = new Date().toISOString();

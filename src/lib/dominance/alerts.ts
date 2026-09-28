@@ -20,7 +20,7 @@ const LINK_CHECK_LETTERS = 3;
 
 export type Alert = {
   /** step 은 크론 단계 자체가 터진 경우다. 나머지는 운용 상태를 알리는 것이다. */
-  code: "step" | "collect" | "stale_review" | "empty_pipeline" | "dead_link";
+  code: "step" | "collect" | "stale_review" | "empty_pipeline" | "dead_link" | "no_audience";
   title: string;
   detail: string;
   /** 이 경보를 처리할 콘솔 화면. 비우면 code 별 기본 화면으로 간다 (ALERT_PATH). */
@@ -189,6 +189,7 @@ const NEXT_STEP: Record<Alert["code"], string> = {
   stale_review: "리뷰를 끝내거나 글을 버리십시오.",
   empty_pipeline: "이슈 목록에서 글을 시작하거나, 발행 달력에서 날짜를 붙이십시오.",
   dead_link: "발행한 글의 근거가 열리지 않습니다. 정정이 필요한지 확인하십시오.",
+  no_audience: "구독자를 받은 뒤 발행 달력에서 [승인 취소] 후 새 날짜로 다시 승인하십시오. 지난 날짜는 크론이 보지 않습니다.",
 };
 
 const SITE_URL = "https://gonnim.dev";
@@ -204,6 +205,7 @@ const ALERT_PATH: Record<Alert["code"], string> = {
   empty_pipeline: "/dominance/candidates",
   // 기록 검색 화면(/dominance/archive)이 생기면 그쪽으로 바꾼다.
   dead_link: "/dominance/letters",
+  no_audience: "/dominance/schedule",
 };
 
 const SCREEN_LABEL: Record<string, string> = {

@@ -35,6 +35,8 @@ export type PublishReport = {
   audienceCount: number;
   outcomes: PublishOutcome[];
   errors: string[];
+  /** 구독자가 0명이라 발행을 건너뛴 날. 글은 approved 로 남는다. */
+  heldForNoAudience?: number;
 };
 
 type DueLetter = {
@@ -181,6 +183,20 @@ export async function publishDue(
   // 명단 동기화가 실패하면 보내지 않는다. 탈퇴한 사람에게 가는 것보다 늦게 가는 편이 낫다.
   const audience = await syncAudience(db);
   errors.push(...audience.errors);
+
+  // 받을 사람이 없으면 보내지 않는다. 첫 글이 아무에게도 가지 않은 채 "발행됨" 으로
+  // 굳으면 다시 보낼 수 없다(발행 뒤에는 날짜를 바꿀 수 없다). 글은 approved 로 둔다.
+  if (audience.count === 0) {
+    return {
+      date,
+      due: due.length,
+      published: 0,
+      audienceCount: 0,
+      outcomes: [],
+      errors,
+      heldForNoAudience: due.length,
+    };
+  }
 
   const outcomes: PublishOutcome[] = [];
   for (const letter of due) {
