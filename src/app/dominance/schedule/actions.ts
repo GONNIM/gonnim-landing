@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { dominanceContext } from "@/lib/dominance/guard";
 import { kstToday } from "@/lib/dominance/kst";
 import { loadLetterSources } from "@/lib/dominance/letters";
-import { runReviewChecks } from "@/lib/dominance/review";
+import { linkCheckUrls, runReviewChecks } from "@/lib/dominance/review";
 import type { LetterBlock, LetterStatus } from "@/lib/dominance/types";
 
 type Row = {
@@ -43,7 +43,7 @@ export async function recheckLinks(
   const sources = await loadLetterSources(db, letterId);
   const checks = await runReviewChecks({
     blocks: data.blocks,
-    sourceUrls: sources.map((s) => s.url),
+    sourceUrls: linkCheckUrls(sources),
     sourceTags: sources.map((s) => s.tag),
   });
   const links = checks.find((c) => c.code === "links");

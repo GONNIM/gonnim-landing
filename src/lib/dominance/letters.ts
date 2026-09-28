@@ -183,6 +183,8 @@ export type LoadedSource = {
   licenseLabel: string;
   /** 본문의 인라인 태그 [E1] 와 짝을 맞추는 이름. 옛 글과 스키마 적용 전에는 null. */
   tag: string | null;
+  /** 외부 원천의 종류(ds_letter_sources.ext_source_kind). 논문 · 보도자료는 null. */
+  extKind: string | null;
 };
 
 // 외부 원천(ds_letter_sources.ext_*)의 표시 이름. 제목에서 기관을 알 수 없으므로 종류 이름만 쓴다.
@@ -266,6 +268,7 @@ export async function loadLetterSources(
           attribution: null,
           licenseLabel: licenseLabel(r.paper.license),
           tag,
+          extKind: null,
         },
       ];
     }
@@ -279,6 +282,7 @@ export async function loadLetterSources(
           attribution: r.gov_press.attribution,
           licenseLabel: "공공누리 제1유형",
           tag,
+          extKind: null,
         },
       ];
     }
@@ -292,6 +296,7 @@ export async function loadLetterSources(
           attribution: null,
           licenseLabel: licenseLabel(r.license),
           tag,
+          extKind: r.ext_source_kind ?? null,
         },
       ];
     }

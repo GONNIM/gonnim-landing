@@ -90,6 +90,14 @@ export async function checkLink(url: string): Promise<LinkStatus> {
   return "unverifiable";
 }
 
+/**
+ * 링크 점검 대상. 지배상식 자체 집계(own)는 뺀다 — 우리 검색 페이지 주소라서
+ * 원천의 존재를 확인하는 대상이 아니고, 늘 "확인 불가" 경고만 남긴다. 원천 목록에는 그대로 나온다.
+ */
+export function linkCheckUrls(sources: { url: string; extKind?: string | null }[]): string[] {
+  return sources.filter((s) => s.extKind !== "own").map((s) => s.url);
+}
+
 /** 경보 메일용. 확인 불가는 죽은 것으로 보지 않는다. */
 export async function isLinkAlive(url: string): Promise<boolean> {
   return (await checkLink(url)) !== "dead";

@@ -6,7 +6,7 @@ import { dominanceContext } from "@/lib/dominance/guard";
 import { dominanceLetterUrl } from "@/lib/dominance/db";
 import { loadLetterSources } from "@/lib/dominance/letters";
 import { runCrossReview } from "@/lib/dominance/cross-review";
-import { isReviewPassable, runReviewChecks } from "@/lib/dominance/review";
+import { isReviewPassable, linkCheckUrls, runReviewChecks } from "@/lib/dominance/review";
 import { toEmailHtml, toPayload, toPlainText } from "@/lib/dominance/render";
 import type {
   CrossReviewNote,
@@ -64,7 +64,7 @@ export async function requestCrossReview(
 
   const checks = await runReviewChecks({
     blocks: letter.blocks,
-    sourceUrls: sources.map((s) => s.url),
+    sourceUrls: linkCheckUrls(sources),
     sourceTags: sources.map((s) => s.tag),
   });
 
@@ -149,7 +149,7 @@ export async function passReview(
   const sources = await loadLetterSources(db, letterId);
   const checks = await runReviewChecks({
     blocks: letter.blocks,
-    sourceUrls: sources.map((s) => s.url),
+    sourceUrls: linkCheckUrls(sources),
     sourceTags: sources.map((s) => s.tag),
   });
 

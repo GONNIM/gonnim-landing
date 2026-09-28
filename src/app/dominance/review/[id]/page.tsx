@@ -4,7 +4,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { dominanceContext } from "@/lib/dominance/guard";
 import { loadLetterSources } from "@/lib/dominance/letters";
-import { runReviewChecks } from "@/lib/dominance/review";
+import { linkCheckUrls, runReviewChecks } from "@/lib/dominance/review";
 import { charCount, readingMinutes } from "@/lib/dominance/render";
 import {
   LETTER_STATUS_LABEL,
@@ -50,7 +50,7 @@ export default async function ReviewDetailPage({
   // 화면을 열 때마다 다시 점검한다. 자동 점검은 돈이 들지 않는다.
   const checks = await runReviewChecks({
     blocks: data.blocks,
-    sourceUrls: sources.map((s) => s.url),
+    sourceUrls: linkCheckUrls(sources),
     sourceTags: sources.map((s) => s.tag),
   });
 
