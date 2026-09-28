@@ -179,15 +179,47 @@ export type LoadedSource = {
   url: string;
   abstract: string | null;
   attribution: string | null;
+  /** 비어 있으면 표시하지 않는다 (link_only). */
   licenseLabel: string;
+  /** 본문의 인라인 태그 [E1] 와 짝을 맞추는 이름. 옛 글과 스키마 적용 전에는 null. */
+  tag: string | null;
 };
 
-const SOURCE_SELECT = `
+// 외부 원천(ds_letter_sources.ext_*)의 표시 이름. 제목에서 기관을 알 수 없으므로 종류 이름만 쓴다.
+const EXT_KIND_LABEL: Record<string, string> = {
+  agency: "정부 기관 고지",
+  disclosure_us: "미국 증권거래위원회 공시",
+  disclosure_kr: "전자공시",
+  grant: "연구비 기록",
+  registry: "임상시험 등록",
+  company_press: "기업 발표",
+  news: "언론",
+  own: "지배상식 집계",
+};
+
+function licenseLabel(license: string | null | undefined): string {
+  if (!license || license === "link_only") return "";
+  if (license === "kogl_1") return "공공누리 제1유형";
+  return LICENSE_LABEL[license] ?? license;
+}
+
+const SOURCE_SELECT_BASE = `
   paper:ds_papers ( source, title, abstract, landing_url, license ),
   gov_press:ds_gov_press ( agency, title, body, landing_url, attribution )
 `;
 
+// 2026-09-28 질문 스키마(D29)가 더한 열. 운영자가 SQL 을 실행하기 전에는 없다.
+const SOURCE_SELECT_EXT = `
+  tag, ext_url, ext_title, ext_source_kind, license,
+  ${SOURCE_SELECT_BASE}
+`;
+
 type SourceRow = {
+  tag?: string | null;
+  ext_url?: string | null;
+  ext_title?: string | null;
+  ext_source_kind?: string | null;
+  license?: string | null;
   paper: {
     source: string;
     title: string;
@@ -209,14 +241,21 @@ export async function loadLetterSources(
   db: SupabaseClient,
   letterId: string,
 ): Promise<LoadedSource[]> {
-  const { data } = await db
+  const withExt = await db
     .from("ds_letter_sources")
-    .select(SOURCE_SELECT)
+    .select(SOURCE_SELECT_EXT)
     .eq("letter_id", letterId);
+
+  // 새 열이 아직 없으면(SQL 실행 전) 옛 열만 읽는다. 이 대비가 없으면 배포 직후
+  // 원천 목록이 비어 리뷰의 링크 점검과 승인이 모두 막힌다.
+  const data = withExt.error
+    ? (await db.from("ds_letter_sources").select(SOURCE_SELECT_BASE).eq("letter_id", letterId)).data
+    : withExt.data;
 
   const rows = (data ?? []) as unknown as SourceRow[];
 
   return rows.flatMap((r): LoadedSource[] => {
+    const tag = r.tag ?? null;
     if (r.paper) {
       return [
         {
@@ -225,7 +264,8 @@ export async function loadLetterSources(
           url: r.paper.landing_url,
           abstract: r.paper.abstract,
           attribution: null,
-          licenseLabel: LICENSE_LABEL[r.paper.license] ?? r.paper.license,
+          licenseLabel: licenseLabel(r.paper.license),
+          tag,
         },
       ];
     }
@@ -238,6 +278,20 @@ export async function loadLetterSources(
           abstract: r.gov_press.body,
           attribution: r.gov_press.attribution,
           licenseLabel: "공공누리 제1유형",
+          tag,
+        },
+      ];
+    }
+    if (r.ext_url) {
+      return [
+        {
+          label: EXT_KIND_LABEL[r.ext_source_kind ?? ""] ?? r.ext_source_kind ?? "외부 원천",
+          title: r.ext_title ?? r.ext_url,
+          url: r.ext_url,
+          abstract: null,
+          attribution: null,
+          licenseLabel: licenseLabel(r.license),
+          tag,
         },
       ];
     }
