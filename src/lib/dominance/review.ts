@@ -35,8 +35,41 @@ export function longSentences(blocks: LetterBlock[]): string[] {
     .filter((s) => s.length > MAX_SENTENCE_LENGTH);
 }
 
-/** HEAD 로 먼저 물어보고 막히면 GET 으로 한 번 더. 일부 학술 서버가 HEAD 를 막는다. */
-export async function isLinkAlive(url: string): Promise<boolean> {
+/**
+ * 링크 상태 셋 (D35).
+ * - alive        열린다
+ * - dead         404 · 410 · 연결 실패 · 시간 초과. 막는다
+ * - unverifiable 403 · 429 등 서버가 자동 요청을 거절했다. 막지 않고 사람이 직접 눌러 본다
+ */
+export type LinkStatus = "alive" | "dead" | "unverifiable";
+
+const EUROPE_PMC_PAGE = /^https?:\/\/(?:www\.)?europepmc\.org\/(?:article|abstract)\/([A-Z]+)\/([A-Za-z0-9]+)/;
+const EUROPE_PMC_REST = "https://www.ebi.ac.uk/europepmc/webservices/rest/search";
+
+// europepmc.org 는 자동 요청에 403 을 준다(2026-09-28 실측, curl·Node·브라우저 UA 모두).
+// 그래서 웹 페이지 대신 약관이 허락한 REST 로 그 논문이 있는지 묻는다.
+async function checkEuropePmc(source: string, id: string): Promise<LinkStatus> {
+  // PMC 번호는 EXT_ID 로 찾히지 않는다(2026-09-28 실측, 99건 중 94건이 0건으로 나왔다). PMCID 필드로 묻는다.
+  const query = source === "PMC" ? `PMCID:${id}` : `EXT_ID:${id} AND SRC:${source}`;
+  try {
+    const res = await fetch(
+      `${EUROPE_PMC_REST}?${new URLSearchParams({ query, format: "json", resultType: "idlist", pageSize: "1" })}`,
+      { signal: AbortSignal.timeout(15000) },
+    );
+    if (!res.ok) return "unverifiable";
+    const data = (await res.json()) as { hitCount?: number };
+    return (data.hitCount ?? 0) > 0 ? "alive" : "dead";
+  } catch {
+    return "unverifiable";
+  }
+}
+
+/** HEAD 로 먼저 물어보고, 열리지 않으면 GET 으로 한 번 더. 일부 학술 서버가 HEAD 를 막는다. */
+export async function checkLink(url: string): Promise<LinkStatus> {
+  const epmc = url.match(EUROPE_PMC_PAGE);
+  if (epmc) return checkEuropePmc(epmc[1], epmc[2]);
+
+  let status: number | null = null;
   for (const method of ["HEAD", "GET"] as const) {
     try {
       const res = await fetch(url, {
@@ -44,12 +77,21 @@ export async function isLinkAlive(url: string): Promise<boolean> {
         redirect: "follow",
         signal: AbortSignal.timeout(8000),
       });
-      if (res.ok) return true;
+      if (res.ok) return "alive";
+      status = res.status;
     } catch {
-      // 다음 방법으로 넘어간다
+      // 다음 방법으로 넘어간다. GET 까지 실패하면 status 는 마지막 응답값이다.
     }
   }
-  return false;
+
+  if (status === null) return "dead"; // 연결 실패 · 시간 초과
+  if (status === 404 || status === 410) return "dead";
+  return "unverifiable";
+}
+
+/** 경보 메일용. 확인 불가는 죽은 것으로 보지 않는다. */
+export async function isLinkAlive(url: string): Promise<boolean> {
+  return (await checkLink(url)) !== "dead";
 }
 
 export async function runReviewChecks(input: {
@@ -96,19 +138,27 @@ export async function runReviewChecks(input: {
         : `출처 없는 블록: ${unsourced.map((b) => BLOCK_LABEL[b.kind]).join(", ")}`,
   });
 
-  // 4. 원천 링크 생존
+  // 4. 원천 링크 생존 — 죽은 링크만 막는다. 확인 불가는 경고로 남긴다 (D35).
   const urls = [...new Set(input.sourceUrls)];
-  const alive = await Promise.all(urls.map(isLinkAlive));
-  const dead = urls.filter((_, i) => !alive[i]);
+  const statuses = await Promise.all(urls.map(checkLink));
+  const dead = urls.filter((_, i) => statuses[i] === "dead");
+  const unverifiable = urls.filter((_, i) => statuses[i] === "unverifiable");
+  const notes = [
+    dead.length > 0 ? `열리지 않는 링크 ${dead.length}건: ${dead.join(", ")}` : "",
+    unverifiable.length > 0
+      ? `확인 불가 ${unverifiable.length}건 · 직접 눌러 확인: ${unverifiable.join(", ")}`
+      : "",
+  ].filter(Boolean);
   checks.push({
     code: "links",
     passed: urls.length > 0 && dead.length === 0,
+    warning: unverifiable.length > 0 || undefined,
     detail:
       urls.length === 0
         ? "원천이 하나도 연결되지 않았습니다"
-        : dead.length === 0
-          ? null
-          : `열리지 않는 링크 ${dead.length}건: ${dead.join(", ")}`,
+        : notes.length > 0
+          ? notes.join(" / ")
+          : null,
   });
 
   // 5. 훅 형태

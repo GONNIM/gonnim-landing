@@ -197,11 +197,13 @@ export function ReviewPanel({
             {checks.map((c) => {
               const bad = !c.passed;
               const hard = isBlockingCheck(c.code);
+              // 통과했지만 확인 불가가 남은 경우 (링크 403 · 429). 막지 않고 눈에 띄게만 한다.
+              const soft = c.passed && c.warning === true;
               return (
                 <li key={c.code} className="text-xs">
                   <div className="flex gap-2">
                     <span className="shrink-0">
-                      {c.passed ? "✅" : hard ? "🔴" : "⚠️"}
+                      {soft ? "⚠️" : c.passed ? "✅" : hard ? "🔴" : "⚠️"}
                     </span>
                     <span
                       className={
@@ -209,7 +211,9 @@ export function ReviewPanel({
                           ? hard
                             ? "text-red-300"
                             : "text-amber-300"
-                          : "text-foreground/85"
+                          : soft
+                            ? "text-amber-300"
+                            : "text-foreground/85"
                       }
                     >
                       {REVIEW_CHECK_LABEL[c.code]}

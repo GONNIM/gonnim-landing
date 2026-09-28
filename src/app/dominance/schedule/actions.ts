@@ -49,8 +49,11 @@ export async function recheckLinks(
 
   return {
     ok: links?.passed ?? false,
+    // 통과해도 확인 불가(403 · 429)가 남으면 그 목록을 보여 준다. 사람이 직접 눌러 본다 (D35).
     detail: links?.passed
-      ? `${sources.length}개 정상`
+      ? links.detail
+        ? `${sources.length}개 중 ${links.detail}`
+        : `${sources.length}개 정상`
       : (links?.detail ?? "확인하지 못했습니다"),
     checkedAt: new Date().toISOString(),
   };

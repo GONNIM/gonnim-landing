@@ -183,6 +183,8 @@ export const BLOCKING_REVIEW_CHECKS: ReviewCheckCode[] = [
 export type ReviewCheck = {
   code: ReviewCheckCode;
   passed: boolean;
+  // 통과했지만 사람이 봐야 할 것이 남았다. 지금은 링크 확인 불가(403 · 429)에만 쓴다.
+  warning?: boolean;
   detail: string | null;
 };
 
