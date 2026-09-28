@@ -4,6 +4,7 @@
 // 편당 한 번만 부른다 — 주 3회면 한 달에 열두 번이다.
 
 import OpenAI from "openai";
+import type { FactCard } from "./letters";
 import type { CrossReviewNote, LetterBlock } from "./types";
 import { BLOCK_LABEL } from "./types";
 
@@ -12,13 +13,15 @@ const DEFAULT_BASE_URL = "https://api.z.ai/api/paas/v4";
 
 const SYSTEM_INSTRUCTIONS = `당신은 한국어 연구·보건 뉴스레터의 교정자다. 글을 고치지 않고 문제만 지적한다.
 
-원천 초록과 레터 본문을 받는다. 찾을 것은 세 가지다.
+사실 카드(태그 · 종류 · 제목 · 내용)와 레터 본문을 받는다. 찾을 것은 세 가지다.
 
 1. unsourced  — 원천 초록에 근거가 없는 사실 주장
 2. advice     — 의학적 지시로 읽힐 문장 ("복용하십시오", "치료됩니다", 용량 제시)
 3. coherence  — 앞뒤 연결이 끊긴 곳
 
 # 규칙
+- 링크만 있는 원천은 메모에 적힌 사실만 근거로 인정한다.
+- [태그] 가 붙은 문장은 그 태그의 카드와 대조한다.
 - 문제가 없으면 빈 배열을 반환한다. 억지로 만들지 않는다.
 - 문장을 고쳐 주지 않는다. 무엇이 문제인지만 한 문장으로 쓴다.
 - 한국어로 쓴다. 조사와 어미를 갖춘 완전한 문장으로 쓴다.
@@ -33,7 +36,7 @@ blockIndex 는 본문에 붙은 번호를 그대로 쓴다. 특정할 수 없으
 export async function runCrossReview(input: {
   title: string;
   blocks: LetterBlock[];
-  sourceAbstracts: string[];
+  cards: FactCard[];
 }): Promise<CrossReviewNote[]> {
   const apiKey = process.env.ZAI_API_KEY;
   if (!apiKey) {
@@ -51,8 +54,14 @@ export async function runCrossReview(input: {
     .map((b, i) => `[${i}] ${BLOCK_LABEL[b.kind]}\n${b.text || "(비어 있음)"}`)
     .join("\n\n");
 
-  const abstracts =
-    input.sourceAbstracts.filter(Boolean).join("\n\n---\n\n") || "(원천 초록 없음)";
+  const cards =
+    input.cards
+      .filter((c) => c.content.trim())
+      .map(
+        (c) =>
+          `[${c.tag ?? "태그 없음"}] ${c.kind} · ${c.title}${c.linkOnly ? " · 링크만 있는 원천(메모)" : ""}\n${c.content}`,
+      )
+      .join("\n\n---\n\n") || "(사실 카드 없음)";
 
   const response = await client.chat.completions.create({
     model: process.env.ZAI_MODEL || DEFAULT_MODEL,
@@ -63,7 +72,7 @@ export async function runCrossReview(input: {
       { role: "system", content: SYSTEM_INSTRUCTIONS },
       {
         role: "user",
-        content: `# 원천 초록\n${abstracts}\n\n# 레터 제목\n${input.title}\n\n# 레터 본문\n${body}`,
+        content: `# 사실 카드\n${cards}\n\n# 레터 제목\n${input.title}\n\n# 레터 본문\n${body}`,
       },
     ],
     // @ts-expect-error z.ai 확장 파라미터 · OpenAI SDK 타입에는 없으나 서버는 수용

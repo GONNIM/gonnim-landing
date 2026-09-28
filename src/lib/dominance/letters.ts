@@ -304,6 +304,67 @@ export async function loadLetterSources(
   });
 }
 
+/** 교차 리뷰(④)가 원천 대신 받는 사실 카드 한 장 (D33). */
+export type FactCard = {
+  tag: string | null;
+  kind: string;
+  title: string;
+  content: string;
+  /** 인용할 문장이 없고 메모만 있는 원천. 메모에 적힌 사실만 근거로 인정한다. */
+  linkOnly: boolean;
+};
+
+/** "2005년 2편 → 2025년 177편". 지난해와 그 20년 전을 잇는다. 값이 없으면 null. */
+function curveLine(byYear: Record<string, number | null> | null): string | null {
+  if (!byYear) return null;
+  const last = new Date().getFullYear() - 1;
+  const first = last - 20;
+  const a = byYear[String(first)];
+  const b = byYear[String(last)];
+  if (a == null || b == null) return null;
+  return `Europe PMC 연도별 논문 수 · ${first}년 ${a}편 → ${last}년 ${b}편`;
+}
+
+/**
+ * 글의 원천을 사실 카드로 바꾼다.
+ * - 논문 · 보도자료: 초록(또는 본문)
+ * - 외부 원천: 질문의 증거 표에서 같은 태그의 사실 문장. link_only 면 메모
+ * - 자체 집계(own): 제목 + 질문의 연도별 논문 수 한 줄
+ * question_id 가 없는 옛 글은 초록만 넣는다(외부 원천은 내용 없이 제목만).
+ */
+export async function loadFactCards(
+  db: SupabaseClient,
+  questionId: string | null,
+  sources: LoadedSource[],
+): Promise<FactCard[]> {
+  const evidence = new Map<string, { fact_sentence: string | null; note: string | null; license: string | null }>();
+  let byYear: Record<string, number | null> | null = null;
+
+  if (questionId) {
+    const [ev, q] = await Promise.all([
+      db.from("ds_question_evidence").select("tag, fact_sentence, note, license").eq("question_id", questionId),
+      db.from("ds_questions").select("v4_by_year").eq("id", questionId).maybeSingle(),
+    ]);
+    for (const r of (ev.data ?? []) as { tag: string | null; fact_sentence: string | null; note: string | null; license: string | null }[]) {
+      if (r.tag) evidence.set(r.tag, r);
+    }
+    byYear = (q.data?.v4_by_year as Record<string, number | null> | null) ?? null;
+  }
+
+  return sources.map((s): FactCard => {
+    const base = { tag: s.tag, kind: s.label, title: s.title };
+    if (s.extKind === "own") {
+      return { ...base, content: curveLine(byYear) ?? "", linkOnly: false };
+    }
+    if (s.extKind) {
+      const e = s.tag ? evidence.get(s.tag) : undefined;
+      if (e?.license === "link_only") return { ...base, content: e.note ?? "", linkOnly: true };
+      return { ...base, content: e?.fact_sentence ?? "", linkOnly: false };
+    }
+    return { ...base, content: s.abstract ?? "", linkOnly: false };
+  });
+}
+
 /** 편집기가 저장할 때 쓴다. updated_at 을 항상 같이 올린다. */
 export async function saveLetterBody(
   db: SupabaseClient,

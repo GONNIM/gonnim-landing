@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { Resend } from "resend";
 import { dominanceContext } from "@/lib/dominance/guard";
 import { dominanceLetterUrl } from "@/lib/dominance/db";
-import { loadLetterSources } from "@/lib/dominance/letters";
+import { loadFactCards, loadLetterSources } from "@/lib/dominance/letters";
 import { runCrossReview } from "@/lib/dominance/cross-review";
 import { isReviewPassable, linkCheckUrls, runReviewChecks } from "@/lib/dominance/review";
 import { toEmailHtml, toPayload, toPlainText } from "@/lib/dominance/render";
@@ -23,10 +23,11 @@ type LetterRow = {
   status: string;
   review_checks: ReviewChecks | null;
   revision_count: number;
+  question_id: string | null;
 };
 
 const LETTER_SELECT =
-  "id, slug, title, summary, blocks, status, review_checks, revision_count";
+  "id, slug, title, summary, blocks, status, review_checks, revision_count, question_id";
 
 async function loadLetter(
   db: Awaited<ReturnType<typeof dominanceContext>>["db"],
@@ -56,7 +57,7 @@ export async function requestCrossReview(
     notes = await runCrossReview({
       title: letter.title,
       blocks: letter.blocks,
-      sourceAbstracts: sources.map((s) => s.abstract ?? ""),
+      cards: await loadFactCards(db, letter.question_id, sources),
     });
   } catch (err) {
     return { notes: [], error: err instanceof Error ? err.message : String(err) };
