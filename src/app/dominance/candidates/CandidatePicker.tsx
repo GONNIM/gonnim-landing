@@ -94,7 +94,7 @@ export function CandidatePicker({ cards }: { cards: CandidateCard[] }) {
                 </div>
 
                 {c.breakdown?.interest.paradoxLine && (
-                  <p className="mt-2 text-sm text-amber-200">
+                  <p className="mt-2 text-sm text-foreground">
                     역설 · {c.breakdown.interest.paradoxLine}
                   </p>
                 )}
