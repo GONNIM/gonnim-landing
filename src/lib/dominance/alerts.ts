@@ -108,9 +108,9 @@ async function emptyPipelineAlerts(db: SupabaseClient): Promise<Alert[]> {
       detail:
         waiting > 0
           ? `리뷰를 통과한 글 ${waiting}편이 날짜를 기다립니다. 발행 달력에서 날짜를 붙이십시오.`
-          : "리뷰를 통과한 글도 없습니다. 이슈 목록에서 글을 시작하십시오.",
+          : "리뷰를 통과한 글도 없습니다. 글 목록에서 쓰는 중인 글을 이어 쓰십시오.",
       // 날짜만 붙이면 되는 글이 있으면 달력으로, 없으면 글을 시작할 곳으로 보낸다.
-      path: waiting > 0 ? "/dominance/schedule" : "/dominance/candidates",
+      path: waiting > 0 ? "/dominance/schedule" : "/dominance/letters",
     },
   ];
 }
@@ -187,7 +187,7 @@ const NEXT_STEP: Record<Alert["code"], string> = {
   step: "크론 단계가 실패했습니다. 실행 기록에서 어느 단계인지 확인하십시오.",
   collect: "원천 주소 규칙이 바뀌었을 수 있습니다. 이틀 연속이면 수집기를 고쳐야 합니다.",
   stale_review: "리뷰를 끝내거나 글을 버리십시오.",
-  empty_pipeline: "이슈 목록에서 글을 시작하거나, 발행 달력에서 날짜를 붙이십시오.",
+  empty_pipeline: "글 목록에서 쓰는 중인 글을 이어 쓰거나, 발행 달력에서 날짜를 붙이십시오.",
   dead_link: "발행한 글의 근거가 열리지 않습니다. 정정이 필요한지 확인하십시오.",
   no_audience: "구독자를 받은 뒤 발행 달력에서 [승인 취소] 후 새 날짜로 다시 승인하십시오. 지난 날짜는 크론이 보지 않습니다.",
 };
@@ -202,7 +202,8 @@ const ALERT_PATH: Record<Alert["code"], string> = {
   step: "/dominance/runs",
   collect: "/dominance/runs",
   stale_review: "/dominance/review",
-  empty_pipeline: "/dominance/candidates",
+  // 후보 화면은 옛 방식이다(D24 · 2026-09-29). 글 목록으로 보낸다.
+  empty_pipeline: "/dominance/letters",
   // 기록 검색 화면(/dominance/archive)이 생기면 그쪽으로 바꾼다.
   dead_link: "/dominance/letters",
   no_audience: "/dominance/schedule",
