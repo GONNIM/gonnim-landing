@@ -57,8 +57,8 @@ type SubscriberRow = {
  */
 export async function pullResendUnsubscribes(
   db: SupabaseClient,
+  resend: Resend = client(),
 ): Promise<{ checked: number; pulled: number; errors: string[] }> {
-  const resend = client();
   const errors: string[] = [];
 
   const { data, error } = await db
@@ -92,13 +92,14 @@ export async function pullResendUnsubscribes(
 
 export async function syncAudience(
   db: SupabaseClient,
+  // 시험에서 가짜 응답을 넣으려고 밖에서 받을 수 있게 둔다. 평소에는 비워 둔다.
+  resend: Resend = client(),
 ): Promise<{ count: number; errors: string[] }> {
-  const resend = client();
   const segment = segmentId();
   const errors: string[] = [];
 
   // Resend 에서 수신거부한 사람을 먼저 원장에 반영한다. 순서를 바꾸면 그 사람을 되살린다.
-  const pulled = await pullResendUnsubscribes(db);
+  const pulled = await pullResendUnsubscribes(db, resend);
   errors.push(...pulled.errors);
 
   const { data, error } = await db
@@ -114,15 +115,9 @@ export async function syncAudience(
 
     try {
       if (active) {
-        const res = await resend.contacts.create({
-          email: s.email,
-          unsubscribed: false,
-          segments: [{ id: segment }],
-        });
-        if (res.error) throw new Error(res.error.message);
+        const contactId = await upsertContact(resend, s.email, segment, errors, s.id);
         count += 1;
 
-        const contactId = res.data?.id;
         if (contactId && contactId !== s.resend_contact_id) {
           await db
             .from("ds_subscribers")
@@ -147,6 +142,36 @@ export async function syncAudience(
   }
 
   return { count, errors };
+}
+
+/**
+ * 연락처를 만들거나, 이미 있으면 되살려 세그먼트에 넣는다. 연락처 id 를 돌려준다.
+ *
+ * 수신거부했다가 다시 가입한 사람은 Resend 에 이미 연락처가 있다. 그때 create 가 실패하면
+ * 발송 수에서 빠진다. Resend 가 "이미 있음" 에 어떤 오류 코드를 주는지 SDK 목록에 없어서,
+ * create 가 어떤 이유로든 실패하면 update(unsubscribed:false) → 세그먼트 추가로 넘어간다.
+ * update 까지 실패하면 그때 오류로 던진다.
+ */
+async function upsertContact(
+  resend: Resend,
+  email: string,
+  segment: string,
+  errors: string[],
+  rowId: string,
+): Promise<string | null> {
+  const created = await resend.contacts.create({ email, unsubscribed: false, segments: [{ id: segment }] });
+  if (!created.error) return created.data?.id ?? null;
+
+  const updated = await resend.contacts.update({ email, unsubscribed: false });
+  if (updated.error) {
+    throw new Error(`create: ${created.error.message} · update: ${updated.error.message}`);
+  }
+  const added = await resend.contacts.segments.add({ email, segmentId: segment });
+  if (added.error) {
+    // 이미 세그먼트에 있으면 실패할 수 있다. 막지 않고 기록만 남긴다.
+    errors.push(`구독자 ${rowId.slice(0, 8)}: 세그먼트 추가 ${added.error.message}`);
+  }
+  return updated.data?.id ?? null;
 }
 
 /** 브로드캐스트를 만들고 곧바로 보낸다. 발송 수는 이 시점에 알 수 없다. */
