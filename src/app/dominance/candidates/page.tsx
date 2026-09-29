@@ -156,6 +156,10 @@ function SectionHead({ title, hint }: { title: string; hint: string }) {
 function Heading() {
   return (
     <section>
+      {/* D24 · 2026-09-29 — 이 화면은 옛 방식의 기록이다. 새 방식의 결과로 오해하지 않게 맨 위에 둔다. */}
+      <div className="mb-4 rounded-lg border border-amber-500/50 bg-amber-500/10 p-3 text-sm text-amber-100">
+        옛 방식의 후보입니다. 2026-09-29 부터 새 후보를 만들지 않습니다. 질문 화면으로 바뀝니다.
+      </div>
       <h1 className="text-2xl font-semibold tracking-tight">① 이슈 고르기</h1>
       <p className="mt-1 text-sm text-muted-foreground">
         역설 한 줄을 먼저 읽으십시오. 그 줄에 흥미가 없으면 나머지는 보실 필요가
