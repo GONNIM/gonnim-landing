@@ -1,0 +1,130 @@
+"use client";
+
+// [이슈 만들기] · 문장 · 주제어 · 링크 세 가지로 받는다.
+// [채우기] 는 LLM 1회로 칸을 채운다. 모든 칸은 저장 전에 고칠 수 있다. 저장한 이슈는 '제안' 상태로
+// 들어가고, 채택하려면 검증을 거쳐야 한다(넘지 않는 선 7).
+
+import { useState, useTransition } from "react";
+import type { FillMode } from "@/lib/dominance/question-llm";
+import { fillAction, saveIssueAction, type IssueFields } from "./actions";
+import { Btn, FieldsEditor } from "./ui";
+
+const MODES: { key: FillMode; label: string; placeholder: string }[] = [
+  { key: "sentence", label: "① 문장", placeholder: "예: 커피를 마시면 정말 탈수가 오는가?" },
+  { key: "topic", label: "② 주제어", placeholder: "예: 간헐적 단식, 근육" },
+  { key: "link", label: "③ 링크", placeholder: "https://… (제목만 읽고 본문은 읽지 않습니다)" },
+];
+
+const EMPTY: IssueFields = { question: "", premise: "", twist: "", series: "", area: "", queries: ["", ""] };
+
+export function IssueMaker({
+  onSaved,
+  onDuplicate,
+}: {
+  onSaved: (id: string) => void;
+  onDuplicate: (id: string) => void;
+}) {
+  const [mode, setMode] = useState<FillMode>("sentence");
+  const [text, setText] = useState("");
+  const [manualTitle, setManualTitle] = useState("");
+  const [needTitle, setNeedTitle] = useState(false);
+  const [linkTitle, setLinkTitle] = useState<string | null>(null);
+  const [fields, setFields] = useState<IssueFields>(EMPTY);
+  const [msg, setMsg] = useState<string | null>(null);
+  const [pending, start] = useTransition();
+
+  function fill() {
+    setMsg(null);
+    start(async () => {
+      const r = await fillAction({ mode, text, manualTitle: needTitle ? manualTitle : undefined });
+      if (!r.ok) {
+        setMsg(r.error);
+        if (r.needTitle) setNeedTitle(true);
+        return;
+      }
+      setLinkTitle(r.linkTitle);
+      setFields({
+        question: r.filled.question,
+        premise: r.filled.premise,
+        twist: r.filled.twist,
+        series: r.filled.series,
+        area: r.filled.area ?? "",
+        queries: [r.filled.queries[0] ?? "", r.filled.queries[1] ?? ""],
+      });
+      setMsg(`채웠습니다 · ${(r.ms / 1000).toFixed(1)}초${r.linkTitle ? ` · 읽은 제목: ${r.linkTitle}` : ""}. 칸을 확인하고 고치십시오.`);
+    });
+  }
+
+  function save() {
+    setMsg(null);
+    start(async () => {
+      const f = mode === "sentence" && !fields.question.trim() ? { ...fields, question: text } : fields;
+      const r = await saveIssueAction({ mode, text, linkTitle: linkTitle ?? (manualTitle.trim() || null), fields: f });
+      if (r.ok) {
+        setText("");
+        setFields(EMPTY);
+        onSaved(r.id);
+        return;
+      }
+      setMsg(r.error);
+      if (r.duplicateId) onDuplicate(r.duplicateId);
+    });
+  }
+
+  return (
+    <section className="space-y-3 rounded-xl border border-[color:var(--accent)]/60 bg-surface/40 p-5">
+      <div className="flex flex-wrap gap-2">
+        {MODES.map((m) => (
+          <button
+            key={m.key}
+            type="button"
+            onClick={() => {
+              setMode(m.key);
+              setNeedTitle(false);
+              setLinkTitle(null);
+            }}
+            className={`rounded-md border px-3 py-1.5 text-xs ${
+              mode === m.key
+                ? "border-[color:var(--accent)] text-foreground"
+                : "border-[color:var(--border)] text-muted-foreground"
+            }`}
+          >
+            {m.label}
+          </button>
+        ))}
+      </div>
+
+      <div className="flex gap-2">
+        <input
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          placeholder={MODES.find((m) => m.key === mode)!.placeholder}
+          className="w-full rounded-md border border-[color:var(--border)] bg-background px-3 py-2 text-sm"
+        />
+        <Btn onClick={fill} disabled={pending || !text.trim()} accent>
+          {pending ? "…" : "채우기"}
+        </Btn>
+      </div>
+
+      {mode === "link" && needTitle && (
+        <input
+          value={manualTitle}
+          onChange={(e) => setManualTitle(e.target.value)}
+          placeholder="페이지 제목을 직접 적어 주십시오"
+          className="w-full rounded-md border border-amber-500/50 bg-background px-3 py-2 text-sm"
+        />
+      )}
+
+      {msg && <p className="text-xs text-foreground/80">{msg}</p>}
+
+      <FieldsEditor value={fields} onChange={setFields} />
+
+      <div className="flex items-center gap-2">
+        <Btn onClick={save} disabled={pending || !(fields.question.trim() || (mode === "sentence" && text.trim()))} accent>
+          저장
+        </Btn>
+        <span className="text-xs text-muted-foreground">저장하면 &lsquo;제안&rsquo; 상태로 들어갑니다. 채택 전에 검증을 거칩니다.</span>
+      </div>
+    </section>
+  );
+}
