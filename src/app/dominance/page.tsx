@@ -16,10 +16,8 @@ export default async function DominanceHome() {
   const { db } = await dominanceContext();
   const today = kstToday();
 
-  const { data: candidates, error: candErr } = await db
-    .from("ds_candidates")
-    .select("id, candidate_date, state, score, headline")
-    .order("score", { ascending: false });
+  // 스키마가 있는지만 본다. 후보 수는 더 쓰지 않는다(D24).
+  const { error: candErr } = await db.from("ds_candidates").select("id").limit(1);
 
   if (isMissingSchema(candErr)) {
     return (
@@ -48,9 +46,9 @@ export default async function DominanceHome() {
     ? Math.floor((Date.now() - Date.parse(lastRun.started_at)) / 3_600_000)
     : null;
 
-  const rows = candidates ?? [];
-  const todayCount = rows.filter((c) => c.candidate_date === today).length;
-  const stock = rows.filter((c) => c.state === "open").length;
+  // ① 이슈는 질문 단위다(D24). 옛 후보(ds_candidates)는 기록 화면에서만 본다.
+  const { data: questionRows } = await db.from("ds_questions").select("status");
+  const qCount = (s: string) => (questionRows ?? []).filter((q) => q.status === s).length;
 
   const letterRows = (letters ?? []) as {
     id: string;
@@ -73,10 +71,10 @@ export default async function DominanceHome() {
 
       <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
         <Card
-          href="/dominance/candidates"
-          label="① 오늘 이슈"
-          value={`${todayCount}건`}
-          hint={`재고 ${stock}건 · 안 골라도 된다`}
+          href="/dominance/questions"
+          label="① 이슈"
+          value={`통과 ${qCount("validated")}개`}
+          hint={`제안 ${qCount("proposed")} · 보류 ${qCount("held")} · 채택 ${qCount("adopted")}`}
         />
         <Card
           href="/dominance/letters"
@@ -142,8 +140,8 @@ export default async function DominanceHome() {
           <div className="rounded-xl border border-dashed border-[color:var(--border)]/70 p-8 text-center text-sm text-muted-foreground">
             아직 글이 없습니다.
             <br />
-            <Link href="/dominance/candidates" className="underline">
-              ① 이슈 목록
+            <Link href="/dominance/questions" className="underline">
+              ① 이슈 고르기
             </Link>
             에서 쓸 것을 고르고 [글 작성하기]를 누르십시오.
           </div>

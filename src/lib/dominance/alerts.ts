@@ -213,7 +213,8 @@ const SCREEN_LABEL: Record<string, string> = {
   "/dominance/runs": "실행 기록",
   "/dominance/review": "리뷰",
   "/dominance/schedule": "발행 달력",
-  "/dominance/candidates": "이슈 목록",
+  "/dominance/candidates": "옛 후보(기록)",
+  "/dominance/questions": "이슈 고르기",
   "/dominance/letters": "글 목록",
 };
 

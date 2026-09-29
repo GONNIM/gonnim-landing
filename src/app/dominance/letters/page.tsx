@@ -55,8 +55,8 @@ export default async function LettersPage() {
       {rows.length === 0 ? (
         <div className="rounded-xl border border-dashed border-[color:var(--border)]/70 p-8 text-center text-sm text-muted-foreground">
           아직 글이 없습니다.{" "}
-          <Link href="/dominance/candidates" className="underline">
-            ① 이슈 목록
+          <Link href="/dominance/questions" className="underline">
+            ① 이슈 고르기
           </Link>
           에서 시작하십시오.
         </div>
