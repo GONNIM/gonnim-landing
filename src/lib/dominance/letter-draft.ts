@@ -103,25 +103,7 @@ export async function writeDraftFromCard(
     letterId = (data as { id: string }).id;
   }
 
-  // 원천 목록 · 카드의 원천 + [V]
-  const table = await loadEvidence(db, questionId);
-  const byTag = new Map<string, SourceRef>();
-  for (const s of SLOTS) for (const g of table.slots[s]) if (g.source.tag && !byTag.has(g.source.tag)) byTag.set(g.source.tag, g.source);
-  const rows: Record<string, unknown>[] = [...byTag.entries()].map(([tag, s]) => letterSourceRow(letterId, tag, s));
-  if (card.vLine) {
-    rows.push({
-      letter_id: letterId,
-      tag: V_TAG,
-      ext_url: vSearchUrl(card.question),
-      ext_title: card.sources.find((s) => s.tag === V_TAG)!.title,
-      ext_source_kind: "own",
-      license: "link_only",
-    });
-  }
-  const del = await db.from("ds_letter_sources").delete().eq("letter_id", letterId);
-  if (del.error) throw new Error(`원천 목록을 비우지 못했습니다: ${del.error.message}`);
-  const ins = await db.from("ds_letter_sources").insert(rows);
-  if (ins.error) throw new Error(`원천 목록을 넣지 못했습니다: ${ins.error.message}`);
+  await rebuildLetterSources(db, letterId, questionId);
 
   const meta: DraftMeta = {
     titles: gen.titles,
@@ -146,4 +128,33 @@ export async function writeDraftFromCard(
   }
 
   return { letterId, created: !existing, archivedTo, meta };
+}
+
+/**
+ * 글의 원천 목록(ds_letter_sources)을 질문의 지금 카드로 다시 만든다(카드의 원천 + [V]).
+ * 증거를 보강한 뒤 새 판을 쓰거나 편집본을 넣을 때 부른다(25차: 보강한 태그가 원천 목록에 없어 "카드 밖" 으로 잡혔다).
+ */
+export async function rebuildLetterSources(db: SupabaseClient, letterId: string, questionId: string): Promise<number> {
+  const card = await loadQuestionCard(db, questionId);
+  if (!card) throw new Error("질문을 찾지 못했습니다");
+  const table = await loadEvidence(db, questionId);
+  const byTag = new Map<string, SourceRef>();
+  for (const s of SLOTS) for (const g of table.slots[s]) if (g.source.tag && !byTag.has(g.source.tag)) byTag.set(g.source.tag, g.source);
+  const rows: Record<string, unknown>[] = [...byTag.entries()].map(([tag, s]) => letterSourceRow(letterId, tag, s));
+  if (card.vLine) {
+    rows.push({
+      letter_id: letterId,
+      tag: V_TAG,
+      ext_url: vSearchUrl(card.question),
+      ext_title: card.sources.find((s) => s.tag === V_TAG)!.title,
+      ext_source_kind: "own",
+      license: "link_only",
+    });
+  }
+  const del = await db.from("ds_letter_sources").delete().eq("letter_id", letterId);
+  if (del.error) throw new Error(`원천 목록을 비우지 못했습니다: ${del.error.message}`);
+  const ins = await db.from("ds_letter_sources").insert(rows);
+  if (ins.error) throw new Error(`원천 목록을 넣지 못했습니다: ${ins.error.message}`);
+
+  return rows.length;
 }
