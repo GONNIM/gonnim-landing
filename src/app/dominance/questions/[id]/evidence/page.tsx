@@ -1,7 +1,6 @@
 // ② 증거 표 · 질문 하나의 재료 네 칸과 사실 문장 (D26 · D33 · D37 · D43).
 //
-// 문장은 원문과 글자 그대로 대조한 것만 들어간다. 3칸 이상 차면 [글 작성하기] 자리가 보이지만,
-// 3단계 컨펌 전이라 잠겨 있다.
+// 문장은 원문과 글자 그대로 대조한 것만 들어간다. 채택한 질문이고 3칸 이상 차면 [글 작성하기] 가 열린다(20차).
 
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -20,6 +19,13 @@ export default async function EvidencePage({ params }: { params: Promise<{ id: s
   const q = await loadQuestion(db, id);
   if (!q) notFound();
   const table = await loadEvidence(db, id);
+  const { data: letter } = await db
+    .from("ds_letters")
+    .select("id, status")
+    .eq("question_id", id)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle<{ id: string; status: string }>();
 
   return (
     <div className="space-y-6">
@@ -50,6 +56,7 @@ export default async function EvidencePage({ params }: { params: Promise<{ id: s
         status={q.status}
         table={table}
         run={q.evidenceRun as never}
+        letter={letter ?? null}
       />
     </div>
   );

@@ -792,3 +792,112 @@ export async function addOwnerFact(
   if (res === "duplicate") return { ok: false, reason: "같은 칸에 같은 문장이 이미 있습니다" };
   return { ok: true, text: v.text, part: v.part };
 }
+
+// ── SQL 뒤 정리: 묶인 행 펼치기 · 다시 대조 (20차 보충 1) ─────────────────────
+
+export type SplitReport = {
+  rowsBefore: number;
+  rowsAfter: number;
+  split: number;
+  verified: number;
+  failed: { tag: string | null; text: string; reason: string }[];
+  changedGlyphs: number;
+  skipped: number;
+};
+
+/**
+ * SQL 전에 (칸, 원천) 한 행에 줄로 묶어 둔 문장을 한 행에 하나씩 펼친다. 메타 줄 속성은 새 칸으로 옮긴다.
+ * reverify 이면 문장마다 원문과 다시 대조해 verified_at · source_part 를 채운다(원문 글자가 다르면 원문 글자로).
+ * 대조에 실패한 문장은 지우지 않고 verified_at 을 비워 둔다. 두 번 돌려도 같다(멱등).
+ */
+export async function splitAndVerify(
+  db: SupabaseClient,
+  questionId: string,
+  reverify: boolean,
+): Promise<SplitReport> {
+  if (!(await hasEvidenceColumns(db))) throw new Error("4단계 SQL 전에는 펼칠 수 없습니다");
+  const rows = await loadRows(db, questionId, true);
+  const rep: SplitReport = { rowsBefore: rows.length, rowsAfter: 0, split: 0, verified: 0, failed: [], changedGlyphs: 0, skipped: 0 };
+
+  // 1) 펼치기
+  for (const r of rows) {
+    const ls = lines(r.fact_sentence);
+    if (ls.length <= 1 && !(ls.length === 1 && splitNote(r.note).facts.length > 0)) continue;
+    const { memo, facts } = splitNote(r.note);
+    const m0 = facts[0] ?? {};
+    const colsOf = (m: FactMeta) => ({
+      fact_subject: m.subject ?? null,
+      fact_year: m.year ?? null,
+      has_number: m.has_number ?? null,
+      verified_at: m.verified_at ?? null,
+      source_part: m.source_part ?? null,
+    });
+    const { error: e0 } = await db
+      .from("ds_question_evidence")
+      .update({ fact_sentence: ls[0], note: memo, ...colsOf(m0) })
+      .eq("id", r.id);
+    if (e0) throw new Error(e0.message);
+    for (let i = 1; i < ls.length; i++) {
+      const { error } = await db.from("ds_question_evidence").insert({
+        question_id: r.question_id,
+        slot: r.slot,
+        tag: r.tag,
+        added_by: r.added_by,
+        paper_id: r.paper_id,
+        gov_press_id: r.gov_press_id,
+        ext_url: r.ext_url,
+        ext_title: r.ext_title,
+        ext_source_kind: r.ext_source_kind,
+        license: r.license,
+        note: memo,
+        fact_sentence: ls[i],
+        ...colsOf(facts[i] ?? {}),
+      });
+      // 23505 = 이미 펼쳐 둔 문장(두 번째 실행)
+      if (error && error.code !== "23505") throw new Error(error.message);
+    }
+    rep.split++;
+  }
+
+  // 2) 다시 대조
+  const after = await loadRows(db, questionId, true);
+  rep.rowsAfter = after.length;
+  if (!reverify) return rep;
+
+  const paperCache = new Map<string, { paper: EpmcPaper | null; xml?: string | null }>();
+  const bodyUsed = new Map<string, number>();
+  for (const r of after) {
+    const text = r.fact_sentence?.trim();
+    if (!text) continue;
+    const src = sourceOf(r);
+    if (src.linkOnly) {
+      rep.skipped++;
+      continue;
+    }
+    let cached = paperCache.get(src.key);
+    if (!cached && src.kind === "paper" && src.externalId) {
+      cached = { paper: await paperById(src.externalId) };
+      paperCache.set(src.key, cached);
+    }
+    if (cached?.paper?.pmcid && cached.xml === undefined && !findVerbatim(cached.paper.abstract, text)) {
+      cached.xml = await fullTextXml(cached.paper.pmcid);
+    }
+    const v = await verifySentence(src, text, bodyUsed.get(src.key) ?? 0, cached ? { paper: cached.paper, xml: cached.xml } : undefined);
+    if (!v.ok) {
+      rep.failed.push({ tag: r.tag, text, reason: v.reason });
+      continue;
+    }
+    if (v.part === "body") bodyUsed.set(src.key, (bodyUsed.get(src.key) ?? 0) + 1);
+    const patch: Record<string, unknown> = { verified_at: new Date().toISOString(), source_part: v.part };
+    if (v.text !== text) {
+      patch.fact_sentence = v.text;
+      rep.changedGlyphs++;
+    }
+    if (r.fact_year === null && v.paper?.year) patch.fact_year = Number(v.paper.year);
+    if (r.has_number === null) patch.has_number = /\d/.test(v.text);
+    const { error } = await db.from("ds_question_evidence").update(patch).eq("id", r.id);
+    if (error) throw new Error(error.message);
+    rep.verified++;
+  }
+  return rep;
+}

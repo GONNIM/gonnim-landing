@@ -16,7 +16,7 @@ export type IndustryLink = {
   name: string;
   why: string;
   query: string;
-  edgar: { url: string; count: number | null };
+  edgar: { url: string };
   reporter: { url: string | null; count: number | null };
   dart: string | null;
 };

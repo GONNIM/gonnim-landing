@@ -235,20 +235,6 @@ async function premiseBodyPhase(db: SupabaseClient, q: Question, run: EvidenceRu
 
 const UA = "gonnim-dominance/1.0 (hi@gonnim.dev)";
 
-async function edgarCount(name: string): Promise<number | null> {
-  try {
-    const r = await fetch(
-      `https://efts.sec.gov/LATEST/search-index?q=${encodeURIComponent(`"${name}"`)}`,
-      { headers: { "User-Agent": UA }, signal: AbortSignal.timeout(15000) },
-    );
-    if (!r.ok) return null;
-    const d = (await r.json()) as { hits?: { total?: { value?: number } } };
-    return d.hits?.total?.value ?? null;
-  } catch {
-    return null;
-  }
-}
-
 async function reporterSearch(text: string): Promise<{ url: string | null; count: number | null }> {
   try {
     const r = await fetch("https://api.reporter.nih.gov/v2/projects/search", {
@@ -277,13 +263,14 @@ async function industryPhase(q: Question, run: EvidenceRun): Promise<string> {
   const leads = await industryLeads({ question: q.question, premise: q.premise });
   const out: IndustryLink[] = [];
   for (const l of leads) {
-    const [count, rep] = await Promise.all([edgarCount(l.name), reporterSearch(l.query)]);
+    // EDGAR 는 링크만 둔다. 흔한 이름("Apple")은 건수가 10,000 으로 나와 뜻이 없었다(19차 실측).
+    const rep = await reporterSearch(l.query);
     await new Promise((ok) => setTimeout(ok, 1000)); // RePORTER 는 초당 1회
     out.push({
       name: l.name,
       why: l.why,
       query: l.query,
-      edgar: { url: `https://www.sec.gov/edgar/search/#/q=${encodeURIComponent(`"${l.name}"`)}`, count },
+      edgar: { url: `https://www.sec.gov/edgar/search/#/q=${encodeURIComponent(`"${l.name}"`)}` },
       reporter: rep,
       dart: l.koName
         ? `https://dart.fss.or.kr/dsab007/main.do?option=corp&textCrpNm=${encodeURIComponent(l.koName)}`

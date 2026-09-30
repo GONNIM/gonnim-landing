@@ -15,6 +15,7 @@ import {
   type Slot,
 } from "@/lib/dominance/evidence";
 import { dominanceContext } from "@/lib/dominance/guard";
+import { writeDraftFromCard } from "@/lib/dominance/letter-draft";
 
 const errText = (e: unknown) => (e instanceof Error ? e.message : String(e));
 
@@ -104,4 +105,20 @@ export async function addPaperAction(id: string, slot: Slot, ref: string): Promi
 export async function removeSourceAction(id: string, slot: Slot, sourceKey: string): Promise<Result> {
   const { db } = await dominanceContext();
   return wrap(id, () => removeSource(db, id, slot, sourceKey));
+}
+
+/** ③ [글 작성하기] · 사실 카드만으로 초안을 쓰고 편집기로 보낸다. 다시 누르면 새 판. */
+export async function writeDraftAction(
+  id: string,
+): Promise<{ ok: true; letterId: string; created: boolean; seconds: number } | { ok: false; error: string }> {
+  const { db } = await dominanceContext();
+  const t0 = Date.now();
+  try {
+    const r = await writeDraftFromCard(db, id);
+    refresh(id);
+    revalidatePath("/dominance/letters");
+    return { ok: true, letterId: r.letterId, created: r.created, seconds: Math.round((Date.now() - t0) / 1000) };
+  } catch (e) {
+    return { ok: false, error: errText(e) };
+  }
 }

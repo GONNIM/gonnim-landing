@@ -21,6 +21,7 @@ import type { QuestionStatus } from "@/lib/dominance/questions";
 import { Btn } from "../../ui";
 import { runCollect } from "../../runCollect";
 import {
+  writeDraftAction,
   addExternalAction,
   addFactAction,
   addPaperAction,
@@ -38,11 +39,13 @@ export function EvidenceBoard({
   status,
   table,
   run,
+  letter,
 }: {
   questionId: string;
   status: QuestionStatus;
   table: EvidenceTable;
   run: EvidenceRun | null;
+  letter: { id: string; status: string } | null;
 }) {
   const router = useRouter();
   const [pending, start] = useTransition();
@@ -56,6 +59,21 @@ export function EvidenceBoard({
       setMsg(r.error ? `실패 · ${r.error}` : ok ?? null);
       router.refresh();
     });
+
+  const canWrite = ["adopted", "drafted"].includes(status) && table.filledSlots >= 3;
+  const [writing, setWriting] = useState(false);
+  async function write() {
+    if (letter && !window.confirm("새 판을 만듭니다. 지금 글은 파일로 보관되고 본문이 바뀝니다.")) return;
+    setWriting(true);
+    setMsg("사실 카드로 초안을 쓰는 중입니다(1분 안팎)…");
+    const r = await writeDraftAction(questionId);
+    setWriting(false);
+    if (!r.ok) {
+      setMsg(`글 작성 실패 · ${r.error}`);
+      return;
+    }
+    router.push(`/dominance/letters/${r.letterId}`);
+  }
 
   async function collect() {
     setMsg(null);
@@ -92,16 +110,28 @@ export function EvidenceBoard({
           <span className="text-xs text-muted-foreground">
             {SLOTS.map((s) => `${SLOT_LABEL[s]} ${table.slots[s].length ? "✓" : "—"}`).join(" · ")}
           </span>
-          {table.filledSlots >= 3 && (
+          <span className="ml-auto flex items-center gap-2">
+            {letter && (
+              <a href={`/dominance/letters/${letter.id}`} className="text-xs text-foreground underline">
+                초안 열기
+              </a>
+            )}
             <button
               type="button"
-              disabled
-              title="3단계 컨펌 뒤에 열립니다"
-              className="ml-auto rounded-md border border-[color:var(--border)] px-3 py-1.5 text-xs text-muted-foreground opacity-60"
+              onClick={write}
+              disabled={!canWrite || writing || pending || (letter !== null && letter.status !== "draft")}
+              title={
+                canWrite
+                  ? letter
+                    ? "새 판을 만듭니다(이전 판은 파일로 보관)"
+                    : "사실 카드만으로 초안을 씁니다"
+                  : "채택한 질문이고 재료 칸 3개 이상일 때 열립니다"
+              }
+              className="rounded-md bg-[color:var(--accent)] px-3 py-1.5 text-xs font-medium text-background disabled:opacity-40"
             >
-              글 작성하기 (3단계 컨펌 뒤 열림)
+              {writing ? "쓰는 중…" : letter ? "글 작성하기 (새 판)" : "글 작성하기"}
             </button>
-          )}
+          </span>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <Btn onClick={collect} disabled={!canCollect || pending || progress !== null} accent>
@@ -158,7 +188,7 @@ function RunSummary({ run }: { run: EvidenceRun }) {
               <li key={l.name}>
                 <b className="text-foreground/90">{l.name}</b> — {l.why}{" "}
                 <a className="underline" href={l.edgar.url} target="_blank" rel="noreferrer noopener">
-                  EDGAR{l.edgar.count !== null ? ` ${l.edgar.count}건` : ""}
+                  EDGAR
                 </a>
                 {" · "}
                 {l.reporter.url ? (
