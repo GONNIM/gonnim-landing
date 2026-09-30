@@ -20,7 +20,9 @@ export type DraftMeta = {
   promptVersion?: number;
   generatedAt: string;
   llmCalls: number;
-  ms: { glossary: number; draft: number };
+  ms: { pick?: number; glossary: number; draft: number };
+  pickLog?: import("./draft-card").PickLog[];
+  unverified?: number;
   tokens: { input: number; output: number };
   cardFacts: number;
   model: string;

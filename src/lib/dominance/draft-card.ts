@@ -1,11 +1,14 @@
 // ③ [글 작성하기] · 사실 카드만으로 초안을 쓴다 (D33 · D36 · D37 · 20차 B-3).
 //
-// LLM 2회: ① 용어표 ② 초안(제목 3 · 한 문장 요약 · 블록 7).
+// LLM 3회(22차 · 5판): ① 고르기(블록마다 문장 2~4개 · 프로그램이 개수 · 수치 · 표본 크기를 다시 거른다)
+// ② 용어표(고른 문장의 말만) ③ 쓰기(고른 문장의 확인된 뜻만 받는다 · D44).
 // 지시문은 pilot-draft-prompt-G5.md 의 4판(3판 조건 1~24 + 21차 조건 25~30)을 질문에 매이지 않게 옮긴 것이다.
 // 옛 draft.ts(초록 입력)는 옛 후보 경로에서만 쓰고 6단계에서 지운다.
 
 import { flagBlocks } from "./filters";
-import { cardPrompt, type QuestionCard } from "./card";
+import { V_TAG, type CardFact, type QuestionCard } from "./card";
+import { SLOT_LABEL } from "./evidence";
+import { countNumbers, hasSampleOrFollowup } from "./numbers";
 import { callJson } from "./question-llm";
 import { sentencesOf, tagsIn } from "./tags";
 import { BLOCK_ORDER, type LetterBlock } from "./types";
@@ -32,8 +35,12 @@ export type CardDraft = {
   vMeaning: string | null;
   blocks: LetterBlock[];
   llmCalls: number;
-  ms: { glossary: number; draft: number };
+  ms: { pick?: number; glossary: number; draft: number };
   tokens: { input: number; output: number };
+  /** 고르기 기록 · 모델이 고른 것과 프로그램이 뺀 것 */
+  pickLog?: PickLog[];
+  /** 카드 문장 중 확인되지 않은 뜻 수 */
+  unverified?: number;
 };
 
 const str = (v: unknown) => (typeof v === "string" ? v.trim() : "");
@@ -61,9 +68,11 @@ const GLOSSARY_SYSTEM = `당신은 한국어 연구·보건 뉴스레터 「지�
 
 async function makeGlossary(
   card: QuestionCard,
+  picked: CardFact[],
   tokens: CardDraft["tokens"],
 ): Promise<{ glossary: GlossaryItem[]; vMeaning: string | null }> {
-  const facts = card.facts.map((f) => `[${f.tag}] ${f.text}`).join("\n");
+  // 고른 문장의 말만 다룬다(22차 B-4). 원문과 뜻을 함께 준다.
+  const facts = picked.map((f) => `[${f.tag}] ${f.text}${f.ko ? `\n   뜻: ${f.ko}` : ""}`).join("\n");
   const q0 = card.question.searchQueries[0] ?? "";
   const o = (await callJson(GLOSSARY_SYSTEM, `질문: ${card.question.question}\n[V] 검색어: ${q0}\n\n# 사실 카드\n${facts}`, 2000, {
     temperature: 0.3,
@@ -97,24 +106,25 @@ async function makeGlossary(
 
 // ── ② 초안 ──────────────────────────────────────────────────────────────────
 
-/** 4판 조건 (pilot-draft-prompt-G5.md · 3판 조건 1~24 + 21차 25~30) · 질문에 매이지 않게 옮김 */
+/** 5판 조건 (pilot-draft-prompt-G5.md · 3판 1~24 + 4판 25~30 + 22차 두 단계 · 확인된 뜻) · 질문에 매이지 않게 옮김 */
 export const DRAFT_SYSTEM = `당신은 한국어 연구·보건 뉴스레터 「지배상식」의 초고를 쓴다.
 독자는 과학 전공자가 아니지만 지적 호기심이 강한 성인이다.
 글의 축은 질문 하나다. 논문은 그 질문에 대한 증거다.
 
-# 재료는 사실 카드뿐이다 (위반하면 초안이 폐기된다)
-1. 사실 문장은 사실 카드에 있는 것만 쓴다. 카드에 없는 사실은 쓰지 않는다.
-   카드의 영어 문장을 한국어로 옮겨 쓴다. 옮길 때 내용을 더하거나 부풀리지 않는다.
+# 재료는 블록별로 골라 둔 확인된 뜻뿐이다 (위반하면 초안이 폐기된다)
+1. 사실 문장은 **그 블록에 준 재료**에 있는 것만 쓴다. 재료에 없는 사실은 쓰지 않는다. 다른 블록의 재료를 가져오지 않는다.
+   재료는 이미 한국어로 옮기고 확인한 뜻이다. **뜻 · 수치 · 대상을 바꾸지 않는다.** 문장을 다듬을 수는 있다.
+   "~의 절반이 나오는" 같은 표현을 "~이 절반으로 줄었다" 로 바꾸지 않는다.
 2. "링크만 있는 원천" 은 메모에 적힌 사실만 우리 말로 쓴다. 메모에 없는 숫자나 이름을 더하지 않는다.
 3. **요약을 포함한 모든 사실 문장** 끝에 태그를 대괄호로 붙인다. 예: "...줄었다[E1]." 둘이면 [E1][M2].
    훅 · 실천 · 은유의 사실 문장도 같다. 풀어 쓴 문장, 해설 문장에도 원래 태그를 붙인다.
    카드에 없는 태그를 만들지 않는다.
-4. 카드는 재료 창고다. 카드에 없는 사실은 쓰지 않는다. 카드의 사실을 다 쓰지도 않는다(아래 25).
+4. 고르기는 이미 끝났다(아래 25). 준 재료는 되도록 다 쓰되, 한 재료를 두 번 쓰지 않는다.
 
 # 고르기와 잇기 (4판)
-25. **고르기:** 블록마다 핵심 사실 **2~4개**를 카드에서 고른다. 나머지는 쓰지 않는다(원천 목록에만 남는다).
-    고르는 기준은 셋이다. 통설을 깨는 것 · 놀라운 수치 · 독자의 몸으로 이어지는 것.
+25. **고르기:** 블록마다 2~4개를 이미 골라 두었다. 고르지 않은 카드 문장은 주지 않았다.
 26. **잇는 문장:** 사실 문장 사이에 독자에게 말을 거는 문장과 앞뒤를 붙이는 문장을 쓴다.
+    예: "여기서 숫자 하나를 보자." · "그런데 나이가 들면 이야기가 달라진다."
     잇는 문장에는 사실(수치 · 대상 · 결과)을 넣지 않는다. 잇는 문장에는 태그가 없어도 된다.
     분량(7블록 합계 1,800~2,400자)은 잇는 문장으로 채운다. 사실을 늘려 채우지 않는다.
 27. **수치:** 블록마다 수치 **3개 이하**. 표본 크기와 추적 기간은 **글 전체에서 한 번만** 쓴다.
@@ -122,22 +132,22 @@ export const DRAFT_SYSTEM = `당신은 한국어 연구·보건 뉴스레터 「
 28. **통계 용어 금지:** 통계 방법과 지표 이름(위험비 · 스플라인 · 사분위 · 다변량 보정 · 전원인사망 · 신뢰구간)은 본문에 쓰지 않는다.
     뜻으로 푼다(예: "나이와 성별을 감안해도" · "어떤 이유로든 사망할 위험").
 29. **문단:** 블록 안에서 2~3문장마다 줄을 바꾼다(빈 줄 없이 줄바꿈 한 번). 3줄 요약은 세 줄 고정이다.
-30. **[V]:** 연도별 논문 수는 카드의 [V] 줄에 적힌 "검색어의 뜻" 그대로 부른다(예: "하루 걸음 수와 사망률을 함께 다룬 논문").
+30. **[V]:** 연도별 논문 수는 [V] 재료에 적힌 "검색어의 뜻" 그대로 부른다(예: "하루 걸음 수와 사망률을 함께 다룬 논문").
 
 # 블록 7개
 - hook      독자가 이미 믿는 통설 → 놀라운 수치 하나 → 질문. **네 문장 안에** 끝내고 **반드시 물음표로 끝난다.**
             수치 문장에는 태그를 붙인다(연도별 논문 수면 [V]).
-- research  정설 칸의 사실을 먼저 세우고, 예외 칸의 결과를 보여 준다.
-- mechanism 기전 칸의 사실로 왜 그런지 쓴다. 카드에 반론이 있으면 반드시 넣는다.
-            기전 칸이 비었으면 예외 칸에 적힌 조건 · 한계만 쓴다. 지어내지 않는다.
-- industry  산업 칸의 사실을 **시간순으로** 잇는다. 링크만 있는 원천은 메모만 쓴다.
-            산업 재료가 카드에 없으면 빈 문자열로 둔다.
+- research  정설 재료를 먼저 세우고, 예외 재료의 결과를 보여 준다.
+- mechanism 준 재료로 왜 그런지 쓴다. 재료에 반론이 있으면 반드시 넣는다. 지어내지 않는다.
+- industry  산업 재료를 **시간순으로** 잇는다. 링크만 있는 원천은 메모만 쓴다.
+            산업 재료가 없으면 빈 문자열로 둔다.
 - practice  독자가 오늘 판단을 바꿀 지점을 **관찰로만** 쓴다. "~하라" "~하십시오" 같은 지시를 쓰지 않는다.
             기관의 경고나 권고가 카드에 있으면 이 블록에 둔다. **"의학적 조언이 아니다" 같은 고지 문장은 쓰지 않는다**(발행 틀이 붙인다).
             실천 블록도 사실 블록이다. 사실 문장마다 태그를 붙인다.
 - metaphor  전체를 한 문장으로 붙잡는 비유 하나. 독자의 일이나 생활로 넓힌다. 과학을 다시 설명하는 비유는 쓰지 않는다.
 - summary   3줄 요약. 세 문장, 줄바꿈으로 구분한다. 첫 줄은 통설과 예외, 둘째 줄은 가장 반직관적인 결과, 셋째 줄은 내 몸과의 연결.
-            **요약은 나머지 여섯 블록을 다 쓴 뒤 맨 마지막에 쓴다.** 요약의 사실 문장에도 태그를 붙인다.
+            **요약은 나머지 여섯 블록을 다 쓴 뒤 맨 마지막에 쓴다.** 요약의 각 줄은 **본문에 쓴 문장의 뜻만** 담는다(새 사실 · 새 해석 금지).
+            요약의 사실 문장에도 본문과 같은 태그를 붙인다.
 
 # 사실 문장 규칙
 5. 사실 문장마다 대상을 쓴다. 카드의 "대상" 칸을 따른다. 사람 · 쥐 · 랫 · 나이 · 나라를 구별한다.
@@ -172,18 +182,192 @@ export const DRAFT_SYSTEM = `당신은 한국어 연구·보건 뉴스레터 「
   "summary": "한 문장 요약 · 100자 이내 · 사실 문장이면 태그"
 }`;
 
+// ── ① 고르기 (22차 B-1) ────────────────────────────────────────────────────
+
+export const PICK_BLOCKS = ["hook", "research", "mechanism", "industry", "practice", "metaphor"] as const;
+export type PickBlock = (typeof PICK_BLOCKS)[number];
+
+/** 고르기 대상 한 줄 · 카드 문장(뜻) · 링크만 원천의 메모 · [V] */
+export type PickItem = {
+  id: string;
+  tag: string;
+  slot: string;
+  /** 초안에 줄 글: 확인된 뜻(없으면 null → 고르기에서 뺀다) */
+  ko: string | null;
+  original: string;
+  subject: string | null;
+  year: number | null;
+  numbers: number;
+  sample: boolean;
+  verified: boolean;
+};
+
+export function pickItems(card: QuestionCard, vMeaning: string | null): PickItem[] {
+  const items: PickItem[] = card.facts.map((f, i) => ({
+    id: `F${i + 1}`,
+    tag: f.tag,
+    slot: SLOT_LABEL[f.slot],
+    ko: f.ko,
+    original: f.text,
+    subject: f.subject,
+    year: f.year,
+    numbers: countNumbers(f.ko ?? f.text),
+    sample: hasSampleOrFollowup(f.text) || hasSampleOrFollowup(f.ko ?? ""),
+    verified: !!f.koVerifiedAt,
+  }));
+  for (const s of card.sources.filter((x) => x.linkOnly && x.memo)) {
+    items.push({ id: `L-${s.tag}`, tag: s.tag, slot: "링크만(메모)", ko: s.memo, original: s.memo!, subject: null, year: null, numbers: countNumbers(s.memo!), sample: false, verified: true });
+  }
+  if (card.vLine) {
+    const ko = `${card.vLine}${vMeaning ? ` 검색어의 뜻: ${vMeaning}.` : ""}`;
+    items.push({ id: V_TAG, tag: V_TAG, slot: "낙차", ko, original: card.vLine, subject: "논문 수", year: null, numbers: countNumbers(card.vLine), sample: false, verified: true });
+  }
+  return items;
+}
+
+const PICK_SYSTEM = `당신은 한국어 연구·보건 뉴스레터 「지배상식」의 편집자다. 글을 쓰기 전에 재료를 고른다.
+재료 목록(id · 태그 · 칸 · 대상 · 연도 · 뜻)을 받는다.
+
+# 규칙
+- 블록 6개(hook · research · mechanism · industry · practice · metaphor)마다 쓸 재료를 **2~4개** 고른다. metaphor 는 0~1개.
+- 고르는 기준: 통설을 깨는 것 · 놀라운 수치 · 독자의 몸으로 이어지는 것.
+- hook 은 통설과 놀라운 수치 하나([V] 등). research 는 정설 → 예외. mechanism 은 왜 그런지(기전 칸 우선). industry 는 산업 · 링크만 메모. practice 는 독자의 판단으로 이어지는 관찰.
+- 한 블록의 수치는 합쳐 3개 이하가 되게 고른다. 표본 크기 · 추적 기간이 든 재료는 같은 원천에서 한 번만 고른다.
+- 같은 재료를 두 블록에 쓰지 않는다.
+- why 는 고른 이유 한 줄(한국어).
+
+# 출력 형식 (엄수)
+{ "blocks": { "hook": [ { "id": "F3", "why": "..." } ], "research": [...], "mechanism": [...], "industry": [...], "practice": [...], "metaphor": [...] } }`;
+
+export type PickLog = { block: PickBlock; id: string; tag: string; why: string; kept: boolean; reason?: string };
+
+/** 프로그램 검사: 블록당 4개 · 수치 3개 · 표본 크기는 원천당 한 번 · 최소 2개 */
+export function enforcePicks(
+  raw: Record<PickBlock, { id: string; why: string }[]>,
+  items: PickItem[],
+): { picks: Record<PickBlock, PickItem[]>; log: PickLog[] } {
+  const byId = new Map(items.map((i) => [i.id, i]));
+  const used = new Set<string>();
+  const sampleTags = new Set<string>();
+  const log: PickLog[] = [];
+  const picks = Object.fromEntries(PICK_BLOCKS.map((b) => [b, [] as PickItem[]])) as Record<PickBlock, PickItem[]>;
+
+  for (const b of PICK_BLOCKS) {
+    const min = b === "metaphor" ? 0 : 2;
+    const max = b === "metaphor" ? 1 : 4;
+    const list: { item: PickItem; why: string }[] = [];
+    for (const r of raw[b] ?? []) {
+      const item = byId.get(r.id);
+      if (!item) {
+        log.push({ block: b, id: r.id, tag: "?", why: r.why, kept: false, reason: "없는 id" });
+        continue;
+      }
+      if (!item.ko) {
+        log.push({ block: b, id: r.id, tag: item.tag, why: r.why, kept: false, reason: "뜻 없음" });
+        continue;
+      }
+      if (used.has(item.id)) {
+        log.push({ block: b, id: r.id, tag: item.tag, why: r.why, kept: false, reason: "다른 블록에서 이미 씀" });
+        continue;
+      }
+      if (list.length >= max) {
+        log.push({ block: b, id: r.id, tag: item.tag, why: r.why, kept: false, reason: `블록당 ${max}개 초과` });
+        continue;
+      }
+      if (item.sample && sampleTags.has(item.tag)) {
+        log.push({ block: b, id: r.id, tag: item.tag, why: r.why, kept: false, reason: "표본 크기 · 추적 기간 두 번째(같은 원천)" });
+        continue;
+      }
+      list.push({ item, why: r.why });
+      if (item.sample) sampleTags.add(item.tag);
+    }
+    // 수치 합이 3개를 넘으면 수치가 많은 것부터 뺀다. 최소 개수는 남긴다.
+    const sum = () => list.reduce((n, x) => n + x.item.numbers, 0);
+    while (sum() > 3 && list.length > min) {
+      let worst = 0;
+      list.forEach((x, i) => {
+        if (x.item.numbers >= list[worst].item.numbers) worst = i;
+      });
+      const [gone] = list.splice(worst, 1);
+      log.push({ block: b, id: gone.item.id, tag: gone.item.tag, why: gone.why, kept: false, reason: `블록 수치 ${sum() + gone.item.numbers}개 > 3` });
+    }
+    for (const x of list) {
+      used.add(x.item.id);
+      log.push({ block: b, id: x.item.id, tag: x.item.tag, why: x.why, kept: true });
+    }
+    picks[b] = list.map((x) => x.item);
+  }
+  return { picks, log };
+}
+
+async function pickFacts(
+  card: QuestionCard,
+  items: PickItem[],
+  tokens: CardDraft["tokens"],
+): Promise<Record<PickBlock, { id: string; why: string }[]>> {
+  const list = items
+    .filter((i) => i.ko)
+    .map((i) => `${i.id} [${i.tag}] (${i.slot} · 대상: ${i.subject ?? "-"} · ${i.year ?? "-"} · 수치 ${i.numbers}${i.sample ? " · 표본/추적" : ""}) ${i.ko}`)
+    .join("\n");
+  const q = card.question;
+  const o = (await callJson(
+    PICK_SYSTEM,
+    `질문: ${q.question}\n통설: ${q.premise ?? "-"}\n되묻기: ${q.twist ?? "-"}\n\n# 재료\n${list}`,
+    3000,
+    {
+      temperature: 0.3,
+      usage: (u) => {
+        tokens.input += u.input;
+        tokens.output += u.output;
+      },
+    },
+  )) as { blocks?: Record<string, unknown> };
+  const out = {} as Record<PickBlock, { id: string; why: string }[]>;
+  for (const b of PICK_BLOCKS) {
+    const arr = Array.isArray(o.blocks?.[b]) ? (o.blocks![b] as unknown[]) : [];
+    out[b] = arr.flatMap((x) => {
+      const r = (x ?? {}) as Record<string, unknown>;
+      return str(r.id) ? [{ id: str(r.id), why: str(r.why) }] : [];
+    });
+  }
+  return out;
+}
+
+// ── 전체 ────────────────────────────────────────────────────────────────────
+
 export async function generateCardDraft(card: QuestionCard): Promise<CardDraft> {
   const tokens = { input: 0, output: 0 };
   const t0 = Date.now();
-  const { glossary, vMeaning } = await makeGlossary(card, tokens);
+
+  // ① 고르기 · [V] 뜻은 용어표 호출이 만들므로, 고르기에는 뜻 없이 [V] 줄만 준다.
+  const items0 = pickItems(card, null);
+  const raw = await pickFacts(card, items0, tokens);
+  const { picks, log } = enforcePicks(raw, items0);
   const t1 = Date.now();
 
+  // ② 용어표 · 고른 문장의 말만
+  const pickedIds = new Set(PICK_BLOCKS.flatMap((b) => picks[b].map((p) => p.id)));
+  const pickedFacts = card.facts.filter((_, i) => pickedIds.has(`F${i + 1}`));
+  const { glossary, vMeaning } = await makeGlossary(card, pickedFacts, tokens);
+  const t2 = Date.now();
+
+  // ③ 쓰기 · 고른 재료의 확인된 뜻만
+  const items = pickItems(card, vMeaning);
+  const byId = new Map(items.map((i) => [i.id, i]));
+  const material = PICK_BLOCKS.map((b) => {
+    const rows = picks[b].map((p) => {
+      const it = byId.get(p.id)!;
+      return `- [${it.tag}] (대상: ${it.subject ?? "-"}${it.year ? ` · ${it.year}` : ""}) ${it.ko}`;
+    });
+    return `## ${b}\n${rows.length ? rows.join("\n") : "(재료 없음)"}`;
+  }).join("\n\n");
   const gl = glossary.length
-    ? glossary.map((g) => `- ${g.source} → 첫 등장 "${g.first}" · 쉬운 말 "${g.plain}"`).join("\n")
+    ? glossary.map((g) => `- 첫 등장 "${g.first}" · 쉬운 말 "${g.plain}"`).join("\n")
     : "(없음)";
+  const q = card.question;
   const o = (await callJson(
     DRAFT_SYSTEM,
-    `${cardPrompt(card, vMeaning)}\n\n# 용어표 (첫 등장에 이 형식 그대로)\n${gl}\n\n위 재료에서 골라 「지배상식」 한 편의 초고를 JSON 으로 쓰시오.`,
+    `질문: ${q.question}\n독자의 통설 (훅용, 출처 불필요): ${q.premise ?? "-"}\n되묻기: ${q.twist ?? "-"}\n\n# 블록별 재료 (확인된 뜻 · 태그 · 대상)\n${material}\n\n# 용어표 (첫 등장에 이 형식 그대로)\n${gl}\n\n위 재료만으로 「지배상식」 한 편의 초고를 JSON 으로 쓰시오.`,
     9000,
     {
       temperature: 0.6,
@@ -193,7 +377,7 @@ export async function generateCardDraft(card: QuestionCard): Promise<CardDraft> 
       },
     },
   )) as { titles?: unknown[]; blocks?: Record<string, unknown>; summary?: unknown };
-  const t2 = Date.now();
+  const t3 = Date.now();
 
   const bodies = o.blocks ?? {};
   const blocks: LetterBlock[] = BLOCK_ORDER.map((kind) => {
@@ -208,9 +392,11 @@ export async function generateCardDraft(card: QuestionCard): Promise<CardDraft> 
     glossary,
     vMeaning,
     blocks: flagBlocks(blocks),
-    llmCalls: 2,
-    ms: { glossary: t1 - t0, draft: t2 - t1 },
+    llmCalls: 3,
+    ms: { pick: t1 - t0, glossary: t2 - t1, draft: t3 - t2 },
     tokens,
+    pickLog: log,
+    unverified: card.facts.filter((f) => !f.koVerifiedAt).length,
   };
 }
 

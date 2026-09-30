@@ -7,16 +7,22 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import {
   EXT_KIND_LABEL,
   SLOTS,
-  SLOT_LABEL,
   loadEvidence,
   type Slot,
 } from "./evidence";
 import { loadQuestion, type Question } from "./questions";
+import { sentencesOf, tagsIn } from "./tags";
 
 export type CardFact = {
+  /** 문장 하나의 id "<행 id>:<줄>" · 고르기 단계가 이 값으로 고른다 */
+  id: string;
   tag: string;
   slot: Slot;
+  /** 원문 */
   text: string;
+  /** 한국어 뜻(D44). 초안은 이 값만 받는다 */
+  ko: string | null;
+  koVerifiedAt: string | null;
   subject: string | null;
   year: number | null;
   hasNumber: boolean | null;
@@ -97,7 +103,17 @@ export async function loadQuestionCard(db: SupabaseClient, questionId: string): 
       if (!s.slots.includes(slot)) s.slots.push(slot);
       sources.set(tag, s);
       for (const f of g.facts) {
-        facts.push({ tag, slot, text: f.text, subject: f.subject, year: f.year, hasNumber: f.hasNumber });
+        facts.push({
+          id: `${f.rowId}:${f.line}`,
+          tag,
+          slot,
+          text: f.text,
+          ko: f.ko,
+          koVerifiedAt: f.koVerifiedAt,
+          subject: f.subject,
+          year: f.year,
+          hasNumber: f.hasNumber,
+        });
       }
     }
   }
@@ -125,47 +141,29 @@ export async function loadQuestionCard(db: SupabaseClient, questionId: string): 
   };
 }
 
-/** LLM 에 넣는 사용자 메시지. 2판 사용자 메시지와 같은 짜임이다. */
-export function cardPrompt(card: QuestionCard, vMeaning: string | null = null): string {
-  const q = card.question;
-  const factLine = (f: CardFact) =>
-    `[${f.tag}] (칸: ${SLOT_LABEL[f.slot]} · 대상: ${f.subject ?? "적히지 않음"} · ${f.year ?? "연도 없음"} · 수치 ${
-      f.hasNumber === null ? "모름" : f.hasNumber ? "있음" : "없음"
-    }) ${f.text}`;
-  const facts = card.facts.map(factLine);
-  if (card.vLine) {
-    // 조건 30 · 검색어의 뜻을 한국어로 함께 준다. 모델은 그 말로 부른다.
-    const meaning = vMeaning ? ` 검색어의 뜻: ${vMeaning}.` : "";
-    facts.push(`[${V_TAG}] (칸: 낙차 · 대상: 논문 수 · 수치 있음) ${card.vLine}${meaning}`);
-  }
-
-  const list = card.sources
-    .filter((s) => !s.linkOnly)
-    .map((s) => `[${s.tag}] ${s.slots.map((x) => SLOT_LABEL[x]).join(" · ") || "낙차"} · ${s.kind} · ${s.title}`);
-  const linkOnly = card.sources
-    .filter((s) => s.linkOnly)
-    .map((s) => `[${s.tag}] ${s.title} · 종류 ${s.kind} · 메모: ${s.memo ?? "(메모 없음 · 쓰지 말 것)"}`);
-
-  return [
-    `질문: ${q.question}`,
-    `독자의 통설 (훅용, 출처 불필요): ${q.premise ?? "-"}`,
-    `되묻기: ${q.twist ?? "-"}`,
-    "",
-    "# 사실 카드 (원천 언어 그대로 · 문장마다 태그 · 칸 · 대상 · 연도 · 수치)",
-    ...facts,
-    "",
-    "# 원천 목록 (태그 · 칸 · 종류 · 제목)",
-    ...list,
-    "",
-    "# 링크만 있는 원천 (인용할 문장 없음 · 메모의 사실만 우리 말로 쓴다)",
-    ...(linkOnly.length ? linkOnly : ["(없음)"]),
-  ].join("\n");
-}
-
 /** 리뷰 점검의 "카드 문장 40자 복제" 용. 원천 언어 문장만(메모는 우리 말이라 뺀다). 질문이 없는 옛 글은 빈 배열. */
 export async function loadCardSentences(db: SupabaseClient, questionId: string | null): Promise<string[]> {
   if (!questionId) return [];
   const card = await loadQuestionCard(db, questionId);
   if (!card) return [];
   return card.facts.map((f) => f.text);
+}
+
+/** 교차 리뷰 number_check 입력 · "절반 · 두 배 · 배 · %" 가 든 본문 문장마다 그 태그의 카드 문장(원문 + 확인된 뜻) */
+export function numberPairs(
+  blocks: { text: string }[],
+  card: QuestionCard,
+): { blockIndex: number; sentence: string; facts: { tag: string; original: string; ko: string | null }[] }[] {
+  const out: { blockIndex: number; sentence: string; facts: { tag: string; original: string; ko: string | null }[] }[] = [];
+  blocks.forEach((b, i) => {
+    for (const s of sentencesOf(b.text)) {
+      if (!/절반|두\s*배|\d+(\.\d+)?\s*배|배로|%/.test(s.text)) continue;
+      const tags = tagsIn(s.text);
+      const facts = card.facts
+        .filter((f) => tags.includes(f.tag))
+        .map((f) => ({ tag: f.tag, original: f.text, ko: f.ko }));
+      if (facts.length) out.push({ blockIndex: i, sentence: s.text, facts });
+    }
+  });
+  return out;
 }
