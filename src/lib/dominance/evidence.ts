@@ -478,8 +478,16 @@ async function oneRow(db: SupabaseClient, rowId: string): Promise<Row> {
   return data as unknown as Row;
 }
 
-/** 문장 하나를 뺀다. 원천의 마지막 문장이면 원천 자리는 남긴다(문장 없는 행). */
-export async function deleteFact(db: SupabaseClient, rowId: string, line: number): Promise<Fact | null> {
+/**
+ * 문장 하나를 뺀다. 원천의 마지막 문장이면 원천 자리는 남긴다(문장 없는 행).
+ * keepBare=false 이면(칸 이동) 마지막 문장이어도 행을 지워 옛 칸에 빈 원천이 남지 않게 한다.
+ */
+export async function deleteFact(
+  db: SupabaseClient,
+  rowId: string,
+  line: number,
+  keepBare = true,
+): Promise<Fact | null> {
   const r = await oneRow(db, rowId);
   const ls = lines(r.fact_sentence);
   const facts = factsOf(r);
@@ -507,7 +515,7 @@ export async function deleteFact(db: SupabaseClient, rowId: string, line: number
     .neq("id", rowId);
   const key = sourceOf(r).key;
   const hasSibling = ((siblings ?? []) as Row[]).some((s) => sourceOf({ ...r, ...s } as Row).key === key);
-  if (hasSibling) {
+  if (hasSibling || !keepBare) {
     const { error } = await db.from("ds_question_evidence").delete().eq("id", rowId);
     if (error) throw new Error(error.message);
   } else {
@@ -542,7 +550,7 @@ export async function moveFact(db: SupabaseClient, rowId: string, line: number, 
     (["search", "owner", "validation", "daily"].includes(r.added_by) ? r.added_by : "owner") as "owner",
   );
   if (res === "duplicate") throw new Error(`${SLOT_LABEL[to]} 칸에 같은 문장이 이미 있습니다`);
-  await deleteFact(db, rowId, line);
+  await deleteFact(db, rowId, line, false);
 }
 
 /** 대상 · 연도 · 수치 유무를 고친다. */

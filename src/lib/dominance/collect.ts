@@ -27,6 +27,8 @@ import { PHASES, type EvidenceRun, type IndustryLink, type Phase } from "./colle
 export { PHASES, PHASE_LABEL, type EvidenceRun, type IndustryLink, type Phase } from "./collect-types";
 
 const OPEN = `(LICENSE:"cc by" OR LICENSE:"cc0")`;
+/** 기전 칸이 비었을 때 검색어에 붙이는 말 (21차 A-3) */
+export const MECHANISM_CLAUSE = "(randomized OR crossover OR laboratory OR experimental OR mechanism)";
 /** 한 번 실행에 칸마다 넣는 문장 상한 */
 const SLOT_CAP = 10;
 
@@ -110,7 +112,10 @@ async function searchPhase(db: SupabaseClient, q: Question, run: EvidenceRun, qu
   const before = await loadEvidence(db, q.id);
   const used = (slot: string) =>
     (before.slots[slot as keyof typeof before.slots]?.reduce((n, g) => n + g.facts.length, 0) ?? 0) + (bySlot[slot] ?? 0);
+  run.assignments ??= [];
   for (const a of assigned) {
+    const title = pool.find((x) => x.externalId === a.key)?.title ?? a.key;
+    run.assignments.push({ id: a.key, title, slot: a.slot, reason: a.reason, saved: 0 });
     if (a.slot === "none") continue;
     if (used(a.slot) >= SLOT_CAP) {
       capped += a.sentences.length;
@@ -145,6 +150,7 @@ async function searchPhase(db: SupabaseClient, q: Question, run: EvidenceRun, qu
       if (r === "saved") {
         added++;
         bySlot[a.slot] = (bySlot[a.slot] ?? 0) + 1;
+        run.assignments[run.assignments.length - 1].saved++;
       } else dup++;
     }
   }
@@ -231,6 +237,19 @@ async function premiseBodyPhase(db: SupabaseClient, q: Question, run: EvidenceRu
   return `CC BY 리뷰 전문 ${intros.length}편 서론 · 저장 ${added}문장 · 대조 실패 ${failed}`;
 }
 
+// ── mechanism ───────────────────────────────────────────────────────────────
+
+async function mechanismPhase(db: SupabaseClient, q: Question, run: EvidenceRun): Promise<string> {
+  const t = await loadEvidence(db, q.id);
+  if (t.slots.mechanism.length > 0) return "기전 칸에 원천이 있어 건너뜁니다";
+  const base = (run.retryQueries ?? run.queries).slice(0, 2);
+  const queries = base.map((x) => `(${x}) AND ${MECHANISM_CLAUSE}`);
+  const note = await searchPhase(db, q, run, queries);
+  const after = await loadEvidence(db, q.id);
+  const facts = after.slots.mechanism.reduce((n, g) => n + g.facts.length, 0);
+  return `검색어 끝에 ${MECHANISM_CLAUSE} · ${note} · 기전 칸 원천 ${after.slots.mechanism.length} · 문장 ${facts}`;
+}
+
 // ── industry ────────────────────────────────────────────────────────────────
 
 const UA = "gonnim-dominance/1.0 (hi@gonnim.dev)";
@@ -300,7 +319,9 @@ async function retryPhase(db: SupabaseClient, q: Question, run: EvidenceRun): Pr
     ),
   });
   run.retryQueries = next;
-  const note = await searchPhase(db, q, run, next);
+  // 기전 칸이 비었으면 다시 쓴 검색어에도 실험 · 기전 말을 붙인다(21차 A-3).
+  const searchWith = empty.includes("mechanism") ? next.map((x) => `(${x}) AND ${MECHANISM_CLAUSE}`) : next;
+  const note = await searchPhase(db, q, run, searchWith);
   return `새 검색어 ${next.join(" / ")} · ${note}`;
 }
 
@@ -324,6 +345,7 @@ export async function runPhase(db: SupabaseClient, questionId: string, phase: Ph
   try {
     if (phase === "search") note = await searchPhase(db, q, run, queries);
     else if (phase === "premise_body") note = await premiseBodyPhase(db, q, run);
+    else if (phase === "mechanism") note = await mechanismPhase(db, q, run);
     else if (phase === "industry") note = await industryPhase(q, run);
     else note = await retryPhase(db, q, run);
   } catch (e) {
