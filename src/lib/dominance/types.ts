@@ -163,7 +163,8 @@ export type ReviewCheckCode =
   | "copy40"
   | "connectives"
   | "numbers"
-  | "untagged_numbers";
+  | "untagged_numbers"
+  | "metaphor_facts";
 
 export const REVIEW_CHECK_LABEL: Record<ReviewCheckCode, string> = {
   filters: "거절 필터 경고 0건",
@@ -173,10 +174,11 @@ export const REVIEW_CHECK_LABEL: Record<ReviewCheckCode, string> = {
   hook: "훅이 질문으로 끝남",
   paradox: "역설 한 문장이 들어감",
   sentence_length: "60자 넘는 문장 없음",
-  copy40: "카드 문장 40자 이상 복제 없음",
+  copy40: "복제 없음(카드 40자 · 지시문 예시)",
   connectives: "인과 · 대조 접속어 확인",
   numbers: "블록당 수치 3개 이하",
   untagged_numbers: "태그 없는 문장에 숫자 없음",
+  metaphor_facts: "은유 블록에 사실 문장 없음",
 };
 
 // 앞의 4개는 막고 뒤의 3개는 경고만 한다.

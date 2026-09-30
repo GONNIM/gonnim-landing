@@ -5,7 +5,7 @@
 
 import { FACTUAL_KINDS, countFlags, flagBlocks, hookIsQuestion } from "./filters";
 import { countNumbers } from "./numbers";
-import { sentencesOf } from "./tags";
+import { BRIDGE_EXAMPLES, sentencesOf } from "./tags";
 import { unknownTags } from "./render";
 import {
   BLOCK_ORDER,
@@ -219,16 +219,23 @@ export async function runReviewChecks(input: {
 
   // 8. 카드 문장 40자 이상 그대로 복제 (경고) · 한국어로 옮긴 글이라 실제로는 영어 원문 복제나 고유명사 나열이 걸린다
   const copies = findCopies(blocks, input.cardSentences ?? []);
+  // 24차 B-2 · 지시문의 잇는 문장 예시가 그대로 들어간 곳
+  const bodyText = blocks.map((b) => b.text).join("\n");
+  const examples = BRIDGE_EXAMPLES.filter((e) => bodyText.includes(e));
+  const copyNotes = [
+    copies.length ? `카드 문장 ${copies.length}곳: ${copies.map((c) => `"${c}"`).join(" / ")}` : "",
+    examples.length ? `지시문 예시 그대로 ${examples.length}곳: ${examples.map((c) => `"${c}"`).join(" / ")}` : "",
+  ].filter(Boolean);
   checks.push({
     code: "copy40",
     passed: true,
-    warning: copies.length > 0 || undefined,
+    warning: copyNotes.length > 0 || undefined,
     detail:
-      copies.length === 0
+      copyNotes.length === 0
         ? input.cardSentences?.length
           ? null
           : "사실 카드가 없는 글이라 확인하지 않았습니다"
-        : `${copies.length}곳: ${copies.map((c) => `"${c}"`).join(" / ")}`,
+        : copyNotes.join(" / "),
   });
 
   // 9. 인과 · 대조 접속어 (경고) · 원천에 없는 인과를 만들지 않았는지 사람이 본다
@@ -266,6 +273,18 @@ export async function runReviewChecks(input: {
     passed: true,
     warning: leaks.length > 0 || undefined,
     detail: leaks.length === 0 ? null : `${leaks.length}문장: ${leaks.map((t) => `"${t}"`).join(" / ")}`,
+  });
+
+  // 12. 은유 블록의 사실 문장 (경고 · 24차 B-3)
+  const metaphorFacts = blocks
+    .filter((b) => b.kind === "metaphor")
+    .flatMap((b) => sentencesOf(b.text).map((x) => x.text))
+    .filter((t) => /\[[A-Z]{1,2}[0-9]{0,2}\]/.test(t));
+  checks.push({
+    code: "metaphor_facts",
+    passed: true,
+    warning: metaphorFacts.length > 0 || undefined,
+    detail: metaphorFacts.length === 0 ? null : `${metaphorFacts.length}문장: ${metaphorFacts.map((t) => `"${t}"`).join(" / ")}`,
   });
 
   return checks;
