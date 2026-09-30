@@ -1,5 +1,5 @@
 -- ===========================================================================
--- 지배상식 · 4단계 스키마 (18차 통합 C-7 · B-3)                   2026-09-29 작성
+-- 지배상식 · 4단계 스키마 (18차 통합 C-7 · B-3 · 19차 A-2 · C-1)  2026-09-29 작성 · 09-30 보강
 -- ===========================================================================
 --
 -- 실행 위치: sprint-dominance 프로젝트의 Supabase SQL Editor (D22 · 런북 10번).
@@ -8,8 +8,11 @@
 --
 -- 순서
 --   1. ds_questions.seed_kind 에 'trend' 추가 (B-3 승인)
---   2. ds_questions 새 칸 4개: area · created_via · source_input · v2_reasons
+--   2. ds_questions 새 칸 6개: area · created_via · source_input · v2_reasons · suggested · evidence_run
 --   3. 메모(work_note) 끝의 임시 메타 줄을 새 칸으로 옮긴다
+--   3a. ds_question_evidence 새 칸 5개 (사실 문장 한 줄마다): fact_subject · fact_year · has_number ·
+--       verified_at · source_part  + 같은 칸 · 같은 원천에 문장 여러 행을 허용하는 유일 인덱스
+--   3b. 증거 note 끝의 임시 메타 줄(문장 한 줄짜리 행)을 새 칸으로 옮긴다
 --   4. ds_letter_reactions  · 레터별 반응 집계 (D42 4층)
 --   5. ds_reaction_dedupe   · 같은 사람의 중복 반응만 막는 해시 (개인 식별 없음)
 --   6. RLS                  · 켜기만 하고 정책은 만들지 않는다 (D22)
@@ -55,6 +58,10 @@ ALTER TABLE public.ds_questions ADD COLUMN IF NOT EXISTS created_via TEXT;
 ALTER TABLE public.ds_questions ADD COLUMN IF NOT EXISTS source_input TEXT;
 -- V2 판정 근거. 상위 5편마다 {id, title, year, license, relevant, reason} (D31)
 ALTER TABLE public.ds_questions ADD COLUMN IF NOT EXISTS v2_reasons JSONB;
+-- [빈 칸 채우기] 제안. 운영자가 저장하기 전까지 화면에 "제안" 으로 보인다(19차 B-1)
+ALTER TABLE public.ds_questions ADD COLUMN IF NOT EXISTS suggested JSONB;
+-- [증거 모으기] 결과 요약: 칸별 원천 · 문장 수, 대조 실패 수, 시간, 산업 검색 링크 (19차 C-3 ⑧)
+ALTER TABLE public.ds_questions ADD COLUMN IF NOT EXISTS evidence_run JSONB;
 
 DO $$
 BEGIN
@@ -80,6 +87,8 @@ SET area         = COALESCE(q.area, m.meta ->> 'area'),
     created_via  = COALESCE(q.created_via, m.meta ->> 'created_via'),
     source_input = COALESCE(q.source_input, m.meta ->> 'source_input'),
     v2_reasons   = COALESCE(q.v2_reasons, m.meta -> 'v2_reasons'),
+    suggested    = COALESCE(q.suggested, m.meta -> 'suggested'),
+    evidence_run = COALESCE(q.evidence_run, m.meta -> 'evidence_run'),
     work_note    = NULLIF(btrim(m.memo, E' \n'), '')
 FROM (
   SELECT id,
@@ -89,6 +98,76 @@ FROM (
   WHERE work_note LIKE '%⟦meta⟧{%'
 ) m
 WHERE q.id = m.id;
+
+
+-- ===========================================================================
+-- 3a. ds_question_evidence · 사실 문장 한 줄의 속성 (19차 C-1)
+-- ===========================================================================
+-- SQL 뒤에는 새 문장을 한 행에 하나씩 넣는다. SQL 전에 한 행에 여러 줄로 묶어 둔 문장은
+-- 그대로 두고, 앱이 note 끝 메타 줄에서 속성을 읽는다(행 안에서만 고친다).
+ALTER TABLE public.ds_question_evidence ADD COLUMN IF NOT EXISTS fact_subject TEXT;      -- 대상 (예: 영국 성인 72,174명)
+ALTER TABLE public.ds_question_evidence ADD COLUMN IF NOT EXISTS fact_year SMALLINT;     -- 연도
+ALTER TABLE public.ds_question_evidence ADD COLUMN IF NOT EXISTS has_number BOOLEAN;     -- 수치 유무
+ALTER TABLE public.ds_question_evidence ADD COLUMN IF NOT EXISTS verified_at TIMESTAMPTZ; -- 원문 글자 대조 시각
+ALTER TABLE public.ds_question_evidence ADD COLUMN IF NOT EXISTS source_part TEXT;       -- 뽑은 곳
+
+-- ★ D43 본문 예외: source_part = 'body' 는 CC BY · CC0 · 퍼블릭 도메인 논문에서만, 원천당 2문장까지.
+--   행 사이를 세야 하는 규칙이라 CHECK 로 걸 수 없다. 앱(evidence.ts verifySentence · BODY_LIMIT)이 지킨다.
+--   레터가 원문을 40자 이상 그대로 옮기지 않는 규칙은 3단계 글 점검이 지킨다.
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint
+                 WHERE conrelid = 'public.ds_question_evidence'::regclass
+                   AND conname = 'ds_question_evidence_source_part') THEN
+    ALTER TABLE public.ds_question_evidence ADD CONSTRAINT ds_question_evidence_source_part
+      CHECK (source_part IS NULL OR source_part IN ('abstract', 'body', 'memo'));
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint
+                 WHERE conrelid = 'public.ds_question_evidence'::regclass
+                   AND conname = 'ds_question_evidence_fact_year') THEN
+    ALTER TABLE public.ds_question_evidence ADD CONSTRAINT ds_question_evidence_fact_year
+      CHECK (fact_year IS NULL OR fact_year BETWEEN 1800 AND 2100);
+  END IF;
+END $$;
+
+-- 옛 유일 인덱스는 같은 칸 · 같은 원천에 행을 하나만 허용했다. 이제 문장이 다르면 행을 여럿 둔다.
+-- 같은 칸 · 같은 원천 · 같은 문장은 여전히 한 번만 (문장 없는 원천 자리도 한 번만).
+DROP INDEX IF EXISTS public.uq_ds_question_evidence_paper;
+DROP INDEX IF EXISTS public.uq_ds_question_evidence_press;
+DROP INDEX IF EXISTS public.uq_ds_question_evidence_ext;
+CREATE UNIQUE INDEX IF NOT EXISTS uq_ds_question_evidence_paper_fact
+  ON public.ds_question_evidence (question_id, slot, paper_id, md5(COALESCE(fact_sentence, '')))
+  WHERE paper_id IS NOT NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS uq_ds_question_evidence_press_fact
+  ON public.ds_question_evidence (question_id, slot, gov_press_id, md5(COALESCE(fact_sentence, '')))
+  WHERE gov_press_id IS NOT NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS uq_ds_question_evidence_ext_fact
+  ON public.ds_question_evidence (question_id, slot, ext_url, md5(COALESCE(fact_sentence, '')))
+  WHERE ext_url IS NOT NULL;
+
+
+-- ===========================================================================
+-- 3b. 증거 메타 줄 옮기기 (문장 한 줄짜리 행만)
+-- ===========================================================================
+-- note 끝 "⟦meta⟧{"facts":[{…}]}" 의 첫 원소를 새 칸으로 옮기고 메타 줄을 지운다.
+-- 여러 줄로 묶인 행은 건드리지 않는다(앱이 메타 줄을 계속 읽는다).
+UPDATE public.ds_question_evidence e
+SET fact_subject = COALESCE(e.fact_subject, m.f ->> 'subject'),
+    fact_year    = COALESCE(e.fact_year, (m.f ->> 'year')::SMALLINT),
+    has_number   = COALESCE(e.has_number, (m.f ->> 'has_number')::BOOLEAN),
+    verified_at  = COALESCE(e.verified_at, (m.f ->> 'verified_at')::TIMESTAMPTZ),
+    source_part  = COALESCE(e.source_part, m.f ->> 'source_part'),
+    note         = NULLIF(btrim(m.memo, E' \n'), '')
+FROM (
+  SELECT id,
+         split_part(note, '⟦meta⟧', 1)                              AS memo,
+         (split_part(note, '⟦meta⟧', 2)::jsonb -> 'facts') -> 0      AS f
+  FROM public.ds_question_evidence
+  WHERE note LIKE '%⟦meta⟧{%'
+    AND fact_sentence IS NOT NULL
+    AND position(E'\n' IN fact_sentence) = 0
+) m
+WHERE e.id = m.id;
 
 
 -- ===========================================================================
@@ -148,24 +227,35 @@ ALTER TABLE public.ds_reaction_dedupe ENABLE ROW LEVEL SECURITY;
 -- 7. 검증
 -- ===========================================================================
 
--- 7-1. 새 칸 4개 (기대: 4줄)
-SELECT column_name, data_type FROM information_schema.columns
-WHERE table_schema = 'public' AND table_name = 'ds_questions'
-  AND column_name IN ('area', 'created_via', 'source_input', 'v2_reasons')
-ORDER BY column_name;
+-- 7-1. 새 칸 (기대: 질문 6줄 + 증거 5줄 = 11줄)
+SELECT table_name, column_name, data_type FROM information_schema.columns
+WHERE table_schema = 'public'
+  AND ((table_name = 'ds_questions'
+        AND column_name IN ('area', 'created_via', 'source_input', 'v2_reasons', 'suggested', 'evidence_run'))
+    OR (table_name = 'ds_question_evidence'
+        AND column_name IN ('fact_subject', 'fact_year', 'has_number', 'verified_at', 'source_part')))
+ORDER BY table_name, column_name;
+
+-- 7-1b. 새 유일 인덱스 3개 (기대: 3줄) · 옛 인덱스 (기대: 0줄)
+SELECT indexname FROM pg_indexes
+WHERE schemaname = 'public' AND tablename = 'ds_question_evidence' AND indexname LIKE 'uq_ds_question_evidence_%'
+ORDER BY indexname;
 
 -- 7-2. 새 표 2개 (기대: 2줄)
 SELECT table_name FROM information_schema.tables
 WHERE table_schema = 'public' AND table_name IN ('ds_letter_reactions', 'ds_reaction_dedupe')
 ORDER BY table_name;
 
--- 7-3. 메타 줄이 남지 않았는가 (기대: 0)
+-- 7-3. 메타 줄이 남지 않았는가 (기대: 0 · 0)
 SELECT count(*) AS meta_left FROM public.ds_questions WHERE work_note LIKE '%⟦meta⟧%';
+SELECT count(*) AS evidence_meta_left_single
+FROM public.ds_question_evidence
+WHERE note LIKE '%⟦meta⟧%' AND fact_sentence IS NOT NULL AND position(E'\n' IN fact_sentence) = 0;
 
 -- 7-4. 영역이 옮겨졌는가 (기대: 질문 수와 비슷한 숫자 · 0 이면 알려 주십시오)
 SELECT count(*) AS with_area FROM public.ds_questions WHERE area IS NOT NULL;
 
--- 7-5. 일부러 실패해야 하는 INSERT 4개. 막히면 NOTICE "OK", 통과하면 블록 전체가 되돌려진다.
+-- 7-5. 일부러 실패해야 하는 INSERT 여러 개(① ~ ⑧). 막히면 NOTICE "OK", 통과하면 블록 전체가 되돌려진다.
 DO $$
 DECLARE
   qid UUID;
@@ -202,6 +292,30 @@ BEGIN
     WHEN not_null_violation THEN RAISE NOTICE '④ 건너뜀 — ds_letters 가 비어 있다';
   END;
 
+  -- ⑥ 증거의 뽑은 곳이 허용 밖
+  BEGIN
+    INSERT INTO public.ds_question_evidence (question_id, ext_url, ext_title, ext_source_kind, license, slot, added_by, source_part)
+    VALUES (qid, 'https://example.org/6', '시험', 'news', 'link_only', 'industry', 'owner', 'full_text');
+    RAISE EXCEPTION '실패해야 할 INSERT ⑥ 이 통과했다 (source_part CHECK 없음)';
+  EXCEPTION WHEN check_violation THEN
+    RAISE NOTICE 'OK ⑥ 허용 밖 source_part 가 막혔다';
+  END;
+
+  -- ⑦ 같은 칸 · 같은 원천이라도 문장이 다르면 두 행이 들어간다(새 유일 인덱스)
+  INSERT INTO public.ds_question_evidence (question_id, ext_url, ext_title, ext_source_kind, license, slot, added_by, fact_sentence)
+  VALUES (qid, 'https://example.org/7', '시험', 'agency', 'public_domain', 'industry', 'owner', '첫 문장'),
+         (qid, 'https://example.org/7', '시험', 'agency', 'public_domain', 'industry', 'owner', '둘째 문장');
+  RAISE NOTICE 'OK ⑦ 같은 원천의 다른 문장 두 행이 들어갔다';
+
+  -- ⑧ 같은 문장은 두 번 들어가지 않는다
+  BEGIN
+    INSERT INTO public.ds_question_evidence (question_id, ext_url, ext_title, ext_source_kind, license, slot, added_by, fact_sentence)
+    VALUES (qid, 'https://example.org/7', '시험', 'agency', 'public_domain', 'industry', 'owner', '첫 문장');
+    RAISE EXCEPTION '실패해야 할 INSERT ⑧ 이 통과했다 (문장 유일 인덱스 없음)';
+  EXCEPTION WHEN unique_violation THEN
+    RAISE NOTICE 'OK ⑧ 같은 문장 중복이 막혔다';
+  END;
+
   -- ⑤ 음수 집계
   BEGIN
     INSERT INTO public.ds_letter_reactions (letter_id, opens)
@@ -222,6 +336,10 @@ SELECT count(*) AS leftover_test_rows FROM public.ds_questions WHERE question LI
 -- ===========================================================================
 -- 되돌리기 (필요할 때만 · 주석 해제 후 실행)
 -- ===========================================================================
+-- ALTER TABLE public.ds_question_evidence DROP COLUMN IF EXISTS source_part, DROP COLUMN IF EXISTS verified_at,
+--   DROP COLUMN IF EXISTS has_number, DROP COLUMN IF EXISTS fact_year, DROP COLUMN IF EXISTS fact_subject;
+--   (문장 여러 행이 생긴 뒤에는 옛 유일 인덱스를 다시 만들 수 없다. 되돌리기 전에 알려 주십시오.)
+-- ALTER TABLE public.ds_questions DROP COLUMN IF EXISTS evidence_run, DROP COLUMN IF EXISTS suggested;
 -- DROP TABLE IF EXISTS public.ds_reaction_dedupe;
 -- DROP TABLE IF EXISTS public.ds_letter_reactions;
 -- ALTER TABLE public.ds_questions DROP COLUMN IF EXISTS v2_reasons;
