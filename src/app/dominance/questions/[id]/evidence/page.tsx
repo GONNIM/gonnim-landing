@@ -1,0 +1,56 @@
+// ② 증거 표 · 질문 하나의 재료 네 칸과 사실 문장 (D26 · D33 · D37 · D43).
+//
+// 문장은 원문과 글자 그대로 대조한 것만 들어간다. 3칸 이상 차면 [글 작성하기] 자리가 보이지만,
+// 3단계 컨펌 전이라 잠겨 있다.
+
+import Link from "next/link";
+import { notFound } from "next/navigation";
+import { loadEvidence } from "@/lib/dominance/evidence";
+import { dominanceContext } from "@/lib/dominance/guard";
+import { loadQuestion } from "@/lib/dominance/questions";
+import { EvidenceBoard } from "./EvidenceBoard";
+
+export const dynamic = "force-dynamic";
+// [증거 모으기] 한 단계가 Europe PMC 여러 번과 LLM 1회를 부른다.
+export const maxDuration = 300;
+
+export default async function EvidencePage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  const { db } = await dominanceContext();
+  const q = await loadQuestion(db, id);
+  if (!q) notFound();
+  const table = await loadEvidence(db, id);
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <Link href="/dominance/questions" className="text-xs text-muted-foreground hover:text-foreground">
+          ← ① 이슈 고르기
+        </Link>
+        <h1 className="mt-2 text-2xl font-semibold tracking-tight">② 증거 표</h1>
+        <p className="mt-2 text-base font-medium text-foreground">{q.question}</p>
+        {(q.premise || q.twist) && (
+          <p className="mt-1 text-sm text-foreground">
+            통설 · {q.premise ?? "—"}
+            <br />
+            되묻기 · {q.twist ?? "—"}
+          </p>
+        )}
+        <p className="mt-1 text-xs text-muted-foreground">
+          영역 {q.area ?? "—"} · 계열 {q.series ?? "—"} · 검색어 {q.searchQueries.join(" / ")}
+        </p>
+      </div>
+      {!table.extColumns && (
+        <p className="rounded-lg border border-dashed border-amber-500/40 p-3 text-xs text-muted-foreground">
+          4단계 SQL 전입니다. 문장의 대상 · 연도 · 수치 · 대조 시각은 메모 칸 끝에 임시로 적습니다(런북 10번).
+        </p>
+      )}
+      <EvidenceBoard
+        questionId={q.id}
+        status={q.status}
+        table={table}
+        run={q.evidenceRun as never}
+      />
+    </div>
+  );
+}
