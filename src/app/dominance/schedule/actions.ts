@@ -1,5 +1,6 @@
 "use server";
 
+import { PRE_PUBLISHING_REASON, publishingStarted } from "@/lib/dominance/publishing";
 import { revalidatePath } from "next/cache";
 import { dominanceContext } from "@/lib/dominance/guard";
 import { kstToday } from "@/lib/dominance/kst";
@@ -67,6 +68,9 @@ export async function approveLetter(
   date: string,
 ): Promise<{ error: string | null; warning: string | null }> {
   const { admin, db } = await dominanceContext();
+
+  // D40 · 발행 시작 선언 전에는 서버에서도 거부한다.
+  if (!publishingStarted()) return { error: PRE_PUBLISHING_REASON, warning: null };
 
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
     return { error: "날짜 형식이 올바르지 않습니다", warning: null };

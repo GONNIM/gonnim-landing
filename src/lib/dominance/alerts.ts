@@ -4,6 +4,7 @@
 // 보낼 것이 없으면 메일을 보내지 않는다 — 매일 오는 "정상" 메일은 곧 안 읽게 되고,
 // 그러면 진짜 경보도 같이 묻힌다.
 
+import { publishingStarted } from "./publishing";
 import { Resend } from "resend";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
@@ -171,7 +172,8 @@ export async function gatherAlerts(
 ): Promise<Alert[]> {
   const [stale, empty, dead] = await Promise.all([
     staleReviewAlerts(db),
-    emptyPipelineAlerts(db),
+    // 발행 시작 선언 전에는 "발행 예정 글 없음" 이 정상이다. 보내지 않는다(D40).
+    publishingStarted() ? emptyPipelineAlerts(db) : Promise.resolve([] as Alert[]),
     deadLinkAlerts(db),
   ]);
 

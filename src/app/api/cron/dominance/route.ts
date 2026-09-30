@@ -11,6 +11,7 @@
 // 실패를 알려주지 않고 로그를 1시간만 보관하므로, 이 경로가 스스로 흔적을
 // 남기지 않으면 아침에 확인할 것이 없다.
 
+import { PRE_PUBLISHING_NOTE, publishingStarted } from "@/lib/dominance/publishing";
 import type { NextRequest } from "next/server";
 
 import { gatherAlerts, sendAlertEmail, type Alert } from "@/lib/dominance/alerts";
@@ -169,7 +170,8 @@ export async function GET(req: NextRequest) {
     `수집 ${found}건(신규 ${newRows}) · ${CANDIDATES_ENABLED ? `후보 ${inserted}건` : CANDIDATES_STOPPED_NOTE} · 발행 ${publishedCount}편 · 경보 ${alerts.length}건` +
     (failedSteps.length > 0 ? ` · 실패 ${failedSteps.join(", ")}` : "") +
     (sourcesDead ? " · 원천 전부 0건" : "") +
-    (heldForNoAudience ? ` · 구독자 0명 · 발행 보류 · 글 ${heldForNoAudience}건` : "");
+    (heldForNoAudience ? ` · 구독자 0명 · 발행 보류 · 글 ${heldForNoAudience}건` : "") +
+    (publishingStarted() ? "" : ` · ${PRE_PUBLISHING_NOTE}`);
 
   const heartbeat = await pingHeartbeat(healthy, summary);
   const endedAt = new Date().toISOString();

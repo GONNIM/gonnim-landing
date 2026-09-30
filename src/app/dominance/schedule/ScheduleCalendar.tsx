@@ -37,7 +37,9 @@ export function ScheduleCalendar({
   todayHref,
   scheduled,
   pool,
+  started,
 }: {
+  started: boolean;
   month: string;
   today: string;
   bounds: {
@@ -272,6 +274,7 @@ export function ScheduleCalendar({
 
       {target && (
         <ApprovalDialog
+          started={started}
           letter={target.letter}
           date={target.date}
           onClose={() => setTarget(null)}
@@ -378,11 +381,13 @@ function Pool({
 
 /** 승인 창 · 확인은 두 가지만 한다. ④에서 본 것을 또 체크하게 하면 형식으로 넘긴다. */
 function ApprovalDialog({
+  started,
   letter,
   date,
   onClose,
   onDone,
 }: {
+  started: boolean;
   letter: Row;
   date: string;
   onClose: () => void;
@@ -501,10 +506,11 @@ function ApprovalDialog({
           <button
             type="button"
             onClick={onApprove}
-            disabled={!ready}
+            disabled={!ready || !started}
+            title={started ? undefined : "발행 시작 선언 전"}
             className="ml-auto rounded-md bg-sky-500/90 px-3 py-1.5 text-xs font-medium text-white hover:bg-sky-500 disabled:cursor-not-allowed disabled:bg-[color:var(--muted)]/30 disabled:text-muted-foreground"
           >
-            승인하고 날짜 확정
+            {started ? "승인하고 날짜 확정" : "발행 시작 선언 전"}
           </button>
         </div>
       </div>

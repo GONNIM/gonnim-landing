@@ -1,5 +1,6 @@
 // ⑤ 발행일 · 모든 날짜를 보여준다. 월·수·금은 추천일이고 제한이 아니다.
 
+import { publishingStarted } from "@/lib/dominance/publishing";
 import Link from "next/link";
 import { dominanceContext } from "@/lib/dominance/guard";
 import { kstToday } from "@/lib/dominance/kst";
@@ -82,7 +83,13 @@ export default async function SchedulePage({
   return (
     <div className="space-y-6">
       <Heading />
+      {!publishingStarted() && (
+        <p className="rounded-lg border border-dashed border-amber-500/40 p-3 text-sm text-muted-foreground">
+          발행 시작 선언 전입니다. [승인하고 날짜 확정]은 잠겨 있습니다. 테스트 발송은 됩니다(D40).
+        </p>
+      )}
       <ScheduleCalendar
+        started={publishingStarted()}
         month={month}
         today={kstToday()}
         bounds={{
