@@ -4,6 +4,8 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { dominanceContext } from "@/lib/dominance/guard";
 import { loadLetterSources } from "@/lib/dominance/letters";
+import { loadQuestionCard } from "@/lib/dominance/card";
+import { readDraftMeta } from "@/lib/dominance/draft-store";
 import {
   LETTER_STATUS_LABEL,
   LETTER_STATUS_STYLE,
@@ -21,6 +23,7 @@ type Row = {
   blocks: LetterBlock[];
   status: LetterStatus;
   revision_count: number;
+  question_id: string | null;
 };
 
 export default async function LetterEditPage({
@@ -33,13 +36,16 @@ export default async function LetterEditPage({
 
   const { data } = await db
     .from("ds_letters")
-    .select("id, title, summary, blocks, status, revision_count")
+    .select("id, title, summary, blocks, status, revision_count, question_id")
     .eq("id", id)
     .maybeSingle<Row>();
 
   if (!data) notFound();
 
   const sources = await loadLetterSources(db, id);
+  // 질문에서 나온 글(20차)은 왼쪽에 사실 카드를 둔다. 옛 글은 원천 초록을 둔다.
+  const card = data.question_id ? await loadQuestionCard(db, data.question_id) : null;
+  const meta = data.question_id ? await readDraftMeta(db, id) : null;
 
   return (
     <div className="space-y-6">
@@ -93,6 +99,18 @@ export default async function LetterEditPage({
         initialSummary={data.summary ?? ""}
         initialBlocks={data.blocks}
         sources={sources}
+        card={
+          card
+            ? {
+                questionId: card.question.id,
+                facts: card.facts,
+                sources: card.sources,
+                vLine: card.vLine,
+                tags: card.tags,
+              }
+            : null
+        }
+        meta={meta ? { titles: meta.titles, glossary: meta.glossary, generatedAt: meta.generatedAt, generation: meta.generation } : null}
       />
     </div>
   );

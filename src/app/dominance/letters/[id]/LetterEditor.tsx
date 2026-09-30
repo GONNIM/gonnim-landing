@@ -2,8 +2,28 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { finishWriting, saveLetter } from "./actions";
+import { finishWriting, saveGlossary, saveLetter } from "./actions";
 import { BLOCK_LABEL, type LetterBlock, type LetterStatus } from "@/lib/dominance/types";
+import type { CardFact, CardSource } from "@/lib/dominance/card";
+import type { GlossaryItem } from "@/lib/dominance/draft-card";
+import { SLOTS, SLOT_LABEL } from "@/lib/dominance/evidence";
+import { FACTUAL_KINDS } from "@/lib/dominance/filters";
+import { sentencesOf, tagsIn } from "@/lib/dominance/tags";
+
+export type EditorCard = {
+  questionId: string;
+  facts: CardFact[];
+  sources: CardSource[];
+  vLine: string | null;
+  tags: string[];
+};
+
+export type EditorMeta = {
+  titles: string[];
+  glossary: GlossaryItem[];
+  generatedAt: string;
+  generation: number;
+};
 
 const AUTOSAVE_DELAY_MS = 3000;
 
@@ -22,6 +42,8 @@ export function LetterEditor({
   initialSummary,
   initialBlocks,
   sources,
+  card,
+  meta,
 }: {
   letterId: string;
   status: LetterStatus;
@@ -29,6 +51,8 @@ export function LetterEditor({
   initialSummary: string;
   initialBlocks: LetterBlock[];
   sources: EditorSource[];
+  card: EditorCard | null;
+  meta: EditorMeta | null;
 }) {
   const router = useRouter();
   const [title, setTitle] = useState(initialTitle);
@@ -37,6 +61,8 @@ export function LetterEditor({
   const [savedAt, setSavedAt] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  // 본문에서 누른 문장의 태그 · 왼쪽 카드에서 켜진다.
+  const [active, setActive] = useState<string[]>([]);
 
   const readOnly = status !== "draft";
   const flagCount = blocks.reduce((n, b) => n + (b.flags?.length ?? 0), 0);
@@ -102,6 +128,9 @@ export function LetterEditor({
 
   return (
     <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)]">
+      {card ? (
+        <CardPanel card={card} active={active} />
+      ) : (
       <aside className="space-y-4 lg:sticky lg:top-24 lg:self-start">
         <h2 className="text-sm font-medium text-muted-foreground">
           원천 {sources.length}개
@@ -138,6 +167,7 @@ export function LetterEditor({
           </article>
         ))}
       </aside>
+      )}
 
       <div className="space-y-4">
         <div className="space-y-2">
@@ -167,7 +197,30 @@ export function LetterEditor({
             }}
             className="w-full rounded-lg border border-[color:var(--border)]/70 bg-surface/30 px-3 py-2 text-sm text-foreground read-only:opacity-70"
           />
+          {meta && meta.titles.length > 0 && (
+            <div className="space-y-1 text-xs text-muted-foreground">
+              <p>제목 후보 · 누르면 제목 칸에 들어갑니다. 직접 써도 됩니다.</p>
+              {meta.titles.map((t) => (
+                <button
+                  key={t}
+                  type="button"
+                  disabled={readOnly}
+                  onClick={() => {
+                    setTitle(t);
+                    setDirty(true);
+                  }}
+                  className={`block w-full rounded-md border px-2.5 py-1.5 text-left text-sm ${
+                    title === t ? "border-[color:var(--accent)] text-foreground" : "border-[color:var(--border)]/60 text-foreground/80"
+                  }`}
+                >
+                  {t}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
+
+        {meta && <GlossaryEditor letterId={letterId} initial={meta.glossary} readOnly={readOnly} />}
 
         {blocks.map((b, i) => (
           <section
@@ -196,8 +249,15 @@ export function LetterEditor({
               readOnly={readOnly}
               rows={b.kind === "summary" ? 4 : 5}
               onChange={(e) => editBlock(i, e.target.value)}
+              onSelect={(e) => {
+                if (!card) return;
+                const pos = e.currentTarget.selectionStart;
+                const sen = sentencesOf(b.text).find((x) => pos >= x.start && pos <= x.end);
+                setActive(sen ? tagsIn(sen.text) : []);
+              }}
               className="mt-2 w-full resize-y rounded-lg border border-[color:var(--border)]/50 bg-background/60 px-3 py-2 text-sm leading-relaxed text-foreground read-only:opacity-70"
             />
+            {card && <TagLint block={b} cardTags={card.tags} />}
           </section>
         ))}
 
@@ -241,5 +301,123 @@ export function LetterEditor({
         )}
       </div>
     </div>
+  );
+}
+
+/** 왼쪽 사실 카드 · 칸별. 본문에서 누른 문장의 태그 카드가 켜진다. */
+function CardPanel({ card, active }: { card: EditorCard; active: string[] }) {
+  const on = (tag: string) => active.includes(tag);
+  return (
+    <aside className="max-h-[calc(100vh-7rem)] space-y-4 overflow-y-auto lg:sticky lg:top-24 lg:self-start">
+      <h2 className="text-sm font-medium text-muted-foreground">
+        사실 카드 {card.facts.length}문장 · 본문 문장을 누르면 그 태그가 켜집니다
+      </h2>
+      {SLOTS.map((slot) => {
+        const facts = card.facts.filter((f) => f.slot === slot);
+        const linkOnly = card.sources.filter((s) => s.linkOnly && s.slots.includes(slot));
+        if (facts.length === 0 && linkOnly.length === 0) return null;
+        return (
+          <section key={slot} className="space-y-1.5">
+            <h3 className="text-xs font-semibold text-foreground/80">{SLOT_LABEL[slot]}</h3>
+            {facts.map((f, i) => (
+              <p
+                key={`${f.tag}-${i}`}
+                className={`rounded-md border p-2 text-xs leading-relaxed ${
+                  on(f.tag) ? "border-[color:var(--accent)] bg-[color:var(--accent)]/10 text-foreground" : "border-[color:var(--border)]/50 text-muted-foreground"
+                }`}
+              >
+                <b className="font-mono">[{f.tag}]</b> {f.subject ? `(${f.subject}${f.year ? ` · ${f.year}` : ""}) ` : ""}
+                {f.text}
+              </p>
+            ))}
+            {linkOnly.map((s) => (
+              <p
+                key={s.tag}
+                className={`rounded-md border border-dashed p-2 text-xs ${on(s.tag) ? "border-[color:var(--accent)] text-foreground" : "border-[color:var(--border)]/50 text-muted-foreground"}`}
+              >
+                <b className="font-mono">[{s.tag}]</b> 링크만 · {s.title} — 메모: {s.memo ?? "없음"}
+              </p>
+            ))}
+          </section>
+        );
+      })}
+      {card.vLine && (
+        <p className={`rounded-md border p-2 text-xs ${on("V") ? "border-[color:var(--accent)] text-foreground" : "border-[color:var(--border)]/50 text-muted-foreground"}`}>
+          <b className="font-mono">[V]</b> {card.vLine}
+        </p>
+      )}
+      <details className="text-xs text-muted-foreground">
+        <summary className="cursor-pointer">원천 목록 {card.sources.length}개</summary>
+        <ul className="mt-1 space-y-1">
+          {card.sources.map((s) => (
+            <li key={s.tag}>
+              <b className="font-mono">[{s.tag}]</b>{" "}
+              <a href={s.url} target="_blank" rel="noreferrer noopener" className="underline">
+                {s.title}
+              </a>{" "}
+              · {s.kind}
+            </li>
+          ))}
+        </ul>
+      </details>
+    </aside>
+  );
+}
+
+/** 블록 아래 표시 · 태그 없는 사실 문장(노랑), 카드에 없는 태그(빨강). */
+function TagLint({ block, cardTags }: { block: LetterBlock; cardTags: string[] }) {
+  const sens = sentencesOf(block.text);
+  const untagged = FACTUAL_KINDS.has(block.kind) ? sens.filter((x) => tagsIn(x.text).length === 0) : [];
+  const unknown = tagsIn(block.text).filter((t) => !cardTags.includes(t));
+  if (untagged.length === 0 && unknown.length === 0) return null;
+  return (
+    <div className="mt-2 space-y-1 text-xs">
+      {unknown.length > 0 && <p className="text-red-300">카드에 없는 태그: {unknown.map((t) => `[${t}]`).join(" ")}</p>}
+      {untagged.map((x, i) => (
+        <p key={i} className="text-amber-300">
+          태그 없는 문장 · {x.text}
+        </p>
+      ))}
+    </div>
+  );
+}
+
+/** 용어표 · 고쳐도 본문은 자동으로 바뀌지 않는다. 사람이 본문을 고친다. */
+function GlossaryEditor({ letterId, initial, readOnly }: { letterId: string; initial: GlossaryItem[]; readOnly: boolean }) {
+  const [items, setItems] = useState(initial);
+  const [msg, setMsg] = useState<string | null>(null);
+  const input = "rounded border border-[color:var(--border)]/60 bg-background/60 px-2 py-1 text-xs text-foreground";
+  const set = (i: number, k: keyof GlossaryItem, v: string) =>
+    setItems((prev) => prev.map((g, j) => (j === i ? { ...g, [k]: v } : g)));
+  return (
+    <details className="rounded-xl border border-[color:var(--border)]/70 bg-surface/30 p-3 text-xs" open>
+      <summary className="cursor-pointer text-muted-foreground">
+        용어표 {items.length}개 · 첫 등장 형식 &ldquo;쉬운 말(원어)&rdquo; · 고쳐도 본문은 자동으로 바뀌지 않습니다
+      </summary>
+      <div className="mt-2 space-y-1.5">
+        {items.map((g, i) => (
+          <div key={i} className="grid gap-1 sm:grid-cols-[1fr_1.4fr_1.4fr]">
+            <span className="self-center text-muted-foreground">
+              {g.source} {g.kind === "procedure" ? "· 절차" : ""}
+            </span>
+            <input className={input} value={g.plain} readOnly={readOnly} onChange={(e) => set(i, "plain", e.target.value)} aria-label="쉬운 말" />
+            <input className={input} value={g.first} readOnly={readOnly} onChange={(e) => set(i, "first", e.target.value)} aria-label="첫 등장" />
+          </div>
+        ))}
+        {!readOnly && (
+          <button
+            type="button"
+            onClick={async () => {
+              const r = await saveGlossary(letterId, items);
+              setMsg(r.error ? `저장 실패 · ${r.error}` : "용어표를 저장했습니다. 본문은 직접 고치십시오.");
+            }}
+            className="rounded-md border border-[color:var(--border)] px-2.5 py-1 text-xs text-foreground/85 hover:border-[color:var(--accent)]"
+          >
+            용어표 저장
+          </button>
+        )}
+        {msg && <p className="text-foreground/80">{msg}</p>}
+      </div>
+    </details>
   );
 }

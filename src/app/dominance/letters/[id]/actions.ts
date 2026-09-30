@@ -4,7 +4,25 @@ import { revalidatePath } from "next/cache";
 import { dominanceContext } from "@/lib/dominance/guard";
 import { countFlags, flagBlocks } from "@/lib/dominance/filters";
 import { saveLetterBody } from "@/lib/dominance/letters";
+import type { GlossaryItem } from "@/lib/dominance/draft-card";
+import { tagsIn } from "@/lib/dominance/tags";
+import { readDraftMeta, writeDraftMeta } from "@/lib/dominance/draft-store";
 import type { LetterBlock } from "@/lib/dominance/types";
+
+type Db = Awaited<ReturnType<typeof dominanceContext>>["db"];
+
+/**
+ * 질문에서 나온 글(20차)은 블록의 출처를 본문의 인라인 태그로 다시 센다. 사람이 문장을 고치면 태그도 따라 바뀐다.
+ * 옛 후보 경로의 글은 태그가 없으므로 그대로 둔다.
+ */
+async function withTagSources(db: Db, letterId: string, blocks: LetterBlock[]): Promise<LetterBlock[]> {
+  const { data } = await db.from("ds_letters").select("question_id").eq("id", letterId).maybeSingle<{ question_id: string | null }>();
+  if (!data?.question_id) return blocks;
+  return blocks.map((b) => {
+    const tags = tagsIn(b.text);
+    return { ...b, sourceIds: tags.length ? tags : undefined };
+  });
+}
 
 export type SaveResult = {
   blocks: LetterBlock[];
@@ -20,7 +38,7 @@ export async function saveLetter(
 ): Promise<SaveResult> {
   const { db } = await dominanceContext();
 
-  const blocks = flagBlocks(patch.blocks);
+  const blocks = flagBlocks(await withTagSources(db, letterId, patch.blocks));
   const { error } = await saveLetterBody(db, letterId, {
     title: patch.title,
     summary: patch.summary,
@@ -42,7 +60,7 @@ export async function finishWriting(
 ): Promise<{ error: string | null }> {
   const { db } = await dominanceContext();
 
-  const blocks = flagBlocks(patch.blocks);
+  const blocks = flagBlocks(await withTagSources(db, letterId, patch.blocks));
   if (countFlags(blocks) > 0) {
     return { error: "거절 필터 경고가 남아 있습니다. 고친 뒤에 올리십시오." };
   }
@@ -67,4 +85,17 @@ export async function finishWriting(
   revalidatePath("/dominance/review");
   revalidatePath("/dominance");
   return { error: error?.message ?? null };
+}
+
+/** 용어표를 고친다. 본문은 자동으로 바뀌지 않는다(사람이 고친다 · 20차 B-4). */
+export async function saveGlossary(letterId: string, glossary: GlossaryItem[]): Promise<{ error: string | null }> {
+  const { db } = await dominanceContext();
+  const meta = await readDraftMeta(db, letterId);
+  if (!meta) return { error: "이 글에는 용어표 파일이 없습니다" };
+  try {
+    await writeDraftMeta(db, letterId, { ...meta, glossary: glossary.filter((g) => g.plain.trim()) });
+    return { error: null };
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : String(e) };
+  }
 }
