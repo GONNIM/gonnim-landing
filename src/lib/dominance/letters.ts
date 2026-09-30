@@ -347,6 +347,7 @@ export async function loadFactCards(
   const memos = new Map<string, string>();
   const linkOnly = new Set<string>();
   let byYear: Record<string, number | null> | null = null;
+  let papers5y: number | null = null;
 
   if (questionId) {
     const [ev, q] = await Promise.all([
@@ -354,7 +355,7 @@ export async function loadFactCards(
         .from("ds_question_evidence")
         .select("tag, fact_sentence, note, license, fact_subject, fact_year")
         .eq("question_id", questionId),
-      db.from("ds_questions").select("v4_by_year").eq("id", questionId).maybeSingle(),
+      db.from("ds_questions").select("v4_by_year, v1_papers_5y").eq("id", questionId).maybeSingle(),
     ]);
     type EvRow = {
       tag: string | null;
@@ -380,12 +381,16 @@ export async function loadFactCards(
       }
     }
     byYear = (q.data?.v4_by_year as Record<string, number | null> | null) ?? null;
+    papers5y = (q.data?.v1_papers_5y as number | null) ?? null;
   }
 
   return sources.map((s): FactCard => {
     const base = { tag: s.tag, kind: s.label, title: s.title };
     if (s.extKind === "own") {
-      return { ...base, content: curveLine(byYear) ?? "", linkOnly: false };
+      // 초안 카드의 [V] 줄과 같은 사실을 준다(21차: "최근 5년" 이 빠져 오지적이 났다).
+      const curve = curveLine(byYear);
+      const five = papers5y !== null ? ` · 최근 5년 ${papers5y.toLocaleString("ko-KR")}편` : "";
+      return { ...base, content: curve ? curve + five : "", linkOnly: false };
     }
     if (s.tag && linkOnly.has(s.tag)) return { ...base, content: memos.get(s.tag) ?? "", linkOnly: true };
     // 질문의 증거 표에 문장이 있으면 그 문장(사실 카드)을 준다. 없으면(옛 글) 초록을 준다.
