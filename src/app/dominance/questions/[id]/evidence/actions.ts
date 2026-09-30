@@ -9,6 +9,7 @@ import {
   deleteFact,
   moveFact,
   removeSource,
+  setFactKo,
   setSourceTag,
   updateFactMeta,
   type ExternalInput,
@@ -121,4 +122,16 @@ export async function writeDraftAction(
   } catch (e) {
     return { ok: false, error: errText(e) };
   }
+}
+
+/** 확인된 뜻(D44) · 고치기 · [확인] */
+export async function setFactKoAction(
+  id: string,
+  rowId: string,
+  line: number,
+  ko: string,
+  verify: boolean,
+): Promise<Result> {
+  const { db } = await dominanceContext();
+  return wrap(id, () => setFactKo(db, rowId, line, ko, verify));
 }

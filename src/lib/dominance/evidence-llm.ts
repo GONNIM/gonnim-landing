@@ -13,7 +13,24 @@ const str = (v: unknown) => (typeof v === "string" ? v.trim() : "");
 
 export type Candidate = { key: string; title: string; abstract: string; year: string | null; isReview: boolean };
 
-export type SentenceCandidate = { text: string; subject: string | null; year: number | null; hasNumber: boolean };
+export type SentenceCandidate = {
+  text: string;
+  subject: string | null;
+  year: number | null;
+  hasNumber: boolean;
+  /** 한국어 뜻 한 줄(D44 · 미확인) */
+  ko: string | null;
+};
+
+/** 확인된 뜻(D44)을 만드는 규칙 · 배정 호출과 일괄 생성 호출이 같이 쓴다 */
+export const KO_RULES = `# 한국어 뜻(ko) 규칙 (D44)
+- 원문 문장 하나의 뜻을 한국어 한 문장으로 쓴다. 뜻을 더하거나 빼지 않는다.
+- **통계 표현은 뜻으로 푼다.** 예: "50% of the optimal dose" → "가장 큰 효과의 절반이 나오는 걸음 수".
+  "hazard ratio 0.60" → "위험이 약 40% 낮았다" 처럼 방향과 크기만 쓴다. 신뢰구간은 쓰지 않는다.
+- 위험비 · 사분위 · 스플라인 · 다변량 보정 같은 통계 이름을 쓰지 않는다.
+- **수치는 원문 그대로 둔다.** 반올림하거나 바꾸지 않는다(10 000 → 10,000 처럼 표기만 한국식으로).
+- 연관을 원인으로 바꾸지 않는다. "~와 관련이 있었다" 를 "~ 때문이다" 로 쓰지 않는다. "~일 수 있다" 를 단정하지 않는다.
+- **대상과 연도를 문장 안에 넣는다.** 예: "2022년 메타분석에서 성인 47,471명 중 …".`;
 
 export type Assignment = {
   key: string;
@@ -35,6 +52,7 @@ function toSentences(v: unknown, max: number): SentenceCandidate[] {
           subject: str(o.subject) || null,
           year: Number.isFinite(year) && year > 1800 ? year : null,
           hasNumber: o.has_number === true,
+          ko: str(o.ko) || null,
         },
       ];
     })
@@ -70,10 +88,13 @@ export async function assignAndExtract(input: {
 - **세 칸이 고루 차게 한다.** 결과 논문이 많아도 예외 칸에만 몰지 않는다. 경로 · 물질 · 실험 조작을 보인 논문은 기전으로,
   통설 자체나 그 근거를 정리한 리뷰는 정설로 보낸다. 한 칸에 8편을 넘기지 않는다.
   단, 기전 칸을 채우려고 연관 연구를 기전으로 보내지 않는다. 기전 논문이 없으면 기전 칸은 비워 둔다.
+- 문장마다 한국어 뜻(ko)을 함께 쓴다. 아래 규칙을 따른다.
+
+${KO_RULES}
 
 # 출력 형식 (엄수)
 다른 설명 없이 JSON 만 반환한다. key 는 받은 값을 그대로 쓴다.
-{ "items": [ { "key": "...", "slot": "exception", "reason": "...", "sentences": [ { "text": "...", "subject": "...", "year": 2024, "has_number": true } ] } ] }`;
+{ "items": [ { "key": "...", "slot": "exception", "reason": "...", "sentences": [ { "text": "...", "subject": "...", "year": 2024, "has_number": true, "ko": "..." } ] } ] }`;
 
   const papers = input.papers
     .map(
@@ -111,9 +132,12 @@ export async function premiseFromBody(input: {
 - 서론의 문장을 **한 글자도 바꾸지 않고** 그대로 옮긴다.
 - 논문마다 많아야 2문장. 없으면 빈 배열.
 - 대상(subject)은 한국어로 짧게. year 는 문장이 말하는 연도가 있으면 그 연도, 없으면 null. has_number 는 수치가 있으면 true.
+- 문장마다 한국어 뜻(ko)을 함께 쓴다.
+
+${KO_RULES}
 
 # 출력 형식 (엄수)
-{ "items": [ { "key": "...", "sentences": [ { "text": "...", "subject": "...", "year": null, "has_number": false } ] } ] }`;
+{ "items": [ { "key": "...", "sentences": [ { "text": "...", "subject": "...", "year": null, "has_number": false, "ko": "..." } ] } ] }`;
 
   const body = input.intros.map((p) => `[${p.key}] ${p.title}\n서론: ${p.text}`).join("\n\n");
   const o = (await callJson(
@@ -164,4 +188,34 @@ export async function industryLeads(input: { question: string; premise: string |
       return [{ name, query: str(r.query) || name, koName: str(r.ko_name) || null, why: str(r.why) }];
     })
     .slice(0, 3);
+}
+
+// ── 확인된 뜻 일괄 생성 (D44 · 22차 A-5) ─────────────────────────────────────
+
+export type KoInput = { id: string; text: string; subject: string | null; year: number | null; source: string };
+
+/** 이미 저장된 문장들의 한국어 뜻을 한 번에 만든다. 확인은 사람이 한다. */
+export async function translateFacts(
+  question: string,
+  facts: KoInput[],
+): Promise<Map<string, string>> {
+  const system = `당신은 한국어 연구·보건 뉴스레터의 증거 담당이다. 논문 문장(원문)마다 한국어 뜻 한 줄을 만든다.
+
+${KO_RULES}
+
+# 출력 형식 (엄수)
+{ "items": [ { "id": "...", "ko": "..." } ] }  · id 는 받은 값 그대로`;
+  const body = facts
+    .map((f) => `[${f.id}] (출처: ${f.source} · 대상: ${f.subject ?? "-"} · ${f.year ?? "연도 없음"}) ${f.text}`)
+    .join("\n");
+  const o = (await callJson(system, `질문: ${question}\n\n${body}`, 6000, { temperature: 0.2 })) as { items?: unknown[] };
+  const out = new Map<string, string>();
+  const ids = new Set(facts.map((f) => f.id));
+  for (const it of o.items ?? []) {
+    const r = (it ?? {}) as Record<string, unknown>;
+    const id = str(r.id);
+    const ko = str(r.ko);
+    if (ids.has(id) && ko) out.set(id, ko);
+  }
+  return out;
 }

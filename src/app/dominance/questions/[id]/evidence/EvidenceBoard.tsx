@@ -28,6 +28,7 @@ import {
   deleteFactAction,
   moveFactAction,
   removeSourceAction,
+  setFactKoAction,
   setTagAction,
   updateFactMetaAction,
 } from "./actions";
@@ -62,7 +63,11 @@ export function EvidenceBoard({
 
   const canWrite = ["adopted", "drafted"].includes(status) && table.filledSlots >= 3;
   const [writing, setWriting] = useState(false);
+  const allFacts = SLOTS.flatMap((s) => table.slots[s].flatMap((g) => g.facts));
+  const unverified = allFacts.filter((f) => !f.koVerifiedAt).length;
   async function write() {
+    // D44 · 초안은 확인된 뜻만 받는다. 확인 안 된 뜻이 있어도 운영자가 고르면 진행한다.
+    if (unverified > 0 && !window.confirm(`확인되지 않은 뜻 ${unverified}개가 있습니다. 확인하지 않은 뜻으로 글을 씁니다. 진행할까요?`)) return;
     if (letter && !window.confirm("새 판을 만듭니다. 지금 글은 파일로 보관되고 본문이 바뀝니다.")) return;
     setWriting(true);
     setMsg("사실 카드로 초안을 쓰는 중입니다(1분 안팎)…");
@@ -130,6 +135,7 @@ export function EvidenceBoard({
               className="rounded-md bg-[color:var(--accent)] px-3 py-1.5 text-xs font-medium text-background disabled:opacity-40"
             >
               {writing ? "쓰는 중…" : letter ? "글 작성하기 (새 판)" : "글 작성하기"}
+              {unverified > 0 ? ` · 확인되지 않은 뜻 ${unverified}개` : ""}
             </button>
           </span>
         </div>
@@ -234,10 +240,17 @@ function SlotSection({
   act: Act;
 }) {
   const facts = groups.reduce((n, g) => n + g.facts.length, 0);
+  const verified = groups.reduce((n, g) => n + g.facts.filter((f) => f.koVerifiedAt).length, 0);
   return (
     <section className="space-y-3">
       <h2 className="text-lg font-medium">
-        {SLOT_LABEL[slot]} <span className="text-sm text-muted-foreground">원천 {groups.length} · 문장 {facts}</span>
+        {SLOT_LABEL[slot]}{" "}
+        <span className="text-sm text-muted-foreground">
+          원천 {groups.length} · 문장 {facts} ·{" "}
+          <span className={verified < facts ? "text-amber-300" : "text-emerald-300"}>
+            확인 {verified} / {facts}
+          </span>
+        </span>
       </h2>
       {groups.length === 0 && (
         <p className="rounded-xl border border-dashed border-[color:var(--border)]/70 p-4 text-sm text-muted-foreground">
@@ -316,9 +329,45 @@ function SourceCard({
 
 function FactRow({ f, slot, questionId, busy, act }: { f: Fact; slot: Slot; questionId: string; busy: boolean; act: Act }) {
   const [subject, setSubject] = useState(f.subject ?? "");
+  const [ko, setKo] = useState(f.ko ?? "");
+  const changed = ko.trim() !== (f.ko ?? "");
   return (
     <li className="rounded-lg border border-[color:var(--border)]/50 p-2.5">
       <p className="text-sm text-foreground">{f.text}</p>
+      {/* D44 · 확인된 뜻. 초안은 이 칸만 받는다. 미확인은 노랑 */}
+      <div className={`mt-2 rounded-md border p-2 ${f.koVerifiedAt && !changed ? "border-emerald-500/40" : "border-amber-500/50 bg-amber-500/5"}`}>
+        <textarea
+          value={ko}
+          onChange={(e) => setKo(e.target.value)}
+          rows={2}
+          placeholder="한국어 뜻이 아직 없습니다"
+          className={`${input} w-full`}
+          aria-label="확인된 뜻"
+        />
+        <div className="mt-1 flex items-center gap-2 text-xs">
+          <span className={f.koVerifiedAt && !changed ? "text-emerald-300" : "text-amber-300"}>
+            {f.koVerifiedAt && !changed ? `확인됨 ${f.koVerifiedAt.slice(0, 10)}` : changed ? "고침 · 아직 확인 안 됨" : "확인 안 됨"}
+          </span>
+          <button
+            type="button"
+            disabled={busy || !ko.trim() || (!!f.koVerifiedAt && !changed)}
+            onClick={() => act(() => setFactKoAction(questionId, f.rowId, f.line, ko, true), "뜻을 확인했습니다")}
+            className="rounded border border-[color:var(--border)] px-2 py-0.5 hover:border-emerald-400 disabled:opacity-40"
+          >
+            확인
+          </button>
+          {changed && (
+            <button
+              type="button"
+              disabled={busy || !ko.trim()}
+              onClick={() => act(() => setFactKoAction(questionId, f.rowId, f.line, ko, false), "뜻을 고쳤습니다(미확인)")}
+              className="rounded border border-[color:var(--border)] px-2 py-0.5 disabled:opacity-40"
+            >
+              고친 뜻만 저장
+            </button>
+          )}
+        </div>
+      </div>
       <div className="mt-1.5 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
         <label className="flex items-center gap-1">
           대상

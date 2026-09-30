@@ -144,6 +144,7 @@ async function searchPhase(db: SupabaseClient, q: Question, run: EvidenceRun, qu
           hasNumber: s.hasNumber,
           verifiedAt: new Date().toISOString(),
           sourcePart: "abstract",
+          ko: s.ko,
         },
         "search",
       );
@@ -225,6 +226,7 @@ async function premiseBodyPhase(db: SupabaseClient, q: Question, run: EvidenceRu
           hasNumber: s.hasNumber,
           verifiedAt: new Date().toISOString(),
           sourcePart: inAbs ? "abstract" : "body",
+          ko: s.ko,
         },
         "search",
       );

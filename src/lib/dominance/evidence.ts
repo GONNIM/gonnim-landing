@@ -64,6 +64,9 @@ type FactMeta = {
   has_number?: boolean | null;
   verified_at?: string | null;
   source_part?: SourcePart | null;
+  /** 확인된 뜻(D44) · SQL(2026-10-01) 전에는 메타 줄에 산다 */
+  ko?: string | null;
+  ko_verified_at?: string | null;
 };
 
 export type Fact = {
@@ -76,6 +79,9 @@ export type Fact = {
   verifiedAt: string | null;
   sourcePart: SourcePart | null;
   addedBy: string;
+  /** 한국어 뜻(D44). 증거 단계에서 만들고 사람이 확인한다 */
+  ko: string | null;
+  koVerifiedAt: string | null;
 };
 
 export type SourceRef = {
@@ -117,6 +123,7 @@ const BASE = `
   press:ds_gov_press!ds_question_evidence_gov_press_id_fkey ( title, landing_url )
 `;
 const EXT = "fact_subject, fact_year, has_number, verified_at, source_part";
+const KO = "fact_ko, fact_ko_verified_at";
 
 type Row = {
   id: string;
@@ -140,6 +147,8 @@ type Row = {
   has_number?: boolean | null;
   verified_at?: string | null;
   source_part?: SourcePart | null;
+  fact_ko?: string | null;
+  fact_ko_verified_at?: string | null;
 };
 
 // ── 메모 · 메타 줄 ──────────────────────────────────────────────────────────
@@ -170,10 +179,17 @@ export async function hasEvidenceColumns(db: SupabaseClient): Promise<boolean> {
   return !error;
 }
 
+/** 확인된 뜻 칸(db/2026-10-01-dominance-fact-ko.sql)이 있는가 */
+export async function hasKoColumns(db: SupabaseClient): Promise<boolean> {
+  const { error } = await db.from("ds_question_evidence").select(KO).limit(1);
+  return !error;
+}
+
 async function loadRows(db: SupabaseClient, questionId: string, ext: boolean): Promise<Row[]> {
+  const ko = ext && (await hasKoColumns(db));
   const { data, error } = await db
     .from("ds_question_evidence")
-    .select(ext ? `${BASE}, ${EXT}` : BASE)
+    .select(ext ? `${BASE}, ${EXT}${ko ? `, ${KO}` : ""}` : BASE)
     .eq("question_id", questionId)
     .order("created_at", { ascending: true });
   if (error) throw new Error(`증거를 읽지 못했습니다: ${error.message}`);
@@ -247,6 +263,8 @@ function factsOf(r: Row): Fact[] {
       : null;
   return ls.map((text, i) => {
     const m = cols ?? meta[i] ?? {};
+    // 확인된 뜻은 칸이 있으면 칸, 없으면 메타 줄(한 줄 행은 메타 첫 원소)
+    const km = meta[i] ?? {};
     return {
       rowId: r.id,
       line: i,
@@ -257,6 +275,8 @@ function factsOf(r: Row): Fact[] {
       verifiedAt: m.verified_at ?? null,
       sourcePart: m.source_part ?? null,
       addedBy: r.added_by,
+      ko: r.fact_ko ?? km.ko ?? null,
+      koVerifiedAt: r.fact_ko_verified_at ?? km.ko_verified_at ?? null,
     };
   });
 }
@@ -379,6 +399,9 @@ export type NewFact = {
   hasNumber: boolean | null;
   verifiedAt: string;
   sourcePart: SourcePart;
+  /** 확인된 뜻 후보(미확인) · D44 */
+  ko?: string | null;
+  koVerifiedAt?: string | null;
 };
 
 type SourceFields = {
@@ -402,6 +425,8 @@ const toMeta = (f: NewFact): FactMeta => ({
   has_number: f.hasNumber,
   verified_at: f.verifiedAt,
   source_part: f.sourcePart,
+  ko: f.ko ?? null,
+  ko_verified_at: f.koVerifiedAt ?? null,
 });
 
 /**
@@ -424,7 +449,8 @@ export async function storeFact(
 
   if (ext) {
     const bare = same.find((r) => !r.fact_sentence);
-    const cols = {
+    const koCols = await hasKoColumns(db);
+    const cols: Record<string, unknown> = {
       fact_sentence: fact.text,
       fact_subject: fact.subject,
       fact_year: fact.year,
@@ -432,6 +458,11 @@ export async function storeFact(
       verified_at: fact.verifiedAt,
       source_part: fact.sourcePart,
     };
+    if (fact.ko) {
+      // 확인된 뜻 칸이 없으면(SQL 2026-10-01 전) 메타 줄에 둔다.
+      if (koCols) Object.assign(cols, { fact_ko: fact.ko, fact_ko_verified_at: fact.koVerifiedAt ?? null });
+      else cols.note = joinNote(bare ? splitNote(bare.note).memo : null, [{ ko: fact.ko, ko_verified_at: fact.koVerifiedAt ?? null }]);
+    }
     const { error } = bare
       ? await db.from("ds_question_evidence").update(cols).eq("id", bare.id)
       : await db
@@ -469,9 +500,10 @@ export async function storeFact(
 
 async function oneRow(db: SupabaseClient, rowId: string): Promise<Row> {
   const ext = await hasEvidenceColumns(db);
+  const ko = ext && (await hasKoColumns(db));
   const { data, error } = await db
     .from("ds_question_evidence")
-    .select(ext ? `${BASE}, ${EXT}` : BASE)
+    .select(ext ? `${BASE}, ${EXT}${ko ? `, ${KO}` : ""}` : BASE)
     .eq("id", rowId)
     .single();
   if (error || !data) throw new Error("증거 행을 찾지 못했습니다");
@@ -546,6 +578,8 @@ export async function moveFact(db: SupabaseClient, rowId: string, line: number, 
       hasNumber: f.hasNumber,
       verifiedAt: f.verifiedAt ?? new Date().toISOString(),
       sourcePart: f.sourcePart ?? "abstract",
+      ko: f.ko,
+      koVerifiedAt: f.koVerifiedAt,
     },
     (["search", "owner", "validation", "daily"].includes(r.added_by) ? r.added_by : "owner") as "owner",
   );
@@ -908,4 +942,38 @@ export async function splitAndVerify(
     rep.verified++;
   }
   return rep;
+}
+
+// ── 확인된 뜻 (D44) ─────────────────────────────────────────────────────────
+
+/**
+ * 문장의 한국어 뜻을 쓴다. verify 이면 확인 시각을 찍는다(사람이 [확인]을 누름).
+ * 뜻을 바꾸면서 verify 가 아니면 확인 시각을 지운다(고친 뜻은 다시 확인해야 한다).
+ */
+export async function setFactKo(
+  db: SupabaseClient,
+  rowId: string,
+  line: number,
+  ko: string,
+  verify: boolean,
+): Promise<void> {
+  const text = ko.trim();
+  if (!text) throw new Error("뜻이 비었습니다");
+  const r = await oneRow(db, rowId);
+  const ls = lines(r.fact_sentence);
+  if (!ls[line]) throw new Error("그 문장을 찾지 못했습니다");
+  const at = verify ? new Date().toISOString() : null;
+  if (ls.length === 1 && (await hasKoColumns(db))) {
+    const { error } = await db
+      .from("ds_question_evidence")
+      .update({ fact_ko: text, fact_ko_verified_at: at })
+      .eq("id", rowId);
+    if (error) throw new Error(error.message);
+    return;
+  }
+  const { memo, facts } = splitNote(r.note);
+  const metas = ls.map((_, i) => facts[i] ?? {});
+  metas[line] = { ...metas[line], ko: text, ko_verified_at: at };
+  const { error } = await db.from("ds_question_evidence").update({ note: joinNote(memo, metas) }).eq("id", rowId);
+  if (error) throw new Error(error.message);
 }
