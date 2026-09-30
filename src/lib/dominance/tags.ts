@@ -36,3 +36,11 @@ export function sentencesOf(text: string): { text: string; start: number; end: n
   push(text.length);
   return out;
 }
+
+/** 전각 마침표 · 물음표 · 느낌표를 반각으로(24차 B-2 · 주말 잠 초안에 "。" 가 나왔다) */
+export function normalizePunct(text: string): string {
+  return text.replace(/。/g, ".").replace(/？/g, "?").replace(/！/g, "!");
+}
+
+/** 초안 지시문의 잇는 문장 예시 · 그대로 복사되면 점검이 경고한다 */
+export const BRIDGE_EXAMPLES = ["여기서 숫자 하나를 보자.", "그런데 나이가 들면 이야기가 달라진다."];

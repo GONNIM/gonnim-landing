@@ -10,7 +10,7 @@ import { V_TAG, type CardFact, type QuestionCard } from "./card";
 import { SLOT_LABEL } from "./evidence";
 import { countNumbers, hasSampleOrFollowup } from "./numbers";
 import { callJson } from "./question-llm";
-import { sentencesOf, tagsIn } from "./tags";
+import { normalizePunct, sentencesOf, tagsIn } from "./tags";
 import { BLOCK_ORDER, type LetterBlock } from "./types";
 
 export { tagsIn } from "./tags";
@@ -51,7 +51,8 @@ const GLOSSARY_SYSTEM = `당신은 한국어 연구·보건 뉴스레터 「지�
 사실 카드(영어 원문)를 읽고 두 가지를 낸다.
 
 # 1. 용어표 (조건 28)
-- **독자가 알아야 할 말만** 3~6개 고른다. 글에서 그 말 자체를 써야 하는 것이다(예: 만보계 · 좌식시간 · 병체결합).
+- **독자가 알아야 할 말만** 3~5개 고른다. 글에서 그 말 자체를 써야 하는 것이다(예: 만보계 · 좌식시간 · 병체결합).
+- **이미 일상어인 말(보충 수면 · 늦잠 · 걸음 수 등)은 넣지 않는다.**
 - **통계 방법과 지표 이름은 넣지 않는다**(위험비 · 스플라인 · 사분위 · 다변량 보정 · 전원인사망 · 신뢰구간 등). 이런 말은 본문에서 뜻으로 풀어 쓴다.
 - 실험 절차를 나타내는 말이 카드에 있으면 1개까지 넣는다.
 - plain(쉬운 풀이)은 **15자 안**으로 쓴다. "잇다 · 연결하다 · 노출하다 · 순환계 · 인자 · 밀도 · 발현" 같은 말을 쓰지 않는다.
@@ -100,7 +101,7 @@ async function makeGlossary(
         },
       ];
     })
-    .slice(0, 6);
+    .slice(0, 5);
   return { glossary, vMeaning: str(o.v_meaning) || null };
 }
 
@@ -145,11 +146,12 @@ export const DRAFT_SYSTEM = `당신은 한국어 연구·보건 뉴스레터 「
             기관의 경고나 권고가 카드에 있으면 이 블록에 둔다. **"의학적 조언이 아니다" 같은 고지 문장은 쓰지 않는다**(발행 틀이 붙인다).
             실천 블록도 사실 블록이다. 사실 문장마다 태그를 붙인다.
 - metaphor  전체를 한 문장으로 붙잡는 비유 하나. 독자의 일이나 생활로 넓힌다. 과학을 다시 설명하는 비유는 쓰지 않는다.
+            **은유 블록은 사실 문장을 쓰지 않는다. 태그 없음**(7판).
 - summary   3줄 요약. 세 문장, 줄바꿈으로 구분한다. 첫 줄은 독자가 믿던 것과 그것을 깬 결과, 둘째 줄은 가장 반직관적인 결과, 셋째 줄은 내 몸과의 연결.
             **요약은 나머지 여섯 블록을 다 쓴 뒤 맨 마지막에 쓴다.** 요약의 각 줄은 **본문에 쓴 문장의 뜻만** 담는다(새 사실 · 새 해석 금지).
             요약의 사실 문장에도 본문과 같은 태그를 붙인다.
 
-# 칸 이름을 본문에 쓰지 않는다 (5판)
+# 칸 이름을 본문에 쓰지 않는다 (6판)
 - 재료가 어느 칸에서 왔는지(정설 · 예외 · 기전 · 산업)는 글에 쓰지 않는다. "정설을 먼저 세워 보자" "예외를 보자" 같은 문장을 쓰지 않는다.
 
 # 사실 문장 규칙
@@ -158,7 +160,7 @@ export const DRAFT_SYSTEM = `당신은 한국어 연구·보건 뉴스레터 「
 6. 접속어: 원천에 없는 인과나 대조를 만들지 않는다. "때문에 · 그래서 · 따라서 · 그럼에도 · 그런데도" 를 두 사실 사이에 넣으려면
    그 관계가 카드에 적혀 있어야 한다.
 7. 기관의 경고 · 권고는 원문이 누구에게 한 말인지 그대로 쓴다(예: "소비자에게 주의를 당부했다"). 기관이 나열한 질병 이름은 "여러 질환" 으로 줄인다.
-8. 용어: 아래 용어표를 쓴다. 처음 나올 때 용어표의 "첫 등장" 형식 그대로 쓰고, 그다음부터는 쉬운 말이나 원어를 쓴다.
+8. 용어: 아래 용어표는 **참고용**이다. 용어를 다른 말로 바꾸지 말고 그대로 쓴다. 괄호 풀이는 프로그램이 첫 등장에 붙인다(7판).
    용어표에 없는 통계 용어는 쓰지 않는다(조건 28).
 9. 실험 절차는 독자가 머릿속에 그릴 수 있는 말로 쓴다. "잇다 · 연결하다 · 노출하다 · 순환계 · 인자 · 밀도 · 발현" 같은 말을 쓰지 않는다.
 
@@ -232,7 +234,7 @@ const PICK_SYSTEM = `당신은 한국어 연구·보건 뉴스레터 「지배�
 재료 목록(id · 태그 · 칸 · 대상 · 연도 · 뜻)을 받는다.
 
 # 규칙
-- 블록 6개(hook · research · mechanism · industry · practice · metaphor)마다 쓸 재료를 **2~4개** 고른다. metaphor 는 0~1개.
+- 블록 5개(hook · research · mechanism · industry · practice)마다 쓸 재료를 **2~4개** 고른다. metaphor 는 재료를 고르지 않는다(사실 없이 비유만 · 7판).
 - 고르는 기준: 통설을 깨는 것 · 놀라운 수치 · 독자의 몸으로 이어지는 것.
 - hook 은 통설과 놀라운 수치 하나([V] 등). research 는 정설 → 예외. mechanism 은 왜 그런지(기전 칸 우선). industry 는 산업 · 링크만 메모. practice 는 독자의 판단으로 이어지는 관찰.
 - 한 블록의 수치는 합쳐 3개 이하가 되게 고른다. 표본 크기 · 추적 기간이 든 재료는 같은 원천에서 한 번만 고른다.
@@ -257,7 +259,8 @@ export function enforcePicks(
 
   for (const b of PICK_BLOCKS) {
     const min = b === "metaphor" ? 0 : 2;
-    const max = b === "metaphor" ? 1 : 4;
+    // 7판 · 은유 블록에는 사실 재료를 주지 않는다
+    const max = b === "metaphor" ? 0 : 4;
     const list: { item: PickItem; why: string }[] = [];
     for (const r of raw[b] ?? []) {
       const item = byId.get(r.id);
@@ -277,7 +280,7 @@ export function enforcePicks(
         log.push({ block: b, id: r.id, tag: item.tag, why: r.why, kept: false, reason: `블록당 ${max}개 초과` });
         continue;
       }
-      // 5판 · 수치가 4개 이상인 재료는 한 블록에 하나만(23차 B-3 · 만 보 3판 E1 나이별 결과)
+      // 6판 · 수치가 4개 이상인 재료는 한 블록에 하나만(23차 B-3 · 만 보 3판 E1 나이별 결과)
       if (item.numbers >= 4 && list.some((x) => x.item.numbers >= 4)) {
         log.push({ block: b, id: r.id, tag: item.tag, why: r.why, kept: false, reason: "수치 4개 이상 재료는 블록당 하나" });
         continue;
@@ -370,12 +373,12 @@ export async function generateCardDraft(card: QuestionCard): Promise<CardDraft> 
     return `## ${b}\n${rows.length ? rows.join("\n") : "(재료 없음)"}`;
   }).join("\n\n");
   const gl = glossary.length
-    ? glossary.map((g) => `- 첫 등장 "${g.first}" · 쉬운 말 "${g.plain}"`).join("\n")
+    ? glossary.map((g) => `- ${g.original || g.plain} (뜻: ${g.plain})`).join("\n")
     : "(없음)";
   const q = card.question;
   const o = (await callJson(
     DRAFT_SYSTEM,
-    `질문: ${q.question}\n독자의 통설 (훅용, 출처 불필요): ${q.premise ?? "-"}\n되묻기: ${q.twist ?? "-"}\n\n# 블록별 재료 (확인된 뜻 · 태그 · 대상)\n${material}\n\n# 용어표 (첫 등장에 이 형식 그대로)\n${gl}\n\n위 재료만으로 「지배상식」 한 편의 초고를 JSON 으로 쓰시오.`,
+    `질문: ${q.question}\n독자의 통설 (훅용, 출처 불필요): ${q.premise ?? "-"}\n되묻기: ${q.twist ?? "-"}\n\n# 블록별 재료 (확인된 뜻 · 태그 · 대상)\n${material}\n\n# 용어표 (참고용 · 용어를 바꾸지 말고 그대로 쓴다. 괄호 풀이는 프로그램이 붙인다)\n${gl}\n\n위 재료만으로 「지배상식」 한 편의 초고를 JSON 으로 쓰시오.`,
     9000,
     {
       temperature: 0.6,
@@ -388,15 +391,20 @@ export async function generateCardDraft(card: QuestionCard): Promise<CardDraft> 
   const t3 = Date.now();
 
   const bodies = o.blocks ?? {};
-  const blocks: LetterBlock[] = BLOCK_ORDER.map((kind) => {
-    const text = kind === "summary" ? str(bodies[kind]) : breakParagraphs(str(bodies[kind]));
+  const raw0 = BLOCK_ORDER.map((kind) => {
+    const t = normalizePunct(str(bodies[kind]));
+    return { kind, text: kind === "summary" ? t : breakParagraphs(t) };
+  });
+  // 7판 · 첫 등장에만 "용어(풀이)" 를 프로그램이 붙인다. 용어는 그대로 둔다.
+  const withGloss = applyGlossary(raw0, glossary);
+  const blocks: LetterBlock[] = withGloss.map(({ kind, text }) => {
     const tags = tagsIn(text);
     return { kind, text, sourceIds: tags.length ? tags : undefined };
   });
 
   return {
     titles: (o.titles ?? []).map(str).filter(Boolean).slice(0, 3),
-    summary: str(o.summary),
+    summary: normalizePunct(str(o.summary)),
     glossary,
     vMeaning,
     blocks: flagBlocks(blocks),
@@ -424,4 +432,24 @@ export function breakParagraphs(text: string, per = 3): string {
     })
     .filter(Boolean)
     .join("\n");
+}
+
+/**
+ * 7판 · 용어표의 용어가 글에 처음 나오는 곳에만 "용어(풀이)" 를 붙인다(읽는 차례 = 블록 차례).
+ * 이미 괄호가 붙어 있으면 두지 않는다. 용어가 글에 없으면 아무것도 하지 않는다.
+ */
+export function applyGlossary<T extends { kind: string; text: string }>(blocks: T[], glossary: GlossaryItem[]): T[] {
+  const out = blocks.map((b) => ({ ...b }));
+  for (const g of glossary) {
+    const term = g.original?.trim();
+    if (!term || !g.plain || term === g.plain) continue;
+    for (const b of out) {
+      const i = b.text.indexOf(term);
+      if (i < 0) continue;
+      const after = b.text.slice(i + term.length);
+      if (!/^\s*\(/.test(after)) b.text = `${b.text.slice(0, i + term.length)}(${g.plain})${after}`;
+      break;
+    }
+  }
+  return out;
 }
