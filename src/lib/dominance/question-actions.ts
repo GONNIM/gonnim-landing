@@ -16,8 +16,11 @@ import {
   AREAS,
   findSameQuestion,
   insertQuestion,
+  loadQuestion,
   normalizeQuestion,
+  updateQuestion,
   type Area,
+  type Suggested,
 } from "./questions";
 import { recentReviewTitles } from "./validate";
 
@@ -132,7 +135,9 @@ export type SaveResult =
 export function checkFields(f: IssueFields): string | null {
   if (!normalizeQuestion(f.question)) return "질문 문장이 비었습니다";
   if (f.queries.filter((q) => q.trim()).length === 0) return "검색어가 하나는 있어야 검증할 수 있습니다";
-  if (f.area && !(AREAS as readonly string[]).includes(f.area)) return "영역은 10개 중 하나여야 합니다";
+  // 영역은 필수, 계열은 선택이다(19차 B-2).
+  if (!f.area) return "영역을 골라 주십시오";
+  if (!(AREAS as readonly string[]).includes(f.area)) return "영역은 10개 중 하나여야 합니다";
   return null;
 }
 
@@ -186,3 +191,37 @@ export async function saveIssue(
   return { ok: true, id };
 }
 
+
+// ── [빈 칸 채우기] (19차 B-1) ───────────────────────────────────────────────
+
+/**
+ * 통설 · 되묻기 · 검색어 · 영역 중 빈 칸만 [채우기]와 같은 LLM 호출(1회)로 채운다.
+ * 바로 저장하지 않는다. suggested 에 두고, 운영자가 고쳐서 저장할 때 칸으로 들어간다.
+ */
+export async function suggestEmptyFields(
+  db: SupabaseClient,
+  id: string,
+): Promise<{ suggested: Suggested; ms: number }> {
+  const q = await loadQuestion(db, id);
+  if (!q) throw new Error("질문을 찾지 못했습니다");
+  const empty = {
+    premise: !q.premise,
+    twist: !q.twist,
+    queries: q.searchQueries.length === 0,
+    area: !q.area,
+  };
+  if (!Object.values(empty).some(Boolean)) throw new Error("빈 칸이 없습니다");
+
+  const t0 = Date.now();
+  const f = await fillIssue({ mode: "sentence", text: q.question });
+  const suggested: Suggested = { at: new Date().toISOString() };
+  if (empty.premise && f.premise) suggested.premise = f.premise;
+  if (empty.twist && f.twist) suggested.twist = f.twist;
+  if (empty.queries && f.queries.length) suggested.queries = f.queries;
+  if (empty.area && f.area) suggested.area = f.area;
+  if (!q.series && f.series) suggested.series = f.series;
+
+  const { error } = await updateQuestion(db, id, {}, { suggested });
+  if (error) throw new Error(`제안을 저장하지 못했습니다: ${error}`);
+  return { suggested, ms: Date.now() - t0 };
+}

@@ -7,6 +7,7 @@ import {
   fillFromInput,
   proposeAndInsert,
   saveIssue,
+  suggestEmptyFields,
   type FillResult,
   type IssueFields,
   type ProposeResult,
@@ -18,6 +19,7 @@ import {
   loadQuestion,
   updateQuestion,
   type Area,
+  type Suggested,
 } from "@/lib/dominance/questions";
 import { validateQuestion, type ValidationResult } from "@/lib/dominance/validate";
 
@@ -87,10 +89,26 @@ export async function editQuestionAction(id: string, f: IssueFields): Promise<{ 
       // 검색어가 바뀌면 검증을 다시 받아야 한다.
       ...(queriesChanged && q.status === "validated" ? { status: "proposed" } : {}),
     },
-    { area: (f.area as Area) || null },
+    // 저장하면 "제안" 표시는 지운다.
+    { area: (f.area as Area) || null, suggested: null },
   );
   revalidatePath(PATH);
   return { error };
+}
+
+// ── [빈 칸 채우기] ─────────────────────────────────────────────────────────
+
+export async function suggestFillAction(
+  id: string,
+): Promise<{ ok: true; suggested: Suggested; ms: number } | { ok: false; error: string }> {
+  const { db } = await dominanceContext();
+  try {
+    const r = await suggestEmptyFields(db, id);
+    revalidatePath(PATH);
+    return { ok: true, ...r };
+  } catch (e) {
+    return { ok: false, error: errText(e) };
+  }
 }
 
 // ── ⓪-2 [검증] ─────────────────────────────────────────────────────────────

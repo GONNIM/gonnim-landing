@@ -1,7 +1,9 @@
 "use client";
 
 import { useMemo, useState, useTransition } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
+import type { EvidenceRun } from "@/lib/dominance/collect-types";
 import {
   AREAS,
   CREATED_VIA_LABEL,
@@ -19,19 +21,22 @@ import {
   editQuestionAction,
   proposeAction,
   setStatusAction,
+  suggestFillAction,
   validateAction,
   type IssueFields,
 } from "./actions";
+import { runCollect } from "./runCollect";
 import { IssueMaker } from "./IssueMaker";
 import { Btn, FieldsEditor } from "./ui";
 
-type SortKey = "created" | "series" | "area" | "v5";
+type SortKey = "area" | "series" | "v5" | "created";
 
+// 영역이 먼저다. 계열은 선택 항목이다(19차 B-2).
 const SORT_LABEL: Record<SortKey, string> = {
-  created: "만든 날",
-  series: "계열",
   area: "영역",
+  series: "계열",
   v5: "V5 관심",
+  created: "만든 날",
 };
 
 /** 한 번에 검증하는 질문 수. Europe PMC 가 동시 요청에 503 을 주므로 2개씩 부른다. */
@@ -45,7 +50,7 @@ export function QuestionBoard({ questions }: { questions: Question[] }) {
   const [statusFilter, setStatusFilter] = useState<QuestionStatus | "all" | "open">("open");
   const [seedFilter, setSeedFilter] = useState<SeedKind | "all">("all");
   const [areaFilter, setAreaFilter] = useState<string>("all");
-  const [sort, setSort] = useState<SortKey>("created");
+  const [sort, setSort] = useState<SortKey>("area");
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [notes, setNotes] = useState<Record<string, string>>({});
   const [running, setRunning] = useState<Set<string>>(new Set());
@@ -126,6 +131,34 @@ export function QuestionBoard({ questions }: { questions: Question[] }) {
     startTransition(async () => {
       const r = await setStatusAction(id, to);
       note(id, r.error ? `실패 · ${r.error}` : `${STATUS_LABEL[to]}(으)로 바꿨습니다`);
+      router.refresh();
+      // D26 ① · 채택하면 [증거 모으기]가 곧바로 돈다. 실패해도 채택은 그대로다.
+      if (!r.error && to === "adopted") void collectAfterAdopt(id);
+    });
+  }
+
+  async function collectAfterAdopt(id: string) {
+    setRunning((s) => new Set(s).add(id));
+    const r = await runCollect(id, (t) => note(id, `채택했습니다 · 증거 모으기 ${t}`));
+    note(
+      id,
+      r.error
+        ? `채택했습니다 · 증거 모으기 실패(${r.error}). 증거 표에서 다시 누를 수 있습니다`
+        : `채택했습니다 · 증거 모으기 끝 · 카드 ${r.run?.total ?? 0}문장`,
+    );
+    setRunning((s) => {
+      const n = new Set(s);
+      n.delete(id);
+      return n;
+    });
+    router.refresh();
+  }
+
+  function suggest(id: string) {
+    startTransition(async () => {
+      note(id, "빈 칸을 채우는 중…");
+      const r = await suggestFillAction(id);
+      note(id, r.ok ? `제안을 받았습니다(${(r.ms / 1000).toFixed(1)}초). [고치기]에서 확인하고 저장하십시오` : `실패 · ${r.error}`);
       router.refresh();
     });
   }
@@ -218,14 +251,6 @@ export function QuestionBoard({ questions }: { questions: Question[] }) {
             </option>
           ))}
         </Filter>
-        <Filter label="갈래" value={seedFilter} onChange={(v) => setSeedFilter(v as never)}>
-          <option value="all">전부</option>
-          {Object.entries(SEED_LABEL).map(([k, v]) => (
-            <option key={k} value={k}>
-              {v}
-            </option>
-          ))}
-        </Filter>
         <Filter label="영역" value={areaFilter} onChange={setAreaFilter}>
           <option value="all">전부</option>
           {AREAS.map((a) => (
@@ -234,6 +259,14 @@ export function QuestionBoard({ questions }: { questions: Question[] }) {
             </option>
           ))}
           <option value="">영역 없음</option>
+        </Filter>
+        <Filter label="갈래" value={seedFilter} onChange={(v) => setSeedFilter(v as never)}>
+          <option value="all">전부</option>
+          {Object.entries(SEED_LABEL).map(([k, v]) => (
+            <option key={k} value={k}>
+              {v}
+            </option>
+          ))}
         </Filter>
         <Filter label="정렬" value={sort} onChange={(v) => setSort(v as SortKey)}>
           {Object.entries(SORT_LABEL).map(([k, v]) => (
@@ -290,7 +323,13 @@ export function QuestionBoard({ questions }: { questions: Question[] }) {
                 />
                 <div className="min-w-0 flex-1">
                   {editing === q.id ? (
-                    <EditForm q={q} onCancel={() => setEditing(null)} onSave={(f) => saveEdit(q.id, f)} busy={busy} />
+                    <EditForm
+                      key={q.suggested?.at ?? "plain"}
+                      q={q}
+                      onCancel={() => setEditing(null)}
+                      onSave={(f) => saveEdit(q.id, f)}
+                      busy={busy}
+                    />
                   ) : (
                     <Card q={q} />
                   )}
@@ -316,6 +355,11 @@ export function QuestionBoard({ questions }: { questions: Question[] }) {
                       <Btn onClick={() => setEditing(q.id)} disabled={busy}>
                         고치기
                       </Btn>
+                      {hasEmpty(q) && !q.suggested && (
+                        <Btn onClick={() => suggest(q.id)} disabled={busy}>
+                          빈 칸 채우기
+                        </Btn>
+                      )}
                     </div>
                   )}
                 </div>
@@ -331,6 +375,7 @@ export function QuestionBoard({ questions }: { questions: Question[] }) {
 function Card({ q }: { q: Question }) {
   const curve = q.seedKind === "hypothesis" ? curveLine(q.v4ByYear) : null;
   const v3Paper = q.v2Reasons?.find((r) => r.relevant && OPEN.has((r.license ?? "").toLowerCase()));
+  const run = q.evidenceRun as EvidenceRun | null;
 
   return (
     <>
@@ -350,17 +395,34 @@ function Card({ q }: { q: Question }) {
         </p>
       )}
 
+      {q.suggested && <SuggestedBlock q={q} />}
+
       <p className="mt-2 text-xs text-muted-foreground">
-        {SEED_LABEL[q.seedKind]}
-        {q.createdVia && q.seedKind === "owner" ? `(${CREATED_VIA_LABEL[q.createdVia]})` : ""} · 계열 {q.series ?? "—"} · 영역{" "}
-        {q.area ?? "—"} · {q.createdAt.slice(0, 10)}
+        영역 {q.area ?? "없음(필수)"} · {SEED_LABEL[q.seedKind]}
+        {q.createdVia && q.seedKind === "owner" ? `(${CREATED_VIA_LABEL[q.createdVia]})` : ""}
+        {q.series ? ` · 계열 ${q.series}` : ""} · {q.createdAt.slice(0, 10)}
       </p>
       <p className="mt-1 text-xs text-muted-foreground">{validationLine(q)}</p>
       {curve && <p className="mt-1 text-xs text-muted-foreground">20년 곡선 · {curve}</p>}
       <p className="mt-1 text-xs text-muted-foreground">
-        증거 칸 {q.slotsFilled}/4
+        증거 칸 {q.slotsFilled}/4 · 카드 {q.factCount}/22문장
         {q.slotsFilled === 0 && (v3Paper ? ` · V3 논문 1편: ${v3Paper.title}` : q.v3EvidenceOk ? " · V3 논문 있음(9/28 실측)" : "")}
+        {(q.slotsFilled > 0 || ["validated", "adopted", "drafted", "published"].includes(q.status)) && (
+          <>
+            {" · "}
+            <Link href={`/dominance/questions/${q.id}/evidence`} className="text-foreground underline">
+              증거 표 →
+            </Link>
+          </>
+        )}
       </p>
+      {run && (
+        <p className="mt-1 text-xs text-muted-foreground">
+          증거 모으기 {run.updatedAt.slice(5, 16).replace("T", " ")} · 새 문장 {run.added} · 대조 실패 {run.verifyFailed} ·{" "}
+          {(run.phases.reduce((n, p) => n + p.ms, 0) / 1000).toFixed(0)}초 · LLM {run.llmCalls}회
+          {run.errors.length ? ` · 오류 ${run.errors.length}` : ""}
+        </p>
+      )}
 
       {q.searchQueries.length > 0 && (
         <p className="mt-1 break-all font-mono text-[11px] text-muted-foreground/80">
@@ -407,17 +469,26 @@ function EditForm({
   onCancel: () => void;
   busy: boolean;
 }) {
+  // 빈 칸에는 [빈 칸 채우기] 제안을 먼저 넣어 둔다. 저장하기 전까지 "제안" 표시가 붙는다.
+  const sg = q.suggested;
+  const qs = q.searchQueries.length ? q.searchQueries : (sg?.queries ?? []);
   const [f, setF] = useState<IssueFields>({
     question: q.question,
-    premise: q.premise ?? "",
-    twist: q.twist ?? "",
-    series: q.series ?? "",
-    area: q.area ?? "",
-    queries: [q.searchQueries[0] ?? "", q.searchQueries[1] ?? ""],
+    premise: q.premise ?? sg?.premise ?? "",
+    twist: q.twist ?? sg?.twist ?? "",
+    series: q.series ?? sg?.series ?? "",
+    area: q.area ?? sg?.area ?? "",
+    queries: [qs[0] ?? "", qs[1] ?? ""],
   });
+  const marks = {
+    premise: !q.premise && !!sg?.premise,
+    twist: !q.twist && !!sg?.twist,
+    queries: q.searchQueries.length === 0 && !!sg?.queries?.length,
+    area: !q.area && !!sg?.area,
+  };
   return (
     <div className="space-y-2">
-      <FieldsEditor value={f} onChange={setF} />
+      <FieldsEditor value={f} onChange={setF} marks={marks} />
       <div className="flex gap-2">
         <Btn onClick={() => onSave(f)} disabled={busy} accent>
           저장
@@ -453,5 +524,31 @@ function Filter({
         {children}
       </select>
     </label>
+  );
+}
+
+function hasEmpty(q: Question): boolean {
+  return !q.premise || !q.twist || q.searchQueries.length === 0 || !q.area;
+}
+
+/** [빈 칸 채우기] 결과 · 저장 전이므로 "제안" 으로 보인다. */
+function SuggestedBlock({ q }: { q: Question }) {
+  const s = q.suggested!;
+  const rows = [
+    s.premise && ["통설", s.premise],
+    s.twist && ["되묻기", s.twist],
+    s.queries?.length && ["검색어", s.queries.join(" / ")],
+    s.area && ["영역", s.area],
+    s.series && ["계열", s.series],
+  ].filter(Boolean) as [string, string][];
+  return (
+    <div className="mt-2 rounded-lg border border-dashed border-amber-500/50 p-2 text-xs">
+      <p className="text-amber-200">제안 · 아직 저장하지 않았습니다. [고치기]에서 확인하고 저장하십시오.</p>
+      {rows.map(([k, v]) => (
+        <p key={k} className="mt-0.5 text-foreground/80">
+          {k} · {v}
+        </p>
+      ))}
+    </div>
   );
 }
