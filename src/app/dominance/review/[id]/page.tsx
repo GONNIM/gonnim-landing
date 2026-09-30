@@ -1,5 +1,6 @@
 // ④ 리뷰 화면 · 왼쪽에 글, 오른쪽에 점검 결과. 여기서는 글을 고치지 않는다.
 
+import { loadCardSentences } from "@/lib/dominance/card";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { dominanceContext } from "@/lib/dominance/guard";
@@ -25,6 +26,7 @@ type Row = {
   status: LetterStatus;
   review_checks: ReviewChecks | null;
   revision_count: number;
+  question_id: string | null;
 };
 
 export default async function ReviewDetailPage({
@@ -38,7 +40,7 @@ export default async function ReviewDetailPage({
   const { data } = await db
     .from("ds_letters")
     .select(
-      "id, title, summary, blocks, status, review_checks, revision_count",
+      "id, title, summary, blocks, status, review_checks, revision_count, question_id",
     )
     .eq("id", id)
     .maybeSingle<Row>();
@@ -53,6 +55,7 @@ export default async function ReviewDetailPage({
     sourceUrls: linkCheckUrls(sources),
     sourceTags: sources.map((s) => s.tag),
     summary: data.summary,
+    cardSentences: await loadCardSentences(db, data.question_id),
   });
 
   return (

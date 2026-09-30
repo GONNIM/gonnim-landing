@@ -5,8 +5,8 @@
 
 import type { LetterBlock } from "./types";
 
-// 사실 문장을 담는 블록. 원천 태그가 없으면 무출처로 본다.
-const FACTUAL_KINDS = new Set(["summary", "research", "mechanism", "industry"]);
+// 사실 문장을 담는 블록. 원천 태그가 없으면 무출처로 본다. 실천도 사실 블록이다(20차 B-5).
+export const FACTUAL_KINDS = new Set(["summary", "research", "mechanism", "industry", "practice"]);
 
 // 주소 · 도메인 · 이메일은 소문자로 쓰는 것이 정상이다. 미번역 검사 전에 지운다.
 // 2026-09-28 실측: 초안의 "ClinicalTrials.gov" 가 `gov` 때문에 미번역으로 걸렸다.

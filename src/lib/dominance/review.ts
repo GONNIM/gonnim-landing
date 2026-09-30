@@ -3,7 +3,7 @@
 // 앞의 4개(filters·blocks·sources·links)는 통과를 막는다. 사실 관계나 저작권에 걸리는 항목이다.
 // 뒤의 3개(hook·paradox·sentence_length)는 경고만 한다. 글의 됨됨이는 기계 판단이 틀릴 수 있다.
 
-import { countFlags, flagBlocks, hookIsQuestion } from "./filters";
+import { FACTUAL_KINDS, countFlags, flagBlocks, hookIsQuestion } from "./filters";
 import { unknownTags } from "./render";
 import {
   BLOCK_ORDER,
@@ -14,7 +14,6 @@ import {
   type ReviewCheckCode,
 } from "./types";
 
-const FACTUAL_KINDS = new Set(["summary", "research", "mechanism", "industry"]);
 
 /** 통설을 세우고 깨는 문장에 거의 항상 나타나는 접속 표현. */
 const PARADOX_MARKERS = [
@@ -113,6 +112,8 @@ export async function runReviewChecks(input: {
   sourceTags?: (string | null)[];
   /** 맨 위 한 문장 요약(ds_letters.summary). 이 태그도 원천 목록과 대조한다. */
   summary?: string | null;
+  /** 사실 카드의 원천 언어 문장(20차 B-5). 주면 40자 복제를 찾는다. 옛 글은 비운다. */
+  cardSentences?: string[];
 }): Promise<ReviewCheck[]> {
   const blocks = flagBlocks(input.blocks);
   const checks: ReviewCheck[] = [];
@@ -154,7 +155,7 @@ export async function runReviewChecks(input: {
       ? `출처 없는 블록: ${unsourced.map((b) => BLOCK_LABEL[b.kind]).join(", ")}`
       : "",
     orphanTags.length > 0
-      ? `원천 목록에 없는 태그 ${orphanTags.length}개: ${orphanTags.map((t) => `[${t}]`).join(" ")}`
+      ? `카드 · 원천 목록에 없는 태그 ${orphanTags.length}개: ${orphanTags.map((t) => `[${t}]`).join(" ")}`
       : "",
   ].filter(Boolean);
   checks.push({
@@ -214,7 +215,65 @@ export async function runReviewChecks(input: {
         : `${MAX_SENTENCE_LENGTH}자를 넘는 문장 ${long.length}개`,
   });
 
+  // 8. 카드 문장 40자 이상 그대로 복제 (경고) · 한국어로 옮긴 글이라 실제로는 영어 원문 복제나 고유명사 나열이 걸린다
+  const copies = findCopies(blocks, input.cardSentences ?? []);
+  checks.push({
+    code: "copy40",
+    passed: true,
+    warning: copies.length > 0 || undefined,
+    detail:
+      copies.length === 0
+        ? input.cardSentences?.length
+          ? null
+          : "사실 카드가 없는 글이라 확인하지 않았습니다"
+        : `${copies.length}곳: ${copies.map((c) => `"${c}"`).join(" / ")}`,
+  });
+
+  // 9. 인과 · 대조 접속어 (경고) · 원천에 없는 인과를 만들지 않았는지 사람이 본다
+  const conn = connectiveSentences(blocks);
+  checks.push({
+    code: "connectives",
+    passed: true,
+    warning: conn.length > 0 || undefined,
+    detail:
+      conn.length === 0
+        ? null
+        : `${conn.length}문장 · 카드에 그 관계가 적혀 있는지 확인: ${conn.map((c) => `"${c}"`).join(" / ")}`,
+  });
+
   return checks;
+}
+
+export const COPY_MIN = 40;
+
+/** 카드 문장과 40자 이상 같은 글자열. 태그는 빼고 본다. */
+export function findCopies(blocks: LetterBlock[], cardSentences: string[]): string[] {
+  const text = blocks.map((b) => b.text.replace(SOURCE_TAG, "")).join("\n");
+  const hits = new Set<string>();
+  for (const s of cardSentences) {
+    for (let i = 0; i + COPY_MIN <= s.length; i++) {
+      const piece = s.slice(i, i + COPY_MIN);
+      if (text.includes(piece)) {
+        // 가능한 만큼 늘려서 한 곳으로 보고한다.
+        let end = i + COPY_MIN;
+        while (end < s.length && text.includes(s.slice(i, end + 1))) end++;
+        hits.add(s.slice(i, end));
+        i = end;
+      }
+    }
+  }
+  return [...hits];
+}
+
+export const CONNECTIVES = ["때문", "그래서", "따라서", "그럼에도", "그런데도"];
+
+/** 인과 · 대조 접속어가 든 문장. 태그는 빼고 인용한다. */
+export function connectiveSentences(blocks: LetterBlock[]): string[] {
+  return blocks
+    .flatMap((b) => b.text.split(/(?<=[.!?。])\s+|\n+/))
+    .map((s) => s.trim())
+    .filter((s) => CONNECTIVES.some((c) => s.includes(c)))
+    .map((s) => s.replace(SOURCE_TAG, "").trim());
 }
 
 export function blockingFailures(checks: ReviewCheck[]): ReviewCheck[] {
