@@ -319,10 +319,15 @@ function curveLine(byYear: Record<string, number | null> | null): string | null 
   if (!byYear) return null;
   const last = new Date().getFullYear() - 1;
   const first = last - 20;
-  const a = byYear[String(first)];
   const b = byYear[String(last)];
-  if (a == null || b == null) return null;
-  return `Europe PMC 연도별 논문 수 · ${first}년 ${a}편 → ${last}년 ${b}편`;
+  // 20년 전 값이 없으면(최근 11년만 잰 질문) 가장 이른 해를 쓴다.
+  const from =
+    byYear[String(first)] != null
+      ? first
+      : Math.min(...Object.keys(byYear).filter((k) => /^\d{4}$/.test(k) && byYear[k] != null).map(Number));
+  const a = Number.isFinite(from) ? byYear[String(from)] : null;
+  if (a == null || b == null || from >= last) return null;
+  return `Europe PMC 연도별 논문 수 · ${from}년 ${a}편 → ${last}년 ${b}편`;
 }
 
 /**
@@ -337,16 +342,42 @@ export async function loadFactCards(
   questionId: string | null,
   sources: LoadedSource[],
 ): Promise<FactCard[]> {
-  const evidence = new Map<string, { fact_sentence: string | null; note: string | null; license: string | null }>();
+  // 태그마다 증거 표의 문장 전부(20차 · 한 행에 한 문장). 메모는 link_only 원천의 우리 말이다.
+  const facts = new Map<string, string[]>();
+  const memos = new Map<string, string>();
+  const linkOnly = new Set<string>();
   let byYear: Record<string, number | null> | null = null;
 
   if (questionId) {
     const [ev, q] = await Promise.all([
-      db.from("ds_question_evidence").select("tag, fact_sentence, note, license").eq("question_id", questionId),
+      db
+        .from("ds_question_evidence")
+        .select("tag, fact_sentence, note, license, fact_subject, fact_year")
+        .eq("question_id", questionId),
       db.from("ds_questions").select("v4_by_year").eq("id", questionId).maybeSingle(),
     ]);
-    for (const r of (ev.data ?? []) as { tag: string | null; fact_sentence: string | null; note: string | null; license: string | null }[]) {
-      if (r.tag) evidence.set(r.tag, r);
+    type EvRow = {
+      tag: string | null;
+      fact_sentence: string | null;
+      note: string | null;
+      license: string | null;
+      fact_subject?: string | null;
+      fact_year?: number | null;
+    };
+    for (const r of (ev.data ?? []) as EvRow[]) {
+      if (!r.tag) continue;
+      if (r.license === "link_only") {
+        linkOnly.add(r.tag);
+        if (r.note) memos.set(r.tag, r.note);
+        continue;
+      }
+      // 대상 · 연도도 카드의 일부다. 초안이 대상 칸을 쓰므로 교차 리뷰도 같이 받아야 한다(20차 실측: 표본 수 오지적 4건).
+      const prefix = r.fact_subject || r.fact_year ? `(대상: ${r.fact_subject ?? "-"}${r.fact_year ? ` · ${r.fact_year}` : ""}) ` : "";
+      for (const line of (r.fact_sentence ?? "").split("\n").map((l) => l.trim()).filter(Boolean)) {
+        const list = facts.get(r.tag) ?? [];
+        if (!list.includes(prefix + line)) list.push(prefix + line);
+        facts.set(r.tag, list);
+      }
     }
     byYear = (q.data?.v4_by_year as Record<string, number | null> | null) ?? null;
   }
@@ -356,12 +387,11 @@ export async function loadFactCards(
     if (s.extKind === "own") {
       return { ...base, content: curveLine(byYear) ?? "", linkOnly: false };
     }
-    if (s.extKind) {
-      const e = s.tag ? evidence.get(s.tag) : undefined;
-      if (e?.license === "link_only") return { ...base, content: e.note ?? "", linkOnly: true };
-      return { ...base, content: e?.fact_sentence ?? "", linkOnly: false };
-    }
-    return { ...base, content: s.abstract ?? "", linkOnly: false };
+    if (s.tag && linkOnly.has(s.tag)) return { ...base, content: memos.get(s.tag) ?? "", linkOnly: true };
+    // 질문의 증거 표에 문장이 있으면 그 문장(사실 카드)을 준다. 없으면(옛 글) 초록을 준다.
+    const card = s.tag ? facts.get(s.tag) : undefined;
+    if (card?.length) return { ...base, content: card.join("\n"), linkOnly: false };
+    return { ...base, content: s.extKind ? "" : (s.abstract ?? ""), linkOnly: false };
   });
 }
 

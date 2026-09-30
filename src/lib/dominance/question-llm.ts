@@ -17,6 +17,7 @@ export async function callJson(
   system: string,
   user: string,
   maxTokens: number,
+  opts: { temperature?: number; usage?: (u: { input: number; output: number }) => void } = {},
 ): Promise<unknown> {
   const apiKey = process.env.ZAI_API_KEY;
   if (!apiKey) {
@@ -28,7 +29,7 @@ export async function callJson(
 
   const response = await client.chat.completions.create({
     model: process.env.ZAI_MODEL || DEFAULT_MODEL,
-    temperature: 0.4,
+    temperature: opts.temperature ?? 0.4,
     max_tokens: maxTokens,
     response_format: { type: "json_object" },
     messages: [
@@ -39,6 +40,7 @@ export async function callJson(
     thinking: { type: "disabled" },
   });
 
+  opts.usage?.({ input: response.usage?.prompt_tokens ?? 0, output: response.usage?.completion_tokens ?? 0 });
   const content = response.choices[0]?.message?.content;
   if (!content) throw new Error("LLM 응답이 비었습니다");
   try {
