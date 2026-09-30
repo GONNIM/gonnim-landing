@@ -41,7 +41,9 @@ export function EvidenceBoard({
   table,
   run,
   letter,
+  usedIds = [],
 }: {
+  usedIds?: string[];
   questionId: string;
   status: QuestionStatus;
   table: EvidenceTable;
@@ -93,8 +95,38 @@ export function EvidenceBoard({
     (s, i, all) => all.findIndex((x) => x.key === s.key) === i,
   );
 
+  // 25차 C · 글에 쓰인 문장(뜻 확인이 필요한 범위)
+  const usedSet = new Set(usedIds);
+  const usedList = SLOTS.flatMap((slot) =>
+    table.slots[slot].flatMap((g) =>
+      g.facts.filter((f) => usedSet.has(`${f.rowId}:${f.line}`)).map((f) => ({ f, slot, tag: g.source.tag, title: g.source.title })),
+    ),
+  );
+  const usedVerified = usedList.filter((x) => x.f.koVerifiedAt).length;
+
   return (
     <div className="space-y-6">
+      {letter && (
+        <section className="space-y-3 rounded-xl border border-amber-500/40 bg-amber-500/5 p-4">
+          <h2 className="text-base font-medium">
+            글에 쓰인 문장 {usedList.length}개 중 확인 {usedVerified}개
+          </h2>
+          <p className="text-xs text-muted-foreground">
+            뜻 확인은 이 문장들만 하시면 됩니다. 나머지 카드 문장은 확인하지 않아도 됩니다(런북 13번).
+          </p>
+          <ol className="space-y-2">
+            {usedList.map(({ f, slot, tag, title }) => (
+              <div key={`${f.rowId}-${f.line}`}>
+                <p className="text-[11px] text-muted-foreground">
+                  {tag} · {SLOT_LABEL[slot]} · {title.slice(0, 80)}
+                </p>
+                <FactRow f={f} slot={slot} questionId={questionId} busy={pending} act={act} />
+              </div>
+            ))}
+          </ol>
+        </section>
+      )}
+
       {/* 막대 두 개 · D37 카드 목표와 재료 네 칸 */}
       <section className="space-y-3 rounded-xl border border-[color:var(--border)]/70 bg-surface/30 p-4">
         <div>

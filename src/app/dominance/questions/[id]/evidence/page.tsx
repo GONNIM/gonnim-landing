@@ -7,6 +7,7 @@ import { notFound } from "next/navigation";
 import { loadEvidence } from "@/lib/dominance/evidence";
 import { dominanceContext } from "@/lib/dominance/guard";
 import { loadQuestion } from "@/lib/dominance/questions";
+import { loadQuestionCard, usedFacts } from "@/lib/dominance/card";
 import { EvidenceBoard } from "./EvidenceBoard";
 
 export const dynamic = "force-dynamic";
@@ -26,6 +27,13 @@ export default async function EvidencePage({ params }: { params: Promise<{ id: s
     .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle<{ id: string; status: string }>();
+  // 25차 C · 글에 쓰인 문장만 뜻을 확인하면 된다. 그 문장들을 맨 위로 올린다.
+  let usedIds: string[] = [];
+  if (letter) {
+    const { data: lb } = await db.from("ds_letters").select("blocks").eq("id", letter.id).single<{ blocks: { text: string }[] }>();
+    const card = await loadQuestionCard(db, id);
+    if (card && lb) usedIds = usedFacts(card, lb.blocks).map((f) => f.id);
+  }
 
   return (
     <div className="space-y-6">
@@ -57,6 +65,7 @@ export default async function EvidencePage({ params }: { params: Promise<{ id: s
         table={table}
         run={q.evidenceRun as never}
         letter={letter ?? null}
+        usedIds={usedIds}
       />
     </div>
   );

@@ -11,6 +11,7 @@ import {
   type Slot,
 } from "./evidence";
 import { loadQuestion, type Question } from "./questions";
+import { extractNumbers } from "./card-check";
 import { sentencesOf, tagsIn } from "./tags";
 
 export type CardFact = {
@@ -181,8 +182,47 @@ export async function numberMismatchesFor(
   return cardNumberMismatches(blocks, card.facts, card.sources.map((x) => ({ tag: x.tag, memo: x.memo })), card.vLine);
 }
 
-/** 글에 쓴 태그 중 뜻이 확인되지 않은 카드 문장 수(24차 B-5) */
+/**
+ * 글에 쓰인 카드 문장(25차 C) · 태그 문장마다 그 태그의 카드 문장 중 가장 가까운 하나를 고른다.
+ * 가까움 = 같은 숫자 수 × 3 + 뜻과 글자 두 자 묶음이 겹치는 비율. 태그에 카드 문장이 하나뿐이면 그것.
+ * 사람이 뜻을 확인할 범위를 "글에 쓰인 8~12문장" 으로 줄이는 데 쓴다.
+ */
+export function usedFacts(card: QuestionCard, blocks: { text: string }[]): CardFact[] {
+  const used = new Map<string, CardFact>();
+  const bigrams = (t: string) => {
+    const x = t.replace(/\[[A-Z]{1,2}[0-9]{0,2}\]/g, "").replace(/\s+/g, "");
+    return new Set(Array.from({ length: Math.max(0, x.length - 1) }, (_, i) => x.slice(i, i + 2)));
+  };
+  for (const b of blocks) {
+    for (const s of sentencesOf(b.text)) {
+      const tags = tagsIn(s.text);
+      if (!tags.length) continue;
+      const sNums = extractNumbers(s.text).map((n) => n.value);
+      const sBi = bigrams(s.text);
+      for (const tag of tags) {
+        const cands = card.facts.filter((f) => f.tag === tag);
+        if (cands.length === 0) continue;
+        let best = cands[0];
+        let bestScore = -1;
+        for (const f of cands) {
+          const fNums = [f.ko ?? "", f.text, f.subject ?? ""].flatMap((t) => extractNumbers(t).map((n) => n.value));
+          const nHit = sNums.filter((v) => fNums.some((c) => Math.abs(c - v) <= Math.abs(c) * 0.06)).length;
+          const fBi = bigrams(f.ko ?? f.text);
+          const inter = [...sBi].filter((x) => fBi.has(x)).length;
+          const score = nHit * 3 + inter / Math.max(1, Math.min(sBi.size, fBi.size));
+          if (score > bestScore) {
+            best = f;
+            bestScore = score;
+          }
+        }
+        used.set(best.id, best);
+      }
+    }
+  }
+  return [...used.values()];
+}
+
+/** 글에 쓰인 카드 문장 중 뜻이 확인되지 않은 수(24차 B-5 · 25차 C-2 · 쓰인 문장 기준) */
 export function unverifiedInLetter(card: QuestionCard, blocks: { text: string }[]): number {
-  const used = new Set(blocks.flatMap((b) => tagsIn(b.text)));
-  return card.facts.filter((f) => used.has(f.tag) && !f.koVerifiedAt).length;
+  return usedFacts(card, blocks).filter((f) => !f.koVerifiedAt).length;
 }
