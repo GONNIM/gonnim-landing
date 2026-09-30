@@ -126,6 +126,8 @@ export async function writeDraftFromCard(
   const meta: DraftMeta = {
     titles: gen.titles,
     glossary: gen.glossary,
+    vMeaning: gen.vMeaning,
+    promptVersion: 4,
     generatedAt: new Date().toISOString(),
     llmCalls: gen.llmCalls,
     ms: gen.ms,

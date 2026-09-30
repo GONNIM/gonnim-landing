@@ -14,6 +14,10 @@ export const DRAFT_BUCKET = "ds-drafts";
 export type DraftMeta = {
   titles: string[];
   glossary: GlossaryItem[];
+  /** [V] 검색어의 뜻 (4판 조건 30) */
+  vMeaning?: string | null;
+  /** 지시문 판 번호 */
+  promptVersion?: number;
   generatedAt: string;
   llmCalls: number;
   ms: { glossary: number; draft: number };

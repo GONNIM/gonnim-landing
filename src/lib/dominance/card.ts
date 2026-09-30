@@ -126,14 +126,18 @@ export async function loadQuestionCard(db: SupabaseClient, questionId: string): 
 }
 
 /** LLM 에 넣는 사용자 메시지. 2판 사용자 메시지와 같은 짜임이다. */
-export function cardPrompt(card: QuestionCard): string {
+export function cardPrompt(card: QuestionCard, vMeaning: string | null = null): string {
   const q = card.question;
   const factLine = (f: CardFact) =>
     `[${f.tag}] (칸: ${SLOT_LABEL[f.slot]} · 대상: ${f.subject ?? "적히지 않음"} · ${f.year ?? "연도 없음"} · 수치 ${
       f.hasNumber === null ? "모름" : f.hasNumber ? "있음" : "없음"
     }) ${f.text}`;
   const facts = card.facts.map(factLine);
-  if (card.vLine) facts.push(`[${V_TAG}] (칸: 낙차 · 대상: 논문 수 · 수치 있음) ${card.vLine}`);
+  if (card.vLine) {
+    // 조건 30 · 검색어의 뜻을 한국어로 함께 준다. 모델은 그 말로 부른다.
+    const meaning = vMeaning ? ` 검색어의 뜻: ${vMeaning}.` : "";
+    facts.push(`[${V_TAG}] (칸: 낙차 · 대상: 논문 수 · 수치 있음) ${card.vLine}${meaning}`);
+  }
 
   const list = card.sources
     .filter((s) => !s.linkOnly)

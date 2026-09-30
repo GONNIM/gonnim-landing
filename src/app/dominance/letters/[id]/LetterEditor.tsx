@@ -375,7 +375,7 @@ function TagLint({ block, cardTags }: { block: LetterBlock; cardTags: string[] }
       {unknown.length > 0 && <p className="text-red-300">카드에 없는 태그: {unknown.map((t) => `[${t}]`).join(" ")}</p>}
       {untagged.map((x, i) => (
         <p key={i} className="text-amber-300">
-          태그 없는 문장 · {x.text}
+          태그 없는 문장(사실이면 태그를 붙이고, 잇는 문장이면 그대로 둡니다) · {x.text}
         </p>
       ))}
     </div>
