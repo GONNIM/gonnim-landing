@@ -161,7 +161,8 @@ export type ReviewCheckCode =
   | "paradox"
   | "sentence_length"
   | "copy40"
-  | "connectives";
+  | "connectives"
+  | "numbers";
 
 export const REVIEW_CHECK_LABEL: Record<ReviewCheckCode, string> = {
   filters: "거절 필터 경고 0건",
@@ -173,6 +174,7 @@ export const REVIEW_CHECK_LABEL: Record<ReviewCheckCode, string> = {
   sentence_length: "60자 넘는 문장 없음",
   copy40: "카드 문장 40자 이상 복제 없음",
   connectives: "인과 · 대조 접속어 확인",
+  numbers: "블록당 수치 3개 이하",
 };
 
 // 앞의 4개는 막고 뒤의 3개는 경고만 한다.
@@ -193,7 +195,7 @@ export type ReviewCheck = {
 };
 
 export type CrossReviewNote = {
-  kind: "unsourced" | "advice" | "coherence";
+  kind: "unsourced" | "advice" | "coherence" | "number_check";
   message: string;
   blockIndex: number | null;
 };

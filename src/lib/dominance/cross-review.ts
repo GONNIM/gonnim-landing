@@ -18,6 +18,8 @@ const SYSTEM_INSTRUCTIONS = `당신은 한국어 연구·보건 뉴스레터의 
 1. unsourced  — 원천 초록에 근거가 없는 사실 주장
 2. advice     — 의학적 지시로 읽힐 문장 ("복용하십시오", "치료됩니다", 용량 제시)
 3. coherence  — 앞뒤 연결이 끊긴 곳
+4. number_check — 아래 "수치 대조" 항목마다 본문 문장이 카드 문장과 **같은 뜻인가**. 다르면 무엇이 다른지 쓴다.
+   특히 "~의 절반이 나오는 양" 을 "위험이 절반으로" 로 바꾸는 것처럼 비율 · 배수의 대상이 바뀐 것을 찾는다.
 
 # 규칙
 - 링크만 있는 원천은 메모에 적힌 사실만 근거로 인정한다.
@@ -25,18 +27,23 @@ const SYSTEM_INSTRUCTIONS = `당신은 한국어 연구·보건 뉴스레터의 
 - 문제가 없으면 빈 배열을 반환한다. 억지로 만들지 않는다.
 - 문장을 고쳐 주지 않는다. 무엇이 문제인지만 한 문장으로 쓴다.
 - 한국어로 쓴다. 조사와 어미를 갖춘 완전한 문장으로 쓴다.
-- 지적은 많아도 6개까지만 한다. 중요한 것부터 쓴다.
+- 지적은 많아도 8개까지만 한다. 중요한 것부터 쓴다. number_check 는 같은 뜻이면 쓰지 않는다.
 
 # 출력 형식 (엄수)
 다른 설명 없이 JSON 만 반환한다.
 { "notes": [ { "kind": "unsourced", "blockIndex": 4, "message": "..." } ] }
+kind 는 unsourced · advice · coherence · number_check 중 하나.
 
 blockIndex 는 본문에 붙은 번호를 그대로 쓴다. 특정할 수 없으면 null 로 둔다.`;
+
+/** 수치 대조 한 항목 · 본문의 "절반 · 배 · %" 문장과 그 태그의 카드 문장(원문 + 확인된 뜻) */
+export type NumberPair = { blockIndex: number; sentence: string; facts: { tag: string; original: string; ko: string | null }[] };
 
 export async function runCrossReview(input: {
   title: string;
   blocks: LetterBlock[];
   cards: FactCard[];
+  numberPairs?: NumberPair[];
 }): Promise<CrossReviewNote[]> {
   const apiKey = process.env.ZAI_API_KEY;
   if (!apiKey) {
@@ -72,7 +79,7 @@ export async function runCrossReview(input: {
       { role: "system", content: SYSTEM_INSTRUCTIONS },
       {
         role: "user",
-        content: `# 사실 카드\n${cards}\n\n# 레터 제목\n${input.title}\n\n# 레터 본문\n${body}`,
+        content: `# 사실 카드\n${cards}\n\n# 레터 제목\n${input.title}\n\n# 레터 본문\n${body}${pairs(input.numberPairs)}`,
       },
     ],
     // @ts-expect-error z.ai 확장 파라미터 · OpenAI SDK 타입에는 없으나 서버는 수용
@@ -85,7 +92,18 @@ export async function runCrossReview(input: {
   return parseNotes(content, input.blocks.length);
 }
 
-const KINDS = new Set(["unsourced", "advice", "coherence"]);
+function pairs(list: NumberPair[] | undefined): string {
+  if (!list?.length) return "";
+  const rows = list.map(
+    (p, i) =>
+      `(${i + 1}) 본문 [${p.blockIndex}] ${p.sentence}\n${p.facts
+        .map((f) => `    카드 [${f.tag}] 원문: ${f.original}\n    카드 [${f.tag}] 확인된 뜻: ${f.ko ?? "(없음)"}`)
+        .join("\n")}`,
+  );
+  return `\n\n# 수치 대조 (number_check · 항목마다 같은 뜻인지)\n${rows.join("\n")}`;
+}
+
+const KINDS = new Set(["unsourced", "advice", "coherence", "number_check"]);
 
 function parseNotes(raw: string, blockCount: number): CrossReviewNote[] {
   const json = raw.trim().replace(/^```(?:json)?\n?|\n?```$/g, "");
@@ -118,11 +136,12 @@ function parseNotes(raw: string, blockCount: number): CrossReviewNote[] {
         },
       ];
     })
-    .slice(0, 6);
+    .slice(0, 8);
 }
 
 export const CROSS_REVIEW_KIND_LABEL: Record<CrossReviewNote["kind"], string> = {
   unsourced: "원천에 없는 주장",
   advice: "의학적 지시로 읽힘",
   coherence: "앞뒤 연결이 끊김",
+  number_check: "수치의 뜻이 카드와 다름",
 };

@@ -4,6 +4,7 @@
 // 뒤의 3개(hook·paradox·sentence_length)는 경고만 한다. 글의 됨됨이는 기계 판단이 틀릴 수 있다.
 
 import { FACTUAL_KINDS, countFlags, flagBlocks, hookIsQuestion } from "./filters";
+import { countNumbers } from "./numbers";
 import { unknownTags } from "./render";
 import {
   BLOCK_ORDER,
@@ -239,6 +240,18 @@ export async function runReviewChecks(input: {
       conn.length === 0
         ? null
         : `${conn.length}문장 · 카드에 그 관계가 적혀 있는지 확인: ${conn.map((c) => `"${c}"`).join(" / ")}`,
+  });
+
+  // 10. 블록당 수치 (경고 · 22차 C-1) · 4개 이상이면 블록 이름과 개수
+  const heavy = blocks
+    .filter((b) => b.kind !== "summary")
+    .map((b) => ({ kind: b.kind, n: countNumbers(b.text) }))
+    .filter((x) => x.n >= 4);
+  checks.push({
+    code: "numbers",
+    passed: true,
+    warning: heavy.length > 0 || undefined,
+    detail: heavy.length === 0 ? null : heavy.map((x) => `${BLOCK_LABEL[x.kind]} ${x.n}개`).join(" · "),
   });
 
   return checks;

@@ -328,6 +328,12 @@ function CardPanel({ card, active }: { card: EditorCard; active: string[] }) {
               >
                 <b className="font-mono">[{f.tag}]</b> {f.subject ? `(${f.subject}${f.year ? ` · ${f.year}` : ""}) ` : ""}
                 {f.text}
+                {/* 22차 C-3 · 켜진 카드는 원문과 확인된 뜻을 함께 보인다 */}
+                {on(f.tag) && f.ko && (
+                  <span className="mt-1 block text-foreground/90">
+                    뜻{f.koVerifiedAt ? "(확인됨)" : "(미확인)"} · {f.ko}
+                  </span>
+                )}
               </p>
             ))}
             {linkOnly.map((s) => (

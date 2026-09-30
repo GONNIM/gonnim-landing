@@ -6,7 +6,7 @@ import { dominanceContext } from "@/lib/dominance/guard";
 import { dominanceLetterUrl } from "@/lib/dominance/db";
 import { loadFactCards, loadLetterSources } from "@/lib/dominance/letters";
 import { runCrossReview } from "@/lib/dominance/cross-review";
-import { loadCardSentences } from "@/lib/dominance/card";
+import { loadCardSentences, loadQuestionCard, numberPairs } from "@/lib/dominance/card";
 import { isReviewPassable, linkCheckUrls, runReviewChecks } from "@/lib/dominance/review";
 import { toEmailHtml, toPayload, toPlainText } from "@/lib/dominance/render";
 import type {
@@ -59,6 +59,10 @@ export async function requestCrossReview(
       title: letter.title,
       blocks: letter.blocks,
       cards: await loadFactCards(db, letter.question_id, sources),
+      // 22차 C-2 · "절반 · 배 · %" 문장은 카드 원문 · 확인된 뜻과 따로 대조한다
+      numberPairs: letter.question_id
+        ? numberPairs(letter.blocks, (await loadQuestionCard(db, letter.question_id))!)
+        : undefined,
     });
   } catch (err) {
     return { notes: [], error: err instanceof Error ? err.message : String(err) };
