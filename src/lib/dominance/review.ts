@@ -5,6 +5,7 @@
 
 import { FACTUAL_KINDS, countFlags, flagBlocks, hookIsQuestion } from "./filters";
 import { countNumbers } from "./numbers";
+import { sentencesOf } from "./tags";
 import { unknownTags } from "./render";
 import {
   BLOCK_ORDER,
@@ -252,6 +253,19 @@ export async function runReviewChecks(input: {
     passed: true,
     warning: heavy.length > 0 || undefined,
     detail: heavy.length === 0 ? null : heavy.map((x) => `${BLOCK_LABEL[x.kind]} ${x.n}개`).join(" · "),
+  });
+
+  // 11. 태그 없는 문장의 숫자 (경고 · 23차 B-1) · 잇는 문장에 사실이 새는 것을 잡는다(연도는 세지 않음)
+  const leaks = blocks.flatMap((b) =>
+    sentencesOf(b.text)
+      .map((x) => x.text)
+      .filter((t) => !/\[[A-Z]{1,2}[0-9]{0,2}\]/.test(t) && countNumbers(t) > 0),
+  );
+  checks.push({
+    code: "untagged_numbers",
+    passed: true,
+    warning: leaks.length > 0 || undefined,
+    detail: leaks.length === 0 ? null : `${leaks.length}문장: ${leaks.map((t) => `"${t}"`).join(" / ")}`,
   });
 
   return checks;
