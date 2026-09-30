@@ -9,6 +9,7 @@ import type { GlossaryItem } from "@/lib/dominance/draft-card";
 import { SLOTS, SLOT_LABEL } from "@/lib/dominance/evidence";
 import { FACTUAL_KINDS } from "@/lib/dominance/filters";
 import { sentencesOf, tagsIn } from "@/lib/dominance/tags";
+import type { NumberMismatch } from "@/lib/dominance/card-check";
 
 export type EditorCard = {
   questionId: string;
@@ -44,7 +45,9 @@ export function LetterEditor({
   sources,
   card,
   meta,
+  initialMismatches = [],
 }: {
+  initialMismatches?: NumberMismatch[];
   letterId: string;
   status: LetterStatus;
   initialTitle: string;
@@ -63,6 +66,8 @@ export function LetterEditor({
   const [message, setMessage] = useState<string | null>(null);
   // 본문에서 누른 문장의 태그 · 왼쪽 카드에서 켜진다.
   const [active, setActive] = useState<string[]>([]);
+  // 24차 A-6 · 저장할 때마다 카드 수치 대조 결과가 온다
+  const [mismatches, setMismatches] = useState<NumberMismatch[]>(initialMismatches);
 
   const readOnly = status !== "draft";
   const flagCount = blocks.reduce((n, b) => n + (b.flags?.length ?? 0), 0);
@@ -81,6 +86,7 @@ export function LetterEditor({
       return;
     }
     setBlocks(res.blocks);
+    setMismatches(res.mismatches);
     setSavedAt(res.savedAt);
     setMessage(null);
   }, [letterId]);
@@ -258,6 +264,13 @@ export function LetterEditor({
               className="mt-2 w-full resize-y rounded-lg border border-[color:var(--border)]/50 bg-background/60 px-3 py-2 text-sm leading-relaxed text-foreground read-only:opacity-70"
             />
             {card && <TagLint block={b} cardTags={card.tags} />}
+            {mismatches
+              .filter((m) => m.blockIndex === i)
+              .map((m, j) => (
+                <p key={j} className="mt-1 text-xs text-red-300">
+                  카드와 수치가 다름({m.numbers.join(" · ")}) · {m.sentence}
+                </p>
+              ))}
           </section>
         ))}
 

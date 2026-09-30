@@ -5,7 +5,9 @@ import { dominanceContext } from "@/lib/dominance/guard";
 import { countFlags, flagBlocks } from "@/lib/dominance/filters";
 import { saveLetterBody } from "@/lib/dominance/letters";
 import type { GlossaryItem } from "@/lib/dominance/draft-card";
-import { tagsIn } from "@/lib/dominance/tags";
+import { normalizePunct, tagsIn } from "@/lib/dominance/tags";
+import { numberMismatchesFor } from "@/lib/dominance/card";
+import type { NumberMismatch } from "@/lib/dominance/card-check";
 import { readDraftMeta, writeDraftMeta } from "@/lib/dominance/draft-store";
 import type { LetterBlock } from "@/lib/dominance/types";
 
@@ -19,13 +21,22 @@ async function withTagSources(db: Db, letterId: string, blocks: LetterBlock[]): 
   const { data } = await db.from("ds_letters").select("question_id").eq("id", letterId).maybeSingle<{ question_id: string | null }>();
   if (!data?.question_id) return blocks;
   return blocks.map((b) => {
-    const tags = tagsIn(b.text);
-    return { ...b, sourceIds: tags.length ? tags : undefined };
+    // 24차 B-2 · 전각 마침표 · 물음표를 반각으로
+    const text = normalizePunct(b.text);
+    const tags = tagsIn(text);
+    return { ...b, text, sourceIds: tags.length ? tags : undefined };
   });
+}
+
+async function questionOf(db: Db, letterId: string): Promise<string | null> {
+  const { data } = await db.from("ds_letters").select("question_id").eq("id", letterId).maybeSingle<{ question_id: string | null }>();
+  return data?.question_id ?? null;
 }
 
 export type SaveResult = {
   blocks: LetterBlock[];
+  /** 카드 수치 대조에서 어긋난 문장(24차 A-6) · 저장은 막지 않는다 */
+  mismatches: NumberMismatch[];
   flagCount: number;
   savedAt: string;
   error: string | null;
@@ -47,6 +58,7 @@ export async function saveLetter(
 
   return {
     blocks,
+    mismatches: await numberMismatchesFor(db, await questionOf(db, letterId), blocks),
     flagCount: countFlags(blocks),
     savedAt: new Date().toISOString(),
     error: error?.message ?? null,

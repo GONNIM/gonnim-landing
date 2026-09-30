@@ -167,3 +167,22 @@ export function numberPairs(
   });
   return out;
 }
+
+/** 편집기 · 저장 때 도는 카드 수치 대조(24차 A-6). 질문이 없는 옛 글은 빈 배열. */
+export async function numberMismatchesFor(
+  db: SupabaseClient,
+  questionId: string | null,
+  blocks: { text: string }[],
+): Promise<import("./card-check").NumberMismatch[]> {
+  if (!questionId) return [];
+  const card = await loadQuestionCard(db, questionId);
+  if (!card) return [];
+  const { cardNumberMismatches } = await import("./card-check");
+  return cardNumberMismatches(blocks, card.facts, card.sources.map((x) => ({ tag: x.tag, memo: x.memo })), card.vLine);
+}
+
+/** 글에 쓴 태그 중 뜻이 확인되지 않은 카드 문장 수(24차 B-5) */
+export function unverifiedInLetter(card: QuestionCard, blocks: { text: string }[]): number {
+  const used = new Set(blocks.flatMap((b) => tagsIn(b.text)));
+  return card.facts.filter((f) => used.has(f.tag) && !f.koVerifiedAt).length;
+}

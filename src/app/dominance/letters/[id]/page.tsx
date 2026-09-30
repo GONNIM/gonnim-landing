@@ -4,7 +4,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { dominanceContext } from "@/lib/dominance/guard";
 import { loadLetterSources } from "@/lib/dominance/letters";
-import { loadQuestionCard } from "@/lib/dominance/card";
+import { loadQuestionCard, numberMismatchesFor, unverifiedInLetter } from "@/lib/dominance/card";
 import { readDraftMeta } from "@/lib/dominance/draft-store";
 import {
   LETTER_STATUS_LABEL,
@@ -46,6 +46,9 @@ export default async function LetterEditPage({
   // 질문에서 나온 글(20차)은 왼쪽에 사실 카드를 둔다. 옛 글은 원천 초록을 둔다.
   const card = data.question_id ? await loadQuestionCard(db, data.question_id) : null;
   const meta = data.question_id ? await readDraftMeta(db, id) : null;
+  const mismatches = await numberMismatchesFor(db, data.question_id, data.blocks);
+  // 24차 B-5 · 확인되지 않은 뜻으로 만든 초안이면 맨 위에 표시. 운영자가 뜻을 확인하면 사라진다.
+  const unverified = card ? unverifiedInLetter(card, data.blocks) : 0;
 
   return (
     <div className="space-y-6">
@@ -85,6 +88,12 @@ export default async function LetterEditPage({
         </div>
       </section>
 
+      {unverified > 0 && (
+        <p className="rounded-lg border border-amber-500/60 bg-amber-500/10 p-3 text-sm text-amber-200">
+          확인 전 초안 · 뜻 {unverified}개 미확인. 증거 표에서 뜻을 확인하시면 이 표시가 사라집니다.
+        </p>
+      )}
+
       {data.status !== "draft" && (
         <p className="rounded-lg border border-[color:var(--border)]/70 bg-surface/40 p-3 text-sm text-muted-foreground">
           이 글은 이미 리뷰 단계로 올라갔습니다. 고치시려면 리뷰 화면에서 [수정으로
@@ -110,6 +119,7 @@ export default async function LetterEditPage({
               }
             : null
         }
+        initialMismatches={mismatches}
         meta={meta ? { titles: meta.titles, glossary: meta.glossary, generatedAt: meta.generatedAt, generation: meta.generation } : null}
       />
     </div>
