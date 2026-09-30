@@ -13,7 +13,11 @@ import { AREAS, type Area } from "./questions";
 const DEFAULT_MODEL = "glm-5.2";
 const DEFAULT_BASE_URL = "https://api.z.ai/api/paas/v4";
 
-async function callJson(system: string, user: string, maxTokens: number): Promise<unknown> {
+export async function callJson(
+  system: string,
+  user: string,
+  maxTokens: number,
+): Promise<unknown> {
   const apiKey = process.env.ZAI_API_KEY;
   if (!apiKey) {
     const err = new Error("ZAI_API_KEY 없음 · LLM 을 부를 수 없습니다");

@@ -73,12 +73,25 @@ export type V2Reason = {
   reason: string;
 };
 
+/** [빈 칸 채우기] 결과 · 운영자가 저장하기 전까지 "제안" 으로 보인다. */
+export type Suggested = {
+  premise?: string;
+  twist?: string;
+  queries?: string[];
+  area?: string;
+  series?: string;
+  at: string;
+};
+
 /** 4단계 SQL 이 칸으로 만드는 값. SQL 전에는 work_note 메타 줄에 산다. */
 export type QuestionExt = {
   area?: string | null;
   created_via?: CreatedVia | null;
   source_input?: string | null;
   v2_reasons?: V2Reason[] | null;
+  suggested?: Suggested | null;
+  /** ② [증거 모으기] 결과 요약 (collect.ts 의 EvidenceRun) */
+  evidence_run?: unknown;
 };
 
 export type Question = {
@@ -108,8 +121,12 @@ export type Question = {
   createdVia: CreatedVia | null;
   sourceInput: string | null;
   v2Reasons: V2Reason[] | null;
+  suggested: Suggested | null;
+  evidenceRun: unknown;
   /** 재료 네 칸 중 증거가 들어 있는 칸 수 */
   slotsFilled: number;
+  /** 사실 카드 문장 수 (D37 목표 22) */
+  factCount: number;
 };
 
 const BASE_COLUMNS = `
@@ -117,7 +134,7 @@ const BASE_COLUMNS = `
   v1_papers_5y, v1_reviews, v2_relevant_of_5, v3_evidence_ok, v4_by_year, v4_ratio,
   v5_wiki_en_30d, v5_wiki_ko_30d, v6_medlineplus_topics, checked_at, created_at, adopted_at
 `;
-const EXT_COLUMNS = "area, created_via, source_input, v2_reasons";
+const EXT_COLUMNS = "area, created_via, source_input, v2_reasons, suggested, evidence_run";
 
 // ── work_note 메타 줄 ─────────────────────────────────────────────────────────
 // 형식: 사람 메모 + 줄바꿈 + "⟦meta⟧" + JSON 한 줄. SQL 의 옮기기 문장이 같은 표시를 찾는다.
@@ -177,9 +194,11 @@ type Row = {
   created_via?: CreatedVia | null;
   source_input?: string | null;
   v2_reasons?: V2Reason[] | null;
+  suggested?: Suggested | null;
+  evidence_run?: unknown;
 };
 
-function toQuestion(r: Row, slotsFilled: number): Question {
+function toQuestion(r: Row, counts: { slots: number; facts: number }): Question {
   const { memo, meta } = splitNote(r.work_note);
   return {
     id: r.id,
@@ -208,7 +227,10 @@ function toQuestion(r: Row, slotsFilled: number): Question {
     createdVia: r.created_via ?? meta.created_via ?? null,
     sourceInput: r.source_input ?? meta.source_input ?? null,
     v2Reasons: r.v2_reasons ?? meta.v2_reasons ?? null,
-    slotsFilled,
+    suggested: r.suggested ?? meta.suggested ?? null,
+    evidenceRun: r.evidence_run ?? meta.evidence_run ?? null,
+    slotsFilled: counts.slots,
+    factCount: counts.facts,
   };
 }
 
@@ -235,7 +257,7 @@ export async function loadQuestions(db: SupabaseClient): Promise<LoadedQuestions
     rows.map((r) => r.id),
   );
   return {
-    questions: rows.map((r) => toQuestion(r, slots.get(r.id) ?? 0)),
+    questions: rows.map((r) => toQuestion(r, slots.get(r.id) ?? { slots: 0, facts: 0 })),
     extColumns: ext,
     error: null,
   };
@@ -253,26 +275,29 @@ export async function loadQuestion(
     .maybeSingle();
   if (!data) return null;
   const slots = await loadSlotCounts(db, [id]);
-  return toQuestion(data as unknown as Row, slots.get(id) ?? 0);
+  return toQuestion(data as unknown as Row, slots.get(id) ?? { slots: 0, facts: 0 });
 }
 
 async function loadSlotCounts(
   db: SupabaseClient,
   ids: string[],
-): Promise<Map<string, number>> {
-  const out = new Map<string, number>();
+): Promise<Map<string, { slots: number; facts: number }>> {
+  const out = new Map<string, { slots: number; facts: number }>();
   if (ids.length === 0) return out;
   const { data } = await db
     .from("ds_question_evidence")
-    .select("question_id, slot")
+    .select("question_id, slot, fact_sentence")
     .in("question_id", ids);
   const seen = new Map<string, Set<string>>();
-  for (const r of (data ?? []) as { question_id: string; slot: string }[]) {
+  for (const r of (data ?? []) as { question_id: string; slot: string; fact_sentence: string | null }[]) {
     const s = seen.get(r.question_id) ?? new Set<string>();
     s.add(r.slot);
     seen.set(r.question_id, s);
+    const c = out.get(r.question_id) ?? { slots: 0, facts: 0 };
+    c.facts += (r.fact_sentence ?? "").split("\n").filter((l) => l.trim()).length;
+    out.set(r.question_id, c);
   }
-  for (const [id, s] of seen) out.set(id, s.size);
+  for (const [id, s] of seen) out.get(id)!.slots = s.size;
   return out;
 }
 
