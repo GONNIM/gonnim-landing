@@ -47,17 +47,19 @@ const SEXUAL_KO = /(사정|발기|귀두|수간|시오후키|생식_기관|유�
 
 // 29일 시험의 영역 규칙(최종판) 그대로 · 순서대로 처음 맞는 것. 수면 · 노화·장수 두 줄만 더했다(36차).
 const AREA_RULES: [string, RegExp][] = [
-  ["AI·미래", /(인공지능|\bai\b|gpt|openai|anthropic|앤트로픽|제미나이|언어_모델|딥페이크|artificial|\bjev\b|turing|computer|컴퓨터|월드_와이드_웹|p_versus|amodei)/i],
+  ["AI·미래", /(인공지능|\bai\b|gpt|openai|anthropic|앤트로픽|제미나이|언어_모델|딥페이크|artificial|\bjev\b|turing|computer|컴퓨터|월드_와이드_웹|p_versus|amodei|brockman)/i],
   ["우주·시간", /(행성|위성|항성|우주|^달$|달_착륙|아폴로|천문|planet|space|telescope|starship|^earth$|third planet|moon|astronaut|베텔게우스|로먼)/i],
-  ["몸의 고장", /(병|질환|disease|hydrocephalus|glomerulo|쿠루|health_effects|abnormal)/i],
+  ["몸의 고장", /(병|질환|disease|hydrocephalus|glomerulo|쿠루|health_effects|abnormal|생리_현상|생리 현상)/i],
   ["수면", /(수면|불면|\bsleep|insomnia|circadian|melatonin|멜라토닌)/i],
   ["노화·장수", /(노화|장수|수명|\baging\b|ageing|longevity|senescence|lifespan)/i],
   ["뇌·정신", /(mbti|심리|뇌신경|미주신경|psych|neuroscien|daydream|stanford_prison)/i],
-  ["음식", /(요리|야키니쿠|토마토|비타민|카페인|bread|khat|mitragyna)/i],
-  ["진화", /(species|동물|포유류|곤충|어류|mammal|octopus|\beel\b|beetle|potoo|^cat$|고양이|너구리|삵|오소리|상어|말벌|빈대|돼지풀|gastropod|식물종|tilcayo)/i],
-  ["건강·의학", /(의학|의약|아스피린|허준|이국종|체액|ibogaine|dimethylmercury|physician)/i],
+  ["음식", /(요리|야키니쿠|토마토|비타민|카페인|bread|khat|mitragyna|음식|열매)/i],
+  ["진화", /(species|동물|포유류|곤충|어류|mammal|octopus|\beel\b|beetle|potoo|^cat$|고양이|너구리|삵|오소리|상어|말벌|빈대|돼지풀|gastropod|식물종|식물의 종|tilcayo|fishes|taxonom)/i],
+  ["건강·의학", /(의학|의약|아스피린|허준|이국종|체액|ibogaine|dimethylmercury|physician|biomedical|exercise scien)/i],
+  // 37차: 첫 주 "분류되지 않음" 25개를 보고 낱말을 더함(brockman · 생리 현상 · 음식 · 열매 · 식물의 종 · fishes · taxonom ·
+  //   biomedical · exercise scien · 생명공학 · 생물학자 · 기후 · polygon · science communicator).
   // 예전 최종판은 여기서 "." 로 나머지를 모두 생활 궁금증으로 보냈다. 36차는 예전 1판의 명시 규칙만 쓴다.
-  ["생활 궁금증", /(지진|화산|태풍|hurricane|volcano|niño|climate|chernobyl|misti|체르노빌|polymorph|원소|주기율|periodic|물리|화학|수학|physicist|mathemat|chemist|과학자|퀴리|아인슈타인|뉴턴|갈릴레이|오펜하이머|양자|millennium|perelman|hawking|einstein|oppenheimer|장영실|계산화학|생명과학)/i],
+  ["생활 궁금증", /(지진|화산|태풍|hurricane|volcano|niño|climate|chernobyl|misti|체르노빌|polymorph|원소|주기율|periodic|물리|화학|수학|physicist|mathemat|chemist|과학자|퀴리|아인슈타인|뉴턴|갈릴레이|오펜하이머|양자|millennium|perelman|hawking|einstein|oppenheimer|장영실|계산화학|생명과학|생명공학|생물학자|기후|polygon|science communicator)/i],
 ];
 
 export type Lang = "ko" | "en";
