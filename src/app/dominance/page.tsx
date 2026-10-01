@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { dominanceContext } from "@/lib/dominance/guard";
 import { loadLatestNeeds } from "@/lib/dominance/needs";
-import { kstToday, formatKstDate, formatKstDateTime } from "@/lib/dominance/kst";
+import { kstToday, formatKstDate, formatKstDateTime, hoursSince } from "@/lib/dominance/kst";
 import { isMissingSchema, SchemaNotice } from "@/lib/dominance/schema-guard";
 import {
   LETTER_STATUS_LABEL,
@@ -43,9 +43,7 @@ export default async function DominanceHome() {
     .limit(1)
     .maybeSingle();
 
-  const staleHours = lastRun
-    ? Math.floor((Date.now() - Date.parse(lastRun.started_at)) / 3_600_000)
-    : null;
+  const staleHours = lastRun ? Math.floor(hoursSince(lastRun.started_at)) : null;
 
   // ① 이슈는 질문 단위다(D24). 옛 후보(ds_candidates)는 기록 화면에서만 본다.
   const { data: questionRows } = await db.from("ds_questions").select("status");

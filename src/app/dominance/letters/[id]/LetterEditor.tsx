@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { finishWriting, saveGlossary, saveLetter } from "./actions";
 import { BLOCK_LABEL, type LetterBlock, type LetterStatus } from "@/lib/dominance/types";
@@ -74,8 +74,11 @@ export function LetterEditor({
   const emptyCount = blocks.filter((b) => !b.text.trim()).length;
 
   // 최신 값을 타이머 콜백에서 읽기 위한 통로. 타이머를 값마다 다시 걸지 않는다.
+  // 그리는 중에 ref 를 쓰지 않도록 화면 반영 직후(useLayoutEffect)에 넣는다. 사용자 입력보다 먼저 끝난다.
   const latest = useRef({ title, summary, blocks });
-  latest.current = { title, summary, blocks };
+  useLayoutEffect(() => {
+    latest.current = { title, summary, blocks };
+  });
 
   const persist = useCallback(async () => {
     setBusy(true);

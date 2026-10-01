@@ -34,7 +34,6 @@ const SELF_CHECKS = [
 export function ReviewPanel({
   letterId,
   status,
-  title,
   summary,
   blocks,
   sources,

@@ -106,7 +106,7 @@ export type LetterBlock = {
   sourceIds?: string[];
 };
 
-// 리뷰 화면의 자동 점검 7항목. blocking 이 하나라도 남으면 [리뷰 통과] 가 잠긴다.
+// 리뷰 화면의 자동 점검 12항목. blocking 이 하나라도 남으면 [리뷰 통과] 가 잠긴다.
 export type ReviewCheckCode =
   | "filters"
   | "blocks"
@@ -136,8 +136,8 @@ export const REVIEW_CHECK_LABEL: Record<ReviewCheckCode, string> = {
   metaphor_facts: "은유 블록에 사실 문장 없음",
 };
 
-// 앞의 4개는 막고 뒤의 3개는 경고만 한다.
-// 앞의 4개는 틀리면 사실 관계나 저작권 문제가 되고, 뒤의 3개는 기계 판단이 틀릴 수 있다.
+// 12항목 가운데 막는 4개(앞의 4개)만 막고 나머지 8개는 경고만 한다.
+// 앞의 4개는 틀리면 사실 관계나 저작권 문제가 되고, 나머지 8개는 기계 판단이 틀릴 수 있다.
 export const BLOCKING_REVIEW_CHECKS: ReviewCheckCode[] = [
   "filters",
   "blocks",

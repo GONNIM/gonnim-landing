@@ -40,3 +40,8 @@ export function formatKstDateTime(iso: string | null): string {
     timeZone: "Asia/Seoul",
   });
 }
+
+/** 그 시각부터 지금까지 몇 시간인가(소수). 화면 컴포넌트 밖에서 지금 시각을 읽게 하려고 둔다. */
+export function hoursSince(iso: string, now: number = Date.now()): number {
+  return (now - Date.parse(iso)) / 3_600_000;
+}

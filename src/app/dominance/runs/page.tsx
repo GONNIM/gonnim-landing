@@ -7,7 +7,7 @@
 // "빠진 날짜가 있나". 원본 앱은 실패한 것이 아니라 아무도 이것을 안 봐서 죽었다.
 
 import { dominanceContext } from "@/lib/dominance/guard";
-import { formatKstDateTime, kstDateAfter } from "@/lib/dominance/kst";
+import { formatKstDateTime, hoursSince, kstDateAfter } from "@/lib/dominance/kst";
 import { isMissingSchema, SchemaNotice } from "@/lib/dominance/schema-guard";
 
 export const dynamic = "force-dynamic";
@@ -78,10 +78,8 @@ export default async function DominanceRuns() {
   const runs = (data ?? []) as Run[];
   const last = runs[0];
 
-  const hoursSince = last
-    ? (Date.now() - Date.parse(last.started_at)) / 3_600_000
-    : null;
-  const stale = hoursSince === null || hoursSince > STALE_HOURS;
+  const sinceHours = last ? hoursSince(last.started_at) : null;
+  const stale = sinceHours === null || sinceHours > STALE_HOURS;
 
   const ran = new Set(runs.map((r) => r.run_date));
   const missing: string[] = [];
@@ -107,8 +105,8 @@ export default async function DominanceRuns() {
               className={`text-sm font-medium ${stale ? "text-red-200" : "text-emerald-200"}`}
             >
               {stale
-                ? `마지막 실행이 ${Math.floor(hoursSince!)}시간 전입니다. ${STALE_HOURS}시간을 넘겼습니다.`
-                : `마지막 실행 ${formatKstDateTime(last.started_at)} · ${Math.floor(hoursSince!)}시간 전입니다.`}
+                ? `마지막 실행이 ${Math.floor(sinceHours!)}시간 전입니다. ${STALE_HOURS}시간을 넘겼습니다.`
+                : `마지막 실행 ${formatKstDateTime(last.started_at)} · ${Math.floor(sinceHours!)}시간 전입니다.`}
             </p>
             <p className="mt-1 text-xs text-muted-foreground">{last.summary}</p>
           </>
