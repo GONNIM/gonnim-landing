@@ -11,10 +11,10 @@ import { isReviewPassable, linkCheckUrls, runReviewChecks } from "@/lib/dominanc
 import { toEmailHtml, toPayload, toPlainText } from "@/lib/dominance/render";
 import type {
   CrossReviewNote,
+  CrossReviewRun,
   LetterBlock,
   ReviewChecks,
 } from "@/lib/dominance/types";
-import { MODEL_MAIN } from "@/lib/dominance/llm";
 import { readDraftMeta } from "@/lib/dominance/draft-store";
 
 type LetterRow = {
@@ -47,17 +47,19 @@ async function loadLetter(
 /** 교차 리뷰는 돈이 든다. 결과를 review_checks 에 넣어 두고 다시 부르지 않는다. */
 export async function requestCrossReview(
   letterId: string,
-): Promise<{ notes: CrossReviewNote[]; error: string | null }> {
+): Promise<{ notes: CrossReviewNote[]; runs: CrossReviewRun[]; error: string | null }> {
   const { db } = await dominanceContext();
 
   const letter = await loadLetter(db, letterId);
-  if (!letter) return { notes: [], error: "글을 찾지 못했습니다" };
+  if (!letter) return { notes: [], runs: [], error: "글을 찾지 못했습니다" };
 
   const sources = await loadLetterSources(db, letterId);
 
   let notes: CrossReviewNote[];
+  let runs: CrossReviewRun[];
   try {
-    notes = await runCrossReview({
+    // D47 · main 과 light 를 동시에 부르고 의견을 합친다
+    ({ notes, runs } = await runCrossReview({
       title: letter.title,
       blocks: letter.blocks,
       // 30차 B · [V] 카드에 검색어의 뜻을 붙인다
@@ -66,9 +68,9 @@ export async function requestCrossReview(
       numberPairs: letter.question_id
         ? numberPairs(letter.blocks, (await loadQuestionCard(db, letter.question_id))!)
         : undefined,
-    });
+    }));
   } catch (err) {
-    return { notes: [], error: err instanceof Error ? err.message : String(err) };
+    return { notes: [], runs: [], error: err instanceof Error ? err.message : String(err) };
   }
 
   const checks = await runReviewChecks({
@@ -82,6 +84,7 @@ export async function requestCrossReview(
   const snapshot: ReviewChecks = {
     checks,
     crossReview: notes,
+    crossReviewRuns: runs,
     checkedAt: new Date().toISOString(),
   };
 
@@ -93,13 +96,15 @@ export async function requestCrossReview(
   await db.from("ds_letter_audit").insert({
     letter_id: letterId,
     event: "cross_review",
-    model: MODEL_MAIN,
+    // D47 · 두 모델 이름과 각 비용(prompt_input.runs)
+    model: runs.map((r) => r.model).join(" + "),
+    prompt_input: { runs, totalCost: runs.reduce((n, r) => n + (r.cost ?? 0), 0) },
     raw_output: JSON.stringify(notes),
     passed: notes.length === 0,
   });
 
   revalidatePath(`/dominance/review/${letterId}`);
-  return { notes, error: null };
+  return { notes, runs, error: null };
 }
 
 /** [내게 테스트 발송] · 구독자에게 가지 않는다. 관리자 주소로만 보낸다. */

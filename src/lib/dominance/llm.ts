@@ -22,6 +22,20 @@ const GROQ_MODEL = "openai/gpt-oss-120b";
 const GROQ_BASE_URL = "https://api.groq.com/openai/v1";
 
 export type Tier = "main" | "light";
+
+/** 가격 · 백만 토큰당 달러(docs.z.ai 가격표 · 2026-10-01 확인). 감사 기록의 비용 계산용 · 캐시 할인은 빼고 센다 */
+const PRICE: Record<string, { input: number; output: number }> = {
+  "glm-5.3": { input: 1.4, output: 4.4 },
+  "glm-5.3-flash": { input: 0.15, output: 0.5 },
+  "glm-5.3-flashx": { input: 0.37, output: 1.25 },
+  "glm-5.2": { input: 1.4, output: 4.4 },
+};
+
+/** 한 호출의 추정 비용(달러). 가격표에 없는 모델이면 null */
+export function costOf(u: { input: number; output: number; model: string }): number | null {
+  const p = PRICE[u.model];
+  return p ? (u.input * p.input + u.output * p.output) / 1e6 : null;
+}
 export type Provider = "zai" | "groq";
 export type Usage = { input: number; output: number; reasoning: number; model: string; ms: number };
 

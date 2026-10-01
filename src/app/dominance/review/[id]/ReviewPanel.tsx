@@ -10,6 +10,7 @@ import {
   BLOCK_LABEL,
   REVIEW_CHECK_LABEL,
   type CrossReviewNote,
+  type CrossReviewRun,
   type LetterBlock,
   type LetterStatus,
   type ReviewCheck,
@@ -39,6 +40,7 @@ export function ReviewPanel({
   sources,
   checks,
   savedCrossReview,
+  savedRuns = null,
 }: {
   letterId: string;
   status: LetterStatus;
@@ -48,6 +50,8 @@ export function ReviewPanel({
   sources: Source[];
   checks: ReviewCheck[];
   savedCrossReview: CrossReviewNote[] | null;
+  /** D47 · 모델별 실행 기록(실패 표시용) */
+  savedRuns?: CrossReviewRun[] | null;
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -55,6 +59,7 @@ export function ReviewPanel({
   const [notes, setNotes] = useState<CrossReviewNote[] | null>(
     savedCrossReview,
   );
+  const [runs, setRuns] = useState<CrossReviewRun[] | null>(savedRuns);
   const [ticked, setTicked] = useState<boolean[]>(SELF_CHECKS.map(() => false));
   const [reason, setReason] = useState("");
   const [message, setMessage] = useState<string | null>(null);
@@ -91,6 +96,7 @@ export function ReviewPanel({
         return;
       }
       setNotes(result.notes);
+      setRuns(result.runs);
       setMessage(
         result.notes.length === 0
           ? "교차 리뷰가 지적할 것을 찾지 못했습니다."
@@ -191,7 +197,8 @@ export function ReviewPanel({
         <section className="rounded-lg border border-[color:var(--border)]/70 bg-surface/30 p-4">
           <h2 className="text-sm font-medium">자동 점검</h2>
           <p className="mt-1 text-xs text-muted-foreground">
-            🔴 표시는 통과를 막습니다. ⚠️ 표시는 알려만 드립니다.
+            🔴 표시는 통과를 막습니다. ⚠️ 표시는 알려만 드립니다. ‘참고’ 항목은 기계 초안의 기준이며,
+            사람이 편집한 글은 막는 4개와 교차 리뷰로 판정합니다(D49).
           </p>
           <ul className="mt-3 space-y-2">
             {checks.map((c) => {
@@ -218,6 +225,12 @@ export function ReviewPanel({
                     >
                       {REVIEW_CHECK_LABEL[c.code]}
                     </span>
+                    {/* D49 · 경고 8개(5~12번)는 사람 편집본에 참고치다 */}
+                    {!hard && (
+                      <span className="shrink-0 rounded bg-[color:var(--muted)]/30 px-1 text-[10px] text-muted-foreground">
+                        참고
+                      </span>
+                    )}
                   </div>
                   {c.detail && (
                     <p className="ml-6 mt-0.5 break-words text-[11px] text-muted-foreground">
@@ -243,9 +256,17 @@ export function ReviewPanel({
             </button>
           </div>
           <p className="mt-1 text-xs text-muted-foreground">
-            같은 모델에게 다른 지시문으로 한 번 더 묻습니다. 의견만 받고 글은
+            두 모델(main · light)에게 다른 지시문으로 동시에 묻고 의견을 합칩니다(D47). 의견만 받고 글은
             고치지 않습니다.
           </p>
+          {runs?.some((r) => !r.ok) && (
+            <p className="mt-2 text-[11px] text-red-300">
+              {runs
+                .filter((r) => !r.ok)
+                .map((r) => `${r.tier}(${r.model}) 호출 실패 · 다른 모델의 의견만 보입니다: ${r.error}`)
+                .join(" / ")}
+            </p>
+          )}
           {notes === null ? (
             <p className="mt-3 text-xs text-muted-foreground">
               아직 요청하지 않았습니다.
@@ -264,10 +285,20 @@ export function ReviewPanel({
                   <p className="text-[10px] font-semibold text-amber-300">
                     {CROSS_REVIEW_KIND_LABEL[n.kind]}
                     {n.blockIndex !== null && ` · 블록 [${n.blockIndex}]`}
+                    {n.models && (
+                      <span className="ml-1 font-normal text-muted-foreground">
+                        · {n.models.length === 2 ? "두 모델" : n.models[0]}
+                      </span>
+                    )}
                   </p>
                   <p className="mt-0.5 text-xs leading-relaxed text-foreground/85">
                     {n.message}
                   </p>
+                  {n.otherMessage && (
+                    <p className="mt-0.5 text-[11px] leading-relaxed text-muted-foreground">
+                      light: {n.otherMessage}
+                    </p>
+                  )}
                 </li>
               ))}
             </ul>

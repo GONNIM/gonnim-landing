@@ -157,11 +157,31 @@ export type CrossReviewNote = {
   kind: "unsourced" | "advice" | "coherence" | "number_check";
   message: string;
   blockIndex: number | null;
+  /** D47 · 이 의견을 낸 모델. 두 모델이 같은 문장을 짚었으면 둘 다. 옛 기록에는 없다 */
+  models?: ("main" | "light")[];
+  /** D47 · 두 모델이 합쳐진 의견에서 light 쪽 문장(message 는 main 쪽) */
+  otherMessage?: string;
+};
+
+/** D47 · 교차 리뷰 한 모델의 실행 기록(감사 기록 · 화면 실패 표시) */
+export type CrossReviewRun = {
+  tier: "main" | "light";
+  model: string;
+  ok: boolean;
+  error: string | null;
+  notes: number;
+  input: number;
+  output: number;
+  reasoning: number;
+  ms: number;
+  cost: number | null;
 };
 
 export type ReviewChecks = {
   checks: ReviewCheck[];
   crossReview: CrossReviewNote[];
+  /** D47 · 모델별 실행 기록 */
+  crossReviewRuns?: CrossReviewRun[];
   checkedAt: string;
 };
 

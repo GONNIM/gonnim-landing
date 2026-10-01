@@ -119,6 +119,7 @@ export default async function ReviewDetailPage({
         }))}
         checks={checks}
         savedCrossReview={data.review_checks?.crossReview ?? null}
+        savedRuns={data.review_checks?.crossReviewRuns ?? null}
       />
     </div>
   );
