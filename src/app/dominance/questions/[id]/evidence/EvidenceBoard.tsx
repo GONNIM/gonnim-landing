@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useTransition, createContext, useContext } from "react";
 import { useRouter } from "next/navigation";
 import type { EvidenceRun } from "@/lib/dominance/collect-types";
 import {
@@ -35,6 +35,9 @@ import {
 
 const input = "rounded-md border border-[color:var(--border)] bg-background px-2 py-1 text-xs text-foreground";
 
+// 33차 F · 원문마다 초록의 바로 앞 문장(id "<행>:<줄>" → 문장). FactRow 가 읽는다.
+const PrevContext = createContext<Record<string, string>>({});
+
 export function EvidenceBoard({
   questionId,
   status,
@@ -42,8 +45,10 @@ export function EvidenceBoard({
   run,
   letter,
   usedIds = [],
+  prevById = {},
 }: {
   usedIds?: string[];
+  prevById?: Record<string, string>;
   questionId: string;
   status: QuestionStatus;
   table: EvidenceTable;
@@ -105,6 +110,7 @@ export function EvidenceBoard({
   const usedVerified = usedList.filter((x) => x.f.koVerifiedAt).length;
 
   return (
+    <PrevContext.Provider value={prevById}>
     <div className="space-y-6">
       {letter && (
         <section className="space-y-3 rounded-xl border border-amber-500/40 bg-amber-500/5 p-4">
@@ -193,6 +199,7 @@ export function EvidenceBoard({
         />
       ))}
     </div>
+    </PrevContext.Provider>
   );
 }
 
@@ -363,8 +370,11 @@ function FactRow({ f, slot, questionId, busy, act }: { f: Fact; slot: Slot; ques
   const [subject, setSubject] = useState(f.subject ?? "");
   const [ko, setKo] = useState(f.ko ?? "");
   const changed = ko.trim() !== (f.ko ?? "");
+  const prev = useContext(PrevContext)[`${f.rowId}:${f.line}`];
   return (
     <li className="rounded-lg border border-[color:var(--border)]/50 p-2.5">
+      {/* 33차 F · 지시어(these cases 등)가 맞게 풀렸는지 보려고 초록의 바로 앞 문장을 보인다 */}
+      {prev && <p className="mb-1 text-[11px] leading-relaxed text-muted-foreground">앞 문장: {prev}</p>}
       <p className="text-sm text-foreground">{f.text}</p>
       {/* D44 · 확인된 뜻. 초안은 이 칸만 받는다. 미확인은 노랑 */}
       <div className={`mt-2 rounded-md border p-2 ${f.koVerifiedAt && !changed ? "border-emerald-500/40" : "border-amber-500/50 bg-amber-500/5"}`}>

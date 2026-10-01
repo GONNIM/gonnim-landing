@@ -4,7 +4,8 @@
 
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { loadEvidence } from "@/lib/dominance/evidence";
+import { loadEvidence, SLOTS } from "@/lib/dominance/evidence";
+import { prevSentence } from "@/lib/dominance/prev-sentence";
 import { dominanceContext } from "@/lib/dominance/guard";
 import { loadQuestion } from "@/lib/dominance/questions";
 import { loadQuestionCard, usedFacts } from "@/lib/dominance/card";
@@ -33,6 +34,22 @@ export default async function EvidencePage({ params }: { params: Promise<{ id: s
     const { data: lb } = await db.from("ds_letters").select("blocks").eq("id", letter.id).single<{ blocks: { text: string }[] }>();
     const card = await loadQuestionCard(db, id);
     if (card && lb) usedIds = usedFacts(card, lb.blocks).map((f) => f.id);
+  }
+
+  // 33차 F · 원문마다 초록의 바로 앞 문장(지시어 확인용 · LLM 없음)
+  const groups = SLOTS.flatMap((s) => table.slots[s]);
+  const paperIds = [...new Set(groups.map((g) => g.source.paperId).filter((x): x is string => !!x))];
+  const { data: papers } = paperIds.length
+    ? await db.from("ds_papers").select("id, abstract").in("id", paperIds)
+    : { data: [] };
+  const abstractOf = new Map(((papers ?? []) as { id: string; abstract: string | null }[]).map((p) => [p.id, p.abstract]));
+  const prevById: Record<string, string> = {};
+  for (const g of groups) {
+    if (!g.source.paperId) continue;
+    for (const f of g.facts) {
+      const p = prevSentence(abstractOf.get(g.source.paperId), f.text);
+      if (p) prevById[`${f.rowId}:${f.line}`] = p;
+    }
   }
 
   return (
@@ -66,6 +83,7 @@ export default async function EvidencePage({ params }: { params: Promise<{ id: s
         run={q.evidenceRun as never}
         letter={letter ?? null}
         usedIds={usedIds}
+        prevById={prevById}
       />
     </div>
   );
