@@ -14,7 +14,7 @@ export function FieldsEditor({
   marks?: Partial<Record<keyof IssueFields, boolean>>;
 }) {
   const tag = (k: keyof IssueFields) =>
-    marks[k] ? <span className="ml-1 rounded bg-amber-500/20 px-1 text-[10px] text-amber-200">제안</span> : null;
+    marks[k] ? <span className="ml-1 rounded bg-amber-500/20 px-1 text-[10px] text-amber-700 dark:text-amber-200">제안</span> : null;
   const input =
     "w-full rounded-md border border-[color:var(--border)] bg-background px-2.5 py-1.5 text-sm text-foreground";
   const set = (k: keyof IssueFields, v: string) => onChange({ ...f, [k]: v });
@@ -73,18 +73,21 @@ export function Btn({
   onClick,
   disabled,
   accent,
+  title,
 }: {
   children: React.ReactNode;
   onClick: () => void;
   disabled?: boolean;
   accent?: boolean;
+  /** 마우스를 올리면 보이는 글자. 잠긴 단추에서도 보이도록 바깥 span 에 붙인다(39차 B). */
+  title?: string;
 }) {
-  return (
+  const button = (
     <button
       type="button"
       onClick={onClick}
       disabled={disabled}
-      className={`rounded-md border px-2.5 py-1 text-xs disabled:opacity-40 ${
+      className={`shrink-0 whitespace-nowrap rounded-md border px-2.5 py-1 text-xs disabled:opacity-40 ${title ? "disabled:pointer-events-none" : ""} ${
         accent
           ? "border-[color:var(--accent)] text-foreground hover:bg-[color:var(--accent)]/10"
           : "border-[color:var(--border)] text-foreground/85 hover:border-[color:var(--accent)]"
@@ -92,5 +95,12 @@ export function Btn({
     >
       {children}
     </button>
+  );
+  return title ? (
+    <span title={title} className="inline-flex shrink-0">
+      {button}
+    </span>
+  ) : (
+    button
   );
 }

@@ -344,7 +344,18 @@ export function QuestionBoard({ questions, signal = null }: { questions: Questio
                       <Btn onClick={() => validateMany([q.id])} disabled={busy || running.has(q.id)}>
                         {running.has(q.id) ? "검증 중…" : "검증"}
                       </Btn>
-                      <Btn onClick={() => setStatus(q.id, "adopted")} disabled={busy || !canAdopt(q)} accent>
+                      <Btn
+                        onClick={() => setStatus(q.id, "adopted")}
+                        disabled={busy || !canAdopt(q)}
+                        accent
+                        title={
+                          q.status !== "validated"
+                            ? "검증 통과가 아닙니다"
+                            : q.v3EvidenceOk !== true
+                              ? "V3 논문이 없습니다"
+                              : undefined
+                        }
+                      >
                         채택
                       </Btn>
                       <Btn onClick={() => setStatus(q.id, "rejected")} disabled={busy}>
@@ -441,7 +452,7 @@ function Card({ q }: { q: Question }) {
           <ul className="mt-1 space-y-1">
             {q.v2Reasons.map((r) => (
               <li key={r.id} className="text-muted-foreground">
-                <span className={r.relevant ? "text-emerald-300" : "text-red-300"}>{r.relevant ? "관련" : "무관"}</span>{" "}
+                <span className={r.relevant ? "text-emerald-700 dark:text-emerald-300" : "text-red-700 dark:text-red-300"}>{r.relevant ? "관련" : "무관"}</span>{" "}
                 · {r.year ?? "—"} · {r.license ?? "라이선스 없음"} ·{" "}
                 <a
                   href={`https://europepmc.org/article/${r.id}`}
@@ -546,7 +557,7 @@ function SuggestedBlock({ q }: { q: Question }) {
   ].filter(Boolean) as [string, string][];
   return (
     <div className="mt-2 rounded-lg border border-dashed border-amber-500/50 p-2 text-xs">
-      <p className="text-amber-200">제안 · 아직 저장하지 않았습니다. [고치기]에서 확인하고 저장하십시오.</p>
+      <p className="text-amber-700 dark:text-amber-200">제안 · 아직 저장하지 않았습니다. [고치기]에서 확인하고 저장하십시오.</p>
       {rows.map(([k, v]) => (
         <p key={k} className="mt-0.5 text-foreground/80">
           {k} · {v}

@@ -195,8 +195,8 @@ export function ScheduleCalendar({
                           }
                           className={`rounded px-1 py-0.5 text-[10px] leading-snug ${
                             row.status === "published"
-                              ? "bg-emerald-500/15 text-emerald-200"
-                              : "cursor-grab bg-sky-500/15 text-sky-200"
+                              ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-200"
+                              : "cursor-grab bg-sky-500/15 text-sky-700 dark:text-sky-200"
                           }`}
                         >
                           <Link
@@ -210,7 +210,7 @@ export function ScheduleCalendar({
                               type="button"
                               onClick={() => onUnapprove(row.id)}
                               disabled={pending}
-                              className="mt-0.5 text-[9px] text-sky-300/70 hover:text-sky-200 disabled:opacity-50"
+                              className="mt-0.5 text-[9px] text-sky-700/70 dark:text-sky-300/70 hover:text-sky-700 dark:hover:text-sky-200 disabled:opacity-50"
                             >
                               승인 취소
                             </button>
@@ -224,16 +224,22 @@ export function ScheduleCalendar({
                             ·
                           </span>
                         ) : (
-                          <button
-                            type="button"
-                            onClick={() =>
-                              setPicking(picking === date ? null : date)
-                            }
-                            disabled={pool.length === 0}
-                            className="w-full rounded border border-dashed border-[color:var(--border)]/60 py-1 text-[11px] text-muted-foreground hover:border-[color:var(--accent)] hover:text-foreground disabled:opacity-40"
+                          // 39차 B · 잠긴 단추에서도 이유가 보이도록 바깥 span 에 title 을 붙인다
+                          <span
+                            className="block"
+                            title={pool.length === 0 ? "리뷰를 통과한 글이 없습니다" : undefined}
                           >
-                            ＋
-                          </button>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setPicking(picking === date ? null : date)
+                              }
+                              disabled={pool.length === 0}
+                              className="w-full rounded border border-dashed border-foreground/30 py-1 text-sm font-medium text-foreground/70 hover:border-[color:var(--accent)] hover:text-foreground disabled:pointer-events-none disabled:opacity-60"
+                            >
+                              ＋
+                            </button>
+                          </span>
                         ))}
                     </div>
 
@@ -260,12 +266,12 @@ export function ScheduleCalendar({
       </section>
 
       {notice && (
-        <p className="rounded-md border border-emerald-500/40 bg-emerald-500/10 p-2.5 text-xs text-emerald-200">
+        <p className="rounded-md border border-emerald-500/40 bg-emerald-500/10 p-2.5 text-xs text-emerald-700 dark:text-emerald-200">
           {notice}
         </p>
       )}
       {error && (
-        <p className="rounded-md border border-red-500/40 bg-red-500/10 p-2.5 text-xs text-red-200">
+        <p className="rounded-md border border-red-500/40 bg-red-500/10 p-2.5 text-xs text-red-700 dark:text-red-200">
           {error}
         </p>
       )}
@@ -478,16 +484,16 @@ function ApprovalDialog({
           {links === null ? (
             <span className="text-muted-foreground">확인 중…</span>
           ) : links.ok ? (
-            <span className="text-emerald-300">
+            <span className="text-emerald-700 dark:text-emerald-300">
               {links.detail} ({formatKstDateTime(links.checkedAt)})
             </span>
           ) : (
-            <span className="text-red-300">{links.detail}</span>
+            <span className="text-red-700 dark:text-red-300">{links.detail}</span>
           )}
         </p>
 
-        {message && <p className="text-xs text-emerald-300">{message}</p>}
-        {error && <p className="text-xs text-red-300">{error}</p>}
+        {message && <p className="text-xs text-emerald-700 dark:text-emerald-300">{message}</p>}
+        {error && <p className="text-xs text-red-700 dark:text-red-300">{error}</p>}
 
         <div className="flex flex-wrap gap-2">
           <button
