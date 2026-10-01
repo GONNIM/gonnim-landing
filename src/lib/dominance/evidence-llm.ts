@@ -33,6 +33,7 @@ export const KO_RULES = `# 한국어 뜻(ko) 규칙 (D44)
 - **원문의 권고 · 가능성 표현(should · may · might · suggest)은 결과로 바꾸지 않는다.** "~해야 한다" · "~일 수 있다" 로 남긴다.
 - 원문에 없는 한정어를 붙이지 않는다(예: "general obesity" 를 "비복부 비만" 으로 쓰지 않는다).
 - **odds(ratio)는 "가능성", risk · hazard 는 "위험".** 둘을 섞지 않는다(25차).
+- 가능성 비(odds ratio · OR)는 '가능성 비 N' 또는 'N배' 로 옮긴다. '%' 로 옮기지 않는다. 위험비(hazard ratio · HR)는 그대로 '위험비 N' 으로 옮긴다(34차 · D48).
 - **대상과 연도를 문장 안에 넣는다.** 예: "2022년 메타분석에서 성인 47,471명 중 …".`;
 
 export type Assignment = {
