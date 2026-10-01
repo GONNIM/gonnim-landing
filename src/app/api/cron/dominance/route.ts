@@ -1,11 +1,11 @@
 // 지배상식 크론 하나 · 하루 1회. vercel.json 의 "0 22 * * *" UTC = 07시 KST.
 //
-// 다섯 단계를 순서대로 돈다. 쪼개지 않는 이유는 Hobby 도 300초를 쓰고,
+// 단계를 순서대로 돈다(수집 → 발행 → 성과 확인 → 수신거부 반영 → 경보 → 기록). 쪼개지 않는 이유는 Hobby 도 300초를 쓰고,
 // arXiv 의 3초 대기와 LLM 호출이 과금 CPU 시간에 들어가지 않기 때문이다.
 //
 // 앞 단계가 실패해도 뒤 단계를 멈추지 않는다. 수집이 실패했다고 오늘 발행이
 // 막히면 안 된다 — 발행할 글은 이미 며칠 전에 승인이 끝나 있다.
-// 대신 실패는 전부 모아 5단계 경보 메일로 나간다.
+// 대신 실패는 전부 모아 4단계 경보 메일로 나간다.
 //
 // 끝나면 결과를 ds_cron_runs 에 남기고 하트비트를 찌른다. Vercel Hobby 는 크론
 // 실패를 알려주지 않고 로그를 1시간만 보관하므로, 이 경로가 스스로 흔적을
@@ -16,11 +16,6 @@ import type { NextRequest } from "next/server";
 
 import { gatherAlerts, sendAlertEmail, type Alert } from "@/lib/dominance/alerts";
 import { fetchBroadcastState, pullResendUnsubscribes } from "@/lib/dominance/broadcast";
-import { buildCandidates } from "@/lib/dominance/candidates";
-
-// 논문 단위 후보 생성 스위치. 다시 켜지 않는다 — 4단계 크론 개편(질문 × 새 논문 대조)이 대신한다.
-const CANDIDATES_ENABLED = false;
-const CANDIDATES_STOPPED_NOTE = "후보 생성 중단(D24 · 2026-09-29)";
 import { getDominanceClient } from "@/lib/dominance/db";
 import { pingHeartbeat } from "@/lib/dominance/heartbeat";
 import { kstDateAfter, kstToday } from "@/lib/dominance/kst";
@@ -70,29 +65,7 @@ export async function GET(req: NextRequest) {
     steps.collect = { error: String(err) };
   }
 
-  // 2. 후보 생성 — 중단(D24 · 2026-09-29). 논문 단위 후보는 더 만들지 않는다.
-  //    질문 단위 절차(4단계)가 이 자리를 대신할 때까지 호출만 막는다. 코드는 남겨 둔다.
-  let inserted = 0;
-  if (!CANDIDATES_ENABLED) {
-    steps.candidates = { skipped: CANDIDATES_STOPPED_NOTE };
-  } else try {
-    const built = await buildCandidates(db, { date: today });
-    inserted = built.inserted;
-    steps.candidates = {
-      inserted: built.inserted,
-      trustRejected: built.trustRejected,
-      errors: built.errors,
-    };
-    for (const e of built.errors) {
-      extraAlerts.push({ code: "step", title: "후보 생성 경고", detail: e });
-    }
-  } catch (err) {
-    failedSteps.push("후보 생성");
-    extraAlerts.push(fail("후보 생성", err));
-    steps.candidates = { error: String(err) };
-  }
-
-  // 3. 발행 · 오늘 날짜가 붙은 승인된 글만
+  // 2. 발행 · 오늘 날짜가 붙은 승인된 글만
   let publishedCount = 0;
   let heldForNoAudience = 0;
   try {
@@ -129,8 +102,8 @@ export async function GET(req: NextRequest) {
     steps.publish = { error: String(err) };
   }
 
-  // 4. 성과 확인 · 어제 발행분이 실제로 나갔는지.
-  //    열람률은 Resend API 에 없으므로 읽지 않는다 (broadcast.ts 주석 참고).
+  // 3. 성과 확인 · 어제 발행분이 실제로 나갔는지.
+  //    열람 · 클릭은 Resend API 에 없다. 웹훅으로 센다(독자 반응 4층 · reactions.ts).
   try {
     steps.stats = await syncYesterdayState(db);
   } catch (err) {
@@ -139,7 +112,7 @@ export async function GET(req: NextRequest) {
     steps.stats = { error: String(err) };
   }
 
-  // 4-2. 수신거부 반영 · 발행 메일의 수신거부 링크(Resend)를 원장에 옮긴다. 발행이 없는 날에도 한다.
+  // 3-2. 수신거부 반영 · 발행 메일의 수신거부 링크(Resend)를 원장에 옮긴다. 발행이 없는 날에도 한다.
   try {
     const pulled = await pullResendUnsubscribes(db);
     steps.unsubscribes = pulled;
@@ -152,11 +125,11 @@ export async function GET(req: NextRequest) {
     steps.unsubscribes = { error: String(err) };
   }
 
-  // 5. 경보
+  // 4. 경보
   const alerts = [...extraAlerts, ...(await gatherAlerts(db, reports))];
   const mail = await sendAlertEmail(alerts);
 
-  // 6. 기록과 하트비트.
+  // 5. 기록과 하트비트.
   //    원천에서 한 건도 못 받은 것은 예외가 없어도 고장이다 — 주소 규칙이 바뀌면
   //    수집기는 조용히 0건을 돌려준다. 그것이 원본 앱을 죽인 모습이다.
   const found = reports.reduce((sum, r) => sum + r.found, 0);
@@ -167,7 +140,7 @@ export async function GET(req: NextRequest) {
     failedSteps.length === 0 ? "success" : failedSteps.length >= 4 ? "failed" : "partial";
 
   const summary =
-    `수집 ${found}건(신규 ${newRows}) · ${CANDIDATES_ENABLED ? `후보 ${inserted}건` : CANDIDATES_STOPPED_NOTE} · 발행 ${publishedCount}편 · 경보 ${alerts.length}건` +
+    `수집 ${found}건(신규 ${newRows}) · 발행 ${publishedCount}편 · 경보 ${alerts.length}건` +
     (failedSteps.length > 0 ? ` · 실패 ${failedSteps.join(", ")}` : "") +
     (sourcesDead ? " · 원천 전부 0건" : "") +
     (heldForNoAudience ? ` · 구독자 0명 · 발행 보류 · 글 ${heldForNoAudience}건` : "") +

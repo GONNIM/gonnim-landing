@@ -48,55 +48,7 @@ export const LICENSE_LABEL: Record<string, string> = {
   public_domain: "퍼블릭 도메인",
 };
 
-// operations.md 의 5축. 흥미가 가장 무겁다(30).
-export const SCORE_WEIGHTS = {
-  interest: 30,
-  gap: 25,
-  body: 20,
-  industry: 15,
-  trust: 10,
-} as const;
-
-export type ScoreAxis = keyof typeof SCORE_WEIGHTS;
-
-export const AXIS_LABEL: Record<ScoreAxis, string> = {
-  interest: "흥미",
-  gap: "정보 격차",
-  body: "내 몸",
-  industry: "산업 연결",
-  trust: "신뢰",
-};
-
-// 흥미 축의 하위 신호. 역설이 가장 강하다.
-export const INTEREST_SIGNAL_WEIGHTS = {
-  paradox: 12,
-  counterintuitive: 8,
-  number: 6,
-  name: 4,
-} as const;
-
-export type InterestSignal = keyof typeof INTEREST_SIGNAL_WEIGHTS;
-
-export const INTEREST_SIGNAL_LABEL: Record<InterestSignal, string> = {
-  paradox: "역설",
-  counterintuitive: "반직관",
-  number: "놀라운 수치",
-  name: "아는 이름",
-};
-
-export type ScoreBreakdown = {
-  interest: {
-    value: number;
-    why: string;
-    // 이 연구가 깨는 통설을 한 문장으로. 훅 블록의 재료가 된다.
-    paradoxLine: string | null;
-    signals: Partial<Record<InterestSignal, number>>;
-  };
-  gap: { value: number; why: string };
-  body: { value: number; why: string };
-  industry: { value: number; why: string };
-  trust: { value: number; why: string };
-};
+// 옛 5축 점수(흥미 · 정보 격차 · 내 몸 · 산업 · 신뢰)는 27차 E-1 에 지웠다. ds_candidates 의 기록에만 남는다.
 
 export type CandidateRow = {
   id: string;
@@ -106,7 +58,8 @@ export type CandidateRow = {
   headline: string;
   hook: string | null;
   score: number;
-  score_breakdown: ScoreBreakdown | null;
+  /** 옛 5축 점수 기록 · 읽지 않는다 */
+  score_breakdown: unknown;
   state: CandidateState;
   excluded_reason: string | null;
   created_at: string;
