@@ -112,9 +112,9 @@ function Heading() {
 }
 
 const TONE = {
-  emerald: "border-emerald-500/30 text-emerald-200",
-  amber: "border-amber-500/30 text-amber-200",
-  sky: "border-sky-500/30 text-sky-200",
+  emerald: "border-emerald-500/30 text-emerald-700 dark:text-emerald-200",
+  amber: "border-amber-500/30 text-amber-700 dark:text-amber-200",
+  sky: "border-sky-500/30 text-sky-700 dark:text-sky-200",
   muted: "border-[color:var(--border)] text-muted-foreground",
 } as const;
 

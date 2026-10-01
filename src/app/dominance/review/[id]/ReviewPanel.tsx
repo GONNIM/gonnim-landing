@@ -153,7 +153,7 @@ export function ReviewPanel({
               {b.flags?.map((f) => (
                 <span
                   key={f}
-                  className="rounded bg-red-500/20 px-1.5 py-0.5 text-[10px] text-red-300"
+                  className="rounded bg-red-500/20 px-1.5 py-0.5 text-[10px] text-red-700 dark:text-red-300"
                 >
                   {f}
                 </span>
@@ -169,7 +169,7 @@ export function ReviewPanel({
           <h2 className="text-xs font-semibold text-foreground/85">원천</h2>
           <ul className="mt-2 space-y-1.5">
             {sources.length === 0 ? (
-              <li className="text-xs text-red-300">
+              <li className="text-xs text-red-700 dark:text-red-300">
                 원천이 하나도 연결되지 않았습니다.
               </li>
             ) : (
@@ -215,10 +215,10 @@ export function ReviewPanel({
                       className={
                         bad
                           ? hard
-                            ? "text-red-300"
-                            : "text-amber-300"
+                            ? "text-red-700 dark:text-red-300"
+                            : "text-amber-700 dark:text-amber-300"
                           : soft
-                            ? "text-amber-300"
+                            ? "text-amber-700 dark:text-amber-300"
                             : "text-foreground/85"
                       }
                     >
@@ -259,7 +259,7 @@ export function ReviewPanel({
             고치지 않습니다.
           </p>
           {runs?.some((r) => !r.ok) && (
-            <p className="mt-2 text-[11px] text-red-300">
+            <p className="mt-2 text-[11px] text-red-700 dark:text-red-300">
               {runs
                 .filter((r) => !r.ok)
                 .map((r) => `${r.tier}(${r.model}) 호출 실패 · 다른 모델의 의견만 보입니다: ${r.error}`)
@@ -271,7 +271,7 @@ export function ReviewPanel({
               아직 요청하지 않았습니다.
             </p>
           ) : notes.length === 0 ? (
-            <p className="mt-3 text-xs text-emerald-300">
+            <p className="mt-3 text-xs text-emerald-700 dark:text-emerald-300">
               지적할 것을 찾지 못했습니다.
             </p>
           ) : (
@@ -281,7 +281,7 @@ export function ReviewPanel({
                   key={i}
                   className="rounded border-l-2 border-amber-500/60 bg-amber-950/20 px-2.5 py-1.5"
                 >
-                  <p className="text-[10px] font-semibold text-amber-300">
+                  <p className="text-[10px] font-semibold text-amber-700 dark:text-amber-300">
                     {CROSS_REVIEW_KIND_LABEL[n.kind]}
                     {n.blockIndex !== null && ` · 블록 [${n.blockIndex}]`}
                     {n.models && (
@@ -366,7 +366,7 @@ export function ReviewPanel({
               type="button"
               onClick={onRevert}
               disabled={pending}
-              className="mt-2 w-full rounded-md border border-amber-500/50 px-3 py-1.5 text-xs text-amber-200 hover:bg-amber-500/10 disabled:opacity-50"
+              className="mt-2 w-full rounded-md border border-amber-500/50 px-3 py-1.5 text-xs text-amber-700 dark:text-amber-200 hover:bg-amber-500/10 disabled:opacity-50"
             >
               수정으로 되돌리기
             </button>
@@ -380,12 +380,12 @@ export function ReviewPanel({
         </section>
 
         {message && (
-          <p className="rounded-md border border-emerald-500/40 bg-emerald-500/10 p-2.5 text-xs text-emerald-200">
+          <p className="rounded-md border border-emerald-500/40 bg-emerald-500/10 p-2.5 text-xs text-emerald-700 dark:text-emerald-200">
             {message}
           </p>
         )}
         {error && (
-          <p className="rounded-md border border-red-500/40 bg-red-500/10 p-2.5 text-xs text-red-200">
+          <p className="rounded-md border border-red-500/40 bg-red-500/10 p-2.5 text-xs text-red-700 dark:text-red-200">
             {error}
           </p>
         )}

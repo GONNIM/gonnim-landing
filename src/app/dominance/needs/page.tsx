@@ -60,7 +60,7 @@ export default async function NeedsPage() {
             {week.descMissing ? ` · 설명을 못 받은 문서 ${week.descMissing}개는 빠짐` : ""}
           </p>
         ) : (
-          <p className="mt-2 text-xs text-amber-300">아직 수집한 주가 없습니다. 월요일 07:30(KST) 크론이 첫 주를 만듭니다.</p>
+          <p className="mt-2 text-xs text-amber-700 dark:text-amber-300">아직 수집한 주가 없습니다. 월요일 07:30(KST) 크론이 첫 주를 만듭니다.</p>
         )}
       </section>
 

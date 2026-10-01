@@ -233,10 +233,10 @@ function Banner({
 }) {
   const style =
     tone === "amber"
-      ? "border-amber-500/30 bg-amber-950/10 text-amber-200"
+      ? "border-amber-500/30 bg-amber-950/10 text-amber-700 dark:text-amber-200"
       : tone === "red"
-        ? "border-red-500/40 bg-red-950/20 text-red-200"
-        : "border-violet-500/30 bg-violet-950/10 text-violet-200";
+        ? "border-red-500/40 bg-red-950/20 text-red-700 dark:text-red-200"
+        : "border-violet-500/30 bg-violet-950/10 text-violet-700 dark:text-violet-200";
   return (
     <section className={`rounded-xl border p-5 ${style}`}>
       <p className="text-sm font-medium">{text}</p>

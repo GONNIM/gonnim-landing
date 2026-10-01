@@ -32,7 +32,7 @@ export default async function QuestionsPage({ searchParams }: { searchParams: Pr
         {isMissingSchema(error as never) ? (
           <SchemaNotice file="db/2026-09-28-dominance-questions.sql" hint="" />
         ) : (
-          <p className="text-sm text-red-300">질문을 읽지 못했습니다: {error.message}</p>
+          <p className="text-sm text-red-700 dark:text-red-300">질문을 읽지 못했습니다: {error.message}</p>
         )}
       </div>
     );

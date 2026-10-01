@@ -73,7 +73,7 @@ export default async function ReviewDetailPage({
               {readingMinutes(data.blocks)}분
             </span>
             {data.revision_count > 0 && (
-              <span className="text-xs text-amber-300/80">
+              <span className="text-xs text-amber-700/80 dark:text-amber-300/80">
                 되돌린 횟수 {data.revision_count}회
               </span>
             )}

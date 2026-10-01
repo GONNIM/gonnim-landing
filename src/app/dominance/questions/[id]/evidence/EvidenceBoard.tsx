@@ -256,7 +256,7 @@ function RunSummary({ run }: { run: EvidenceRun }) {
           </ul>
         </div>
       )}
-      {run.errors.length > 0 && <p className="text-red-300">{run.errors.join(" / ")}</p>}
+      {run.errors.length > 0 && <p className="text-red-700 dark:text-red-300">{run.errors.join(" / ")}</p>}
     </div>
   );
 }
@@ -286,7 +286,7 @@ function SlotSection({
         {SLOT_LABEL[slot]}{" "}
         <span className="text-sm text-muted-foreground">
           원천 {groups.length} · 문장 {facts} ·{" "}
-          <span className={verified < facts ? "text-amber-300" : "text-emerald-300"}>
+          <span className={verified < facts ? "text-amber-700 dark:text-amber-300" : "text-emerald-700 dark:text-emerald-300"}>
             확인 {verified} / {facts}
           </span>
         </span>
@@ -357,7 +357,7 @@ function SourceCard({
             if (window.confirm(`${s.tag ?? ""} 원천을 ${SLOT_LABEL[slot]} 칸에서 뺍니다. 이 칸의 문장 ${g.facts.length}개도 함께 빠집니다.`))
               act(() => removeSourceAction(questionId, slot, s.key), "원천을 뺐습니다");
           }}
-          className="text-xs text-muted-foreground hover:text-red-300"
+          className="text-xs text-muted-foreground hover:text-red-700 dark:hover:text-red-300"
         >
           이 칸에서 원천 빼기
         </button>
@@ -387,7 +387,7 @@ function FactRow({ f, slot, questionId, busy, act }: { f: Fact; slot: Slot; ques
           aria-label="확인된 뜻"
         />
         <div className="mt-1 flex items-center gap-2 text-xs">
-          <span className={f.koVerifiedAt && !changed ? "text-emerald-300" : "text-amber-300"}>
+          <span className={f.koVerifiedAt && !changed ? "text-emerald-700 dark:text-emerald-300" : "text-amber-700 dark:text-amber-300"}>
             {f.koVerifiedAt && !changed ? `확인됨 ${f.koVerifiedAt.slice(0, 10)}` : changed ? "고침 · 아직 확인 안 됨" : "확인 안 됨"}
           </span>
           <button
@@ -423,10 +423,10 @@ function FactRow({ f, slot, questionId, busy, act }: { f: Fact; slot: Slot; ques
             className={`${input} w-44`}
           />
         </label>
-        {f.peripheral && <span className="rounded bg-amber-500/20 px-1 text-amber-300" title="관련도 1 · 질문의 한쪽만 다룬다">주변</span>}
+        {f.peripheral && <span className="rounded bg-amber-500/20 px-1 text-amber-700 dark:text-amber-300" title="관련도 1 · 질문의 한쪽만 다룬다">주변</span>}
         <span>연도 {f.year ?? "—"}</span>
         <span>수치 {f.hasNumber === null ? "—" : f.hasNumber ? "있음" : "없음"}</span>
-        <span className={f.verifiedAt ? "text-emerald-300" : ""}>
+        <span className={f.verifiedAt ? "text-emerald-700 dark:text-emerald-300" : ""}>
           {f.verifiedAt
             ? `원문 대조 ✓ ${f.sourcePart ? SOURCE_PART_LABEL[f.sourcePart] : ""} · ${f.verifiedAt.slice(0, 10)}`
             : "대조 기록 없음"}
@@ -448,7 +448,7 @@ function FactRow({ f, slot, questionId, busy, act }: { f: Fact; slot: Slot; ques
           type="button"
           disabled={busy}
           onClick={() => window.confirm("이 문장을 뺍니다.") && act(() => deleteFactAction(questionId, f.rowId, f.line), "문장을 뺐습니다")}
-          className="hover:text-red-300"
+          className="hover:text-red-700 dark:hover:text-red-300"
         >
           삭제
         </button>

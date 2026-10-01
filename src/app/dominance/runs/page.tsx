@@ -34,9 +34,9 @@ type Run = {
 };
 
 const STATUS_STYLE: Record<Run["status"], string> = {
-  success: "bg-emerald-500/15 text-emerald-300",
-  partial: "bg-amber-500/15 text-amber-200",
-  failed: "bg-red-500/15 text-red-300",
+  success: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300",
+  partial: "bg-amber-500/15 text-amber-700 dark:text-amber-200",
+  failed: "bg-red-500/15 text-red-700 dark:text-red-300",
 };
 
 const STATUS_LABEL: Record<Run["status"], string> = {
@@ -102,7 +102,7 @@ export default async function DominanceRuns() {
         {last ? (
           <>
             <p
-              className={`text-sm font-medium ${stale ? "text-red-200" : "text-emerald-200"}`}
+              className={`text-sm font-medium ${stale ? "text-red-700 dark:text-red-200" : "text-emerald-700 dark:text-emerald-200"}`}
             >
               {stale
                 ? `마지막 실행이 ${Math.floor(sinceHours!)}시간 전입니다. ${STALE_HOURS}시간을 넘겼습니다.`
@@ -111,7 +111,7 @@ export default async function DominanceRuns() {
             <p className="mt-1 text-xs text-muted-foreground">{last.summary}</p>
           </>
         ) : (
-          <p className="text-sm font-medium text-red-200">
+          <p className="text-sm font-medium text-red-700 dark:text-red-200">
             기록이 한 건도 없습니다. 크론이 아직 한 번도 돌지 않았습니다.
           </p>
         )}
@@ -119,7 +119,7 @@ export default async function DominanceRuns() {
 
       {missing.length > 0 && (
         <section className="rounded-xl border border-amber-500/30 bg-amber-950/10 p-5">
-          <p className="text-sm font-medium text-amber-200">
+          <p className="text-sm font-medium text-amber-700 dark:text-amber-200">
             최근 {LOOKBACK_DAYS}일 중 기록이 없는 날이 {missing.length}일 있습니다.
           </p>
           <p className="mt-2 text-xs text-muted-foreground">
@@ -157,7 +157,7 @@ export default async function DominanceRuns() {
                       : "끝나지 않음"}
                   </span>
                   {r.alert_count > 0 && (
-                    <span className="text-xs text-amber-300">
+                    <span className="text-xs text-amber-700 dark:text-amber-300">
                       경보 {r.alert_count}건
                       {r.alert_mail_sent ? " · 메일 보냄" : " · 메일 못 보냄"}
                     </span>
@@ -170,13 +170,13 @@ export default async function DominanceRuns() {
                 <p className="mt-1 text-xs text-muted-foreground">{r.summary}</p>
 
                 {r.alert_mail_error && (
-                  <p className="mt-1 text-xs text-red-300">
+                  <p className="mt-1 text-xs text-red-700 dark:text-red-300">
                     경보 메일 실패: {r.alert_mail_error}
                   </p>
                 )}
 
                 {(r.failed_steps?.length ?? 0) > 0 && (
-                  <p className="mt-1 text-xs text-red-300">
+                  <p className="mt-1 text-xs text-red-700 dark:text-red-300">
                     실패한 단계: {r.failed_steps!.join(", ")}
                   </p>
                 )}

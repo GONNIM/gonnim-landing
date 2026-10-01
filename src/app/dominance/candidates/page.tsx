@@ -87,7 +87,7 @@ export default async function CandidatesPage() {
 function Heading({ count }: { count: number }) {
   return (
     <section>
-      <div className="mb-4 rounded-lg border border-amber-500/50 bg-amber-500/10 p-3 text-sm text-amber-100">
+      <div className="mb-4 rounded-lg border border-amber-500/50 bg-amber-500/10 p-3 text-sm text-amber-700 dark:text-amber-100">
         옛 방식의 후보 기록입니다(읽기 전용). 2026-09-29 부터 새 후보를 만들지 않습니다. 이슈는{" "}
         <a href="/dominance/questions" className="underline">① 이슈 고르기</a>에서 고릅니다.
       </div>

@@ -61,7 +61,7 @@ export default async function LetterEditPage({
               {LETTER_STATUS_LABEL[data.status]}
             </span>
             {data.revision_count > 0 && (
-              <span className="text-xs text-amber-300/80">
+              <span className="text-xs text-amber-700/80 dark:text-amber-300/80">
                 리뷰에서 되돌아온 횟수 {data.revision_count}회
               </span>
             )}
@@ -89,7 +89,7 @@ export default async function LetterEditPage({
       </section>
 
       {unverified > 0 && (
-        <p className="rounded-lg border border-amber-500/60 bg-amber-500/10 p-3 text-sm text-amber-200">
+        <p className="rounded-lg border border-amber-500/60 bg-amber-500/10 p-3 text-sm text-amber-700 dark:text-amber-200">
           확인 전 초안 · 뜻 {unverified}개 미확인. 증거 표에서 뜻을 확인하시면 이 표시가 사라집니다.
         </p>
       )}

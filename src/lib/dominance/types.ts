@@ -22,10 +22,10 @@ export const LETTER_STATUS_LABEL: Record<LetterStatus, string> = {
 
 export const LETTER_STATUS_STYLE: Record<LetterStatus, string> = {
   draft: "bg-[color:var(--muted)]/20 text-muted-foreground",
-  review: "bg-amber-500/20 text-amber-300",
-  reviewed: "bg-violet-500/20 text-violet-300",
-  approved: "bg-sky-500/20 text-sky-300",
-  published: "bg-emerald-500/20 text-emerald-300",
+  review: "bg-amber-500/20 text-amber-700 dark:text-amber-300",
+  reviewed: "bg-violet-500/20 text-violet-700 dark:text-violet-300",
+  approved: "bg-sky-500/20 text-sky-700 dark:text-sky-300",
+  published: "bg-emerald-500/20 text-emerald-700 dark:text-emerald-300",
 };
 
 export const AGENCY_LABEL: Record<string, string> = {

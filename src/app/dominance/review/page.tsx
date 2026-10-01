@@ -98,8 +98,8 @@ function Heading() {
 }
 
 const COUNT_TONE = {
-  amber: "border-amber-500/40 bg-amber-500/10 text-amber-200",
-  violet: "border-violet-500/40 bg-violet-500/10 text-violet-200",
+  amber: "border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-200",
+  violet: "border-violet-500/40 bg-violet-500/10 text-violet-700 dark:text-violet-200",
   muted: "border-[color:var(--border)] bg-surface/40 text-muted-foreground",
 } as const;
 

@@ -145,7 +145,7 @@ export function LetterEditor({
           원천 {sources.length}개
         </h2>
         {sources.length === 0 && (
-          <p className="rounded-xl border border-dashed border-red-500/40 p-4 text-xs text-red-300">
+          <p className="rounded-xl border border-dashed border-red-500/40 p-4 text-xs text-red-700 dark:text-red-300">
             연결된 원천이 없습니다. 이 상태로는 리뷰를 통과하지 못합니다.
           </p>
         )}
@@ -206,7 +206,7 @@ export function LetterEditor({
             }}
             className="w-full rounded-lg border border-[color:var(--border)]/70 bg-surface/30 px-3 py-2 text-sm text-foreground read-only:opacity-70"
           />
-          {categoryMark(summary) && <p className="text-xs text-red-300">{categoryMark(summary)}</p>}
+          {categoryMark(summary) && <p className="text-xs text-red-700 dark:text-red-300">{categoryMark(summary)}</p>}
           {meta && meta.titles.length > 0 && (
             <div className="space-y-1 text-xs text-muted-foreground">
               <p>제목 후보 · 누르면 제목 칸에 들어갑니다. 직접 써도 됩니다.</p>
@@ -250,12 +250,12 @@ export function LetterEditor({
               </span>
             </div>
             {b.flags?.map((f) => (
-              <p key={f} className="mt-1 text-xs text-red-300">
+              <p key={f} className="mt-1 text-xs text-red-700 dark:text-red-300">
                 {f}
               </p>
             ))}
             {/* 29차 · 범주 이름은 입력하는 대로 다시 본다(표시만 · 잠그지 않음) */}
-            {categoryMark(b.text) && <p className="mt-1 text-xs text-red-300">{categoryMark(b.text)}</p>}
+            {categoryMark(b.text) && <p className="mt-1 text-xs text-red-700 dark:text-red-300">{categoryMark(b.text)}</p>}
             <textarea
               value={b.text}
               readOnly={readOnly}
@@ -273,7 +273,7 @@ export function LetterEditor({
             {mismatches
               .filter((m) => m.blockIndex === i)
               .map((m, j) => (
-                <p key={j} className="mt-1 text-xs text-red-300">
+                <p key={j} className="mt-1 text-xs text-red-700 dark:text-red-300">
                   {m.kind === "odds_percent"
                     ? `가능성 비를 %로 옮김(${m.numbers.join(" · ")}) · "N배" 로 쓴다(D48) · ${m.sentence}`
                     : `카드와 수치가 다름(${m.numbers.join(" · ")}) · ${m.sentence}`}
@@ -283,7 +283,7 @@ export function LetterEditor({
         ))}
 
         {message && (
-          <p className="rounded-lg border border-red-500/40 bg-red-950/20 p-3 text-sm text-red-300">
+          <p className="rounded-lg border border-red-500/40 bg-red-950/20 p-3 text-sm text-red-700 dark:text-red-300">
             {message}
           </p>
         )}
@@ -297,10 +297,10 @@ export function LetterEditor({
                   ? `저장됨 ${new Date(savedAt).toLocaleTimeString("ko-KR")}`
                   : "3초 동안 입력이 없으면 자동 저장합니다"}
               {flagCount > 0 && (
-                <span className="ml-2 text-red-300">필터 경고 {flagCount}건</span>
+                <span className="ml-2 text-red-700 dark:text-red-300">필터 경고 {flagCount}건</span>
               )}
               {emptyCount > 0 && (
-                <span className="ml-2 text-amber-300">빈 블록 {emptyCount}개</span>
+                <span className="ml-2 text-amber-700 dark:text-amber-300">빈 블록 {emptyCount}개</span>
               )}
             </div>
             <button
@@ -347,7 +347,7 @@ function CardPanel({ card, active }: { card: EditorCard; active: string[] }) {
                   on(f.tag) ? "border-[color:var(--accent)] bg-[color:var(--accent)]/10 text-foreground" : "border-[color:var(--border)]/50 text-muted-foreground"
                 }`}
               >
-                <b className="font-mono">[{f.tag}]</b> {f.peripheral && <span className="text-amber-300">주변 </span>}
+                <b className="font-mono">[{f.tag}]</b> {f.peripheral && <span className="text-amber-700 dark:text-amber-300">주변 </span>}
                 {f.subject ? `(${f.subject}${f.year ? ` · ${f.year}` : ""}) ` : ""}
                 {f.text}
                 {/* 22차 C-3 · 켜진 카드는 원문과 확인된 뜻을 함께 보인다 */}
@@ -400,9 +400,9 @@ function TagLint({ block, cardTags }: { block: LetterBlock; cardTags: string[] }
   if (untagged.length === 0 && unknown.length === 0) return null;
   return (
     <div className="mt-2 space-y-1 text-xs">
-      {unknown.length > 0 && <p className="text-red-300">카드에 없는 태그: {unknown.map((t) => `[${t}]`).join(" ")}</p>}
+      {unknown.length > 0 && <p className="text-red-700 dark:text-red-300">카드에 없는 태그: {unknown.map((t) => `[${t}]`).join(" ")}</p>}
       {untagged.map((x, i) => (
-        <p key={i} className="text-amber-300">
+        <p key={i} className="text-amber-700 dark:text-amber-300">
           태그 없는 문장(사실이면 태그를 붙이고, 잇는 문장이면 그대로 둡니다) · {x.text}
         </p>
       ))}

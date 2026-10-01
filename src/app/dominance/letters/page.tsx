@@ -91,7 +91,7 @@ export default async function LettersPage() {
                       {r.title}
                     </Link>
                     {r.revision_count > 0 && (
-                      <span className="shrink-0 text-xs text-amber-300/80">
+                      <span className="shrink-0 text-xs text-amber-700/80 dark:text-amber-300/80">
                         되돌림 {r.revision_count}회
                       </span>
                     )}
