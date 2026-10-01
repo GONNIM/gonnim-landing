@@ -33,7 +33,7 @@ export const KO_RULES = `# 한국어 뜻(ko) 규칙 (D44)
 - **원문의 권고 · 가능성 표현(should · may · might · suggest)은 결과로 바꾸지 않는다.** "~해야 한다" · "~일 수 있다" 로 남긴다.
 - 원문에 없는 한정어를 붙이지 않는다(예: "general obesity" 를 "비복부 비만" 으로 쓰지 않는다).
 - **odds(ratio)는 "가능성", risk · hazard 는 "위험".** 둘을 섞지 않는다(25차).
-- 가능성 비(odds ratio · OR)는 '가능성 비 N' 또는 'N배' 로 옮긴다. '%' 로 옮기지 않는다. 위험비(hazard ratio · HR)는 그대로 '위험비 N' 으로 옮긴다(34차 · D48).
+- 가능성 비(odds ratio · OR)는 'N배' 로 옮긴다('가능성이 1.21배'). '%' 나 '가능성 비 N' 으로 옮기지 않는다(D48).
 - **대상과 연도를 문장 안에 넣는다.** 예: "2022년 메타분석에서 성인 47,471명 중 …".`;
 
 export type Assignment = {
@@ -120,7 +120,7 @@ ${KO_RULES}
     system,
     `질문: ${input.question}\n통설: ${input.premise ?? "-"}\n되묻기: ${input.twist ?? "-"}\n\n${papers}`,
     14000,
-    { tier: "light" },
+    { tier: "light", stage: "배정" },
   )) as { items?: unknown[] };
 
   const keys = new Set(input.papers.map((p) => p.key));
@@ -172,7 +172,7 @@ ${KO_RULES}
     system,
     `질문: ${input.question}\n통설: ${input.premise ?? "-"}\n\n${body}`,
     3000,
-    { tier: "light" },
+    { tier: "light", stage: "배정(본문 정설)" },
   )) as { items?: unknown[] };
   const keys = new Set(input.intros.map((p) => p.key));
   return (o.items ?? []).flatMap((it) => {
@@ -206,7 +206,7 @@ export async function industryLeads(input: { question: string; premise: string |
 # 출력 형식 (엄수)
 { "items": [ { "name": "...", "query": "...", "ko_name": "", "why": "..." } ] }`;
 
-  const o = (await callJson(system, `질문: ${input.question}\n통설: ${input.premise ?? "-"}`, 1200, { tier: "light" })) as {
+  const o = (await callJson(system, `질문: ${input.question}\n통설: ${input.premise ?? "-"}`, 1200, { tier: "light", stage: "배정(산업 단서)" })) as {
     items?: unknown[];
   };
   return (o.items ?? [])
@@ -237,7 +237,7 @@ ${KO_RULES}
   const body = facts
     .map((f) => `[${f.id}] (출처: ${f.source} · 대상: ${f.subject ?? "-"} · ${f.year ?? "연도 없음"}) ${f.text}`)
     .join("\n");
-  const o = (await callJson(system, `질문: ${question}\n\n${body}`, 6000, { tier: "light", temperature: 0.2 })) as { items?: unknown[] };
+  const o = (await callJson(system, `질문: ${question}\n\n${body}`, 6000, { tier: "light", temperature: 0.2, stage: "뜻" })) as { items?: unknown[] };
   const out = new Map<string, string>();
   const ids = new Set(facts.map((f) => f.id));
   for (const it of o.items ?? []) {
