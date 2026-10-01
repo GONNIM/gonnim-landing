@@ -5,6 +5,7 @@
 
 import type { BlockKind, LetterBlock } from "./types";
 import type { LoadedSource } from "./letters";
+import type { ReactionLinks } from "./reactions";
 import { SENDER_LINE } from "@/lib/sangsik/site";
 
 export type LetterPayload = {
@@ -16,6 +17,10 @@ export type LetterPayload = {
   /** number 는 본문 등장 순서 번호다. 본문에 인용되지 않은 원천은 null 이고 목록 끝에 온다. */
   sources: { number: number | null; label: string; title: string; url: string; license: string }[];
   corrections: { description: string; resolution: string | null; at: string }[];
+  /** 반응 · 투표 링크를 만들 때 쓴다(26차 C). 공개해도 되는 값만 둔다. 옛 JSON 에는 없다. */
+  letterId?: string;
+  /** 운영자가 고른 다음 질문 후보 3개 */
+  votes?: { id: string; question: string }[];
 };
 
 // 인라인 원천 태그 [E1] · [V] (D36). 형식은 ds_letter_sources.tag 의 CHECK 와 같다.
@@ -61,6 +66,8 @@ export function toPayload(input: {
   blocks: LetterBlock[];
   sources: LoadedSource[];
   corrections?: { description: string; resolution: string | null; at: string }[];
+  letterId?: string;
+  votes?: { id: string; question: string }[];
 }): LetterPayload {
   const blocks = input.blocks.filter((b) => b.text.trim());
 
@@ -105,7 +112,33 @@ export function toPayload(input: {
     })),
     sources: [...numbered, ...rest],
     corrections: input.corrections ?? [],
+    ...(input.letterId ? { letterId: input.letterId } : {}),
+    ...(input.votes?.length ? { votes: input.votes.slice(0, 3) } : {}),
   };
+}
+
+/**
+ * 반응 · 투표 블록(26차 C-5). 메일과 웹 페이지가 같은 모양을 쓴다.
+ * 좁은 화면(320px)에서도 버튼이 줄을 바꿔 들어가게 inline-block 과 여백만 쓴다.
+ */
+function reactionBlock(r: ReactionLinks): string {
+  const btn = (l: { label: string; url: string }) =>
+    `<a href="${escapeHtml(l.url)}" style="display:inline-block;margin:0 6px 8px 0;padding:8px 14px;border:1px solid #d1d5db;border-radius:18px;font-size:14px;line-height:1.3;color:#1f2328;text-decoration:none">${escapeHtml(l.label)}</a>`;
+  const votes = r.votes.length
+    ? `<p style="margin:12px 0 8px;font-size:13px;font-weight:600;color:#374151">다음에 무엇을 다룰까요</p>
+       ${r.votes
+         .map(
+           (v) =>
+             `<a href="${escapeHtml(v.url)}" style="display:block;margin:0 0 8px;padding:10px 12px;border:1px solid #d1d5db;border-radius:8px;font-size:14px;line-height:1.5;color:#1f2328;text-decoration:none;word-break:keep-all;overflow-wrap:anywhere">${escapeHtml(v.label)}</a>`,
+         )
+         .join("")}`
+    : "";
+  return `<div style="margin:0 0 28px;padding:16px;border-radius:10px;background:#f9fafb">
+      <p style="margin:0 0 10px;font-size:13px;font-weight:600;color:#374151">이 글은 어땠나요</p>
+      <div>${r.reacts.map(btn).join("")}</div>
+      ${votes}
+      <p style="margin:8px 0 0;font-size:11px;line-height:1.5;color:#9ca3af">누른 사람이 아니라 글마다 숫자만 셉니다.</p>
+    </div>`;
 }
 
 function escapeHtml(s: string): string {
@@ -149,7 +182,7 @@ function sourceLine(s: LetterPayload["sources"][number]): string {
 export function toEmailHtml(
   payload: LetterPayload,
   /** webUrl 이 없으면 "웹에서 보기" 를 그리지 않는다(웹 페이지 자신이 이 틀을 쓸 때). */
-  options: { webUrl?: string; unsubscribeUrl: string },
+  options: { webUrl?: string; unsubscribeUrl: string; reactions?: ReactionLinks; tail?: string },
 ): string {
   const urlOf = new Map(
     payload.sources.filter((s) => s.number !== null).map((s) => [s.number as number, s.url]),
@@ -198,6 +231,7 @@ export function toEmailHtml(
     <hr style="border:none;border-top:1px solid #e5e7eb;margin:0 0 28px">
     ${corrections}
     ${blocks}
+    ${options.reactions ? reactionBlock(options.reactions) : ""}
     <hr style="border:none;border-top:1px solid #e5e7eb;margin:0 0 20px">
     <p style="margin:0 0 8px;font-size:13px;font-weight:600;color:#374151">원천</p>
     <ul style="margin:0 0 20px;padding-left:0">${sources}</ul>
@@ -207,11 +241,11 @@ export function toEmailHtml(
       ${options.webUrl ? `<a href="${escapeHtml(options.webUrl)}" style="color:#6b7280">웹에서 보기</a>
       · ` : ""}<a href="${escapeHtml(options.unsubscribeUrl)}" style="color:#6b7280">수신거부</a>
     </p>
-  </div>
+  </div>${options.tail ?? ""}
 </body></html>`;
 }
 
-export function toPlainText(payload: LetterPayload, unsubscribeUrl?: string): string {
+export function toPlainText(payload: LetterPayload, unsubscribeUrl?: string, reactions?: ReactionLinks): string {
   const blocks = payload.blocks
     .map((b) => (b.label ? `[${b.label}]\n${b.text}` : b.text))
     .join("\n\n");
@@ -225,6 +259,14 @@ export function toPlainText(payload: LetterPayload, unsubscribeUrl?: string): st
     "",
     blocks,
     "",
+    ...(reactions
+      ? [
+          "이 글은 어땠나요",
+          ...reactions.reacts.map((r) => `${r.label}: ${r.url}`),
+          ...(reactions.votes.length ? ["", "다음에 무엇을 다룰까요", ...reactions.votes.map((v) => `${v.label}: ${v.url}`)] : []),
+          "",
+        ]
+      : []),
     "원천",
     sources,
     "",

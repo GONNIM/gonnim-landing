@@ -4,6 +4,7 @@ import { PRE_PUBLISHING_REASON, publishingStarted } from "@/lib/dominance/publis
 import { revalidatePath } from "next/cache";
 import { dominanceContext } from "@/lib/dominance/guard";
 import { kstToday } from "@/lib/dominance/kst";
+import { readVoteCandidates, writeVoteCandidates, type VoteCandidate } from "@/lib/dominance/draft-store";
 import { loadLetterSources } from "@/lib/dominance/letters";
 import { linkCheckUrls, runReviewChecks } from "@/lib/dominance/review";
 import type { LetterBlock, LetterStatus } from "@/lib/dominance/types";
@@ -159,5 +160,36 @@ export async function unapproveLetter(
   if (error) return { error: error.message };
 
   revalidateAll();
+  return { error: null };
+}
+
+/** 다음 질문 투표 후보 고르기(26차 C-3) · validated 질문 목록과 이미 고른 것 */
+export async function loadVoteChoices(
+  letterId: string,
+): Promise<{ options: VoteCandidate[]; picked: string[] }> {
+  const { db } = await dominanceContext();
+  const { data: letter } = await db.from("ds_letters").select("question_id").eq("id", letterId).maybeSingle<{ question_id: string | null }>();
+  const { data } = await db
+    .from("ds_questions")
+    .select("id, question")
+    .eq("status", "validated")
+    .order("created_at", { ascending: false })
+    .limit(100);
+  const options = ((data ?? []) as VoteCandidate[]).filter((q) => q.id !== letter?.question_id);
+  const picked = (await readVoteCandidates(db, letterId)).map((c) => c.id);
+  return { options, picked };
+}
+
+export async function saveVoteChoices(letterId: string, ids: string[]): Promise<{ error: string | null }> {
+  const { db } = await dominanceContext();
+  if (ids.length > 3) return { error: "후보는 3개까지입니다." };
+  const { data } = await db.from("ds_questions").select("id, question, status").in("id", ids.length ? ids : ["00000000-0000-0000-0000-000000000000"]);
+  const rows = (data ?? []) as (VoteCandidate & { status: string })[];
+  if (rows.some((r) => r.status !== "validated") || rows.length !== ids.length) return { error: "검증 통과(validated) 질문만 고를 수 있습니다." };
+  try {
+    await writeVoteCandidates(db, letterId, ids.map((id) => rows.find((r) => r.id === id)!).map(({ id, question }) => ({ id, question })));
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : String(err) };
+  }
   return { error: null };
 }

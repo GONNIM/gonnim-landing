@@ -8,7 +8,7 @@ import Link from "next/link";
 import { formatKstDate, formatKstDateTime } from "@/lib/dominance/kst";
 import type { LetterStatus } from "@/lib/dominance/types";
 import { sendTestEmail } from "../review/[id]/actions";
-import { approveLetter, recheckLinks, unapproveLetter } from "./actions";
+import { approveLetter, loadVoteChoices, recheckLinks, saveVoteChoices, unapproveLetter } from "./actions";
 
 type Row = {
   id: string;
@@ -471,6 +471,8 @@ function ApprovalDialog({
           ))}
         </ul>
 
+        <VotePicker letterId={letter.id} />
+
         <p className="text-xs">
           <span className="text-muted-foreground">원천 링크 재점검: </span>
           {links === null ? (
@@ -513,6 +515,77 @@ function ApprovalDialog({
             {started ? "승인하고 날짜 확정" : "발행 시작 선언 전"}
           </button>
         </div>
+      </div>
+    </div>
+  );
+}
+
+/** 다음 질문 투표 후보 3개(26차 C-3). 고르지 않으면 메일에 투표 줄이 없다. */
+function VotePicker({ letterId }: { letterId: string }) {
+  const [options, setOptions] = useState<{ id: string; question: string }[] | null>(null);
+  const [picked, setPicked] = useState<string[]>([]);
+  const [note, setNote] = useState<string | null>(null);
+  const [pending, startTransition] = useTransition();
+
+  useEffect(() => {
+    let live = true;
+    loadVoteChoices(letterId).then((r) => {
+      if (!live) return;
+      setOptions(r.options);
+      setPicked(r.picked);
+    });
+    return () => {
+      live = false;
+    };
+  }, [letterId]);
+
+  function toggle(id: string, on: boolean) {
+    setNote(null);
+    setPicked((prev) => (on ? (prev.length >= 3 ? prev : [...prev, id]) : prev.filter((x) => x !== id)));
+  }
+
+  function onSave() {
+    startTransition(async () => {
+      const r = await saveVoteChoices(letterId, picked);
+      setNote(r.error ?? `투표 후보 ${picked.length}개를 저장했습니다.`);
+    });
+  }
+
+  return (
+    <div className="space-y-2 rounded-md border border-[color:var(--border)]/60 p-3">
+      <p className="text-xs font-medium">다음 질문 투표 후보 ({picked.length}/3)</p>
+      {options === null ? (
+        <p className="text-xs text-muted-foreground">불러오는 중…</p>
+      ) : options.length === 0 ? (
+        <p className="text-xs text-muted-foreground">검증 통과 질문이 없습니다. 투표 줄 없이 나갑니다.</p>
+      ) : (
+        <ul className="max-h-40 space-y-1 overflow-y-auto">
+          {options.map((q) => (
+            <li key={q.id}>
+              <label className="flex cursor-pointer gap-2 text-xs leading-relaxed text-foreground/85">
+                <input
+                  type="checkbox"
+                  checked={picked.includes(q.id)}
+                  disabled={!picked.includes(q.id) && picked.length >= 3}
+                  onChange={(e) => toggle(q.id, e.target.checked)}
+                  className="mt-0.5 size-3.5 shrink-0 accent-[color:var(--accent)]"
+                />
+                {q.question}
+              </label>
+            </li>
+          ))}
+        </ul>
+      )}
+      <div className="flex items-center gap-2">
+        <button
+          type="button"
+          onClick={onSave}
+          disabled={pending || options === null}
+          className="rounded-md border border-[color:var(--border)] px-3 py-1 text-xs text-foreground/85 hover:border-[color:var(--accent)] disabled:opacity-50"
+        >
+          후보 저장
+        </button>
+        {note && <span className="text-xs text-muted-foreground">{note}</span>}
       </div>
     </div>
   );

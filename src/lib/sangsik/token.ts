@@ -6,9 +6,11 @@
 
 import { createHmac, timingSafeEqual } from "node:crypto";
 
-export type LinkPurpose = "confirm" | "unsubscribe";
+// react: 반응 · 투표 링크의 구독자 몫(26차 C-3). Resend 연락처 속성 ds_rk 에 넣어 두고
+// 브로드캐스트가 {{{contact.ds_rk}}} 로 사람마다 바꿔 넣는다. 만료가 없다.
+export type LinkPurpose = "confirm" | "unsubscribe" | "react";
 
-/** 확인 링크는 7일 뒤 만료된다. 수신거부 링크는 만료가 없다(언제 눌러도 끊겨야 한다). */
+/** 확인 링크는 7일 뒤 만료된다. 수신거부 · 반응 링크는 만료가 없다(언제 눌러도 끊겨야 한다). */
 const CONFIRM_TTL_MS = 7 * 86_400_000;
 
 function secret(): string {
@@ -60,4 +62,27 @@ export function verifyLink(
   if (exp !== 0 && exp < now) return { ok: false, reason: "expired" };
 
   return { ok: true, id };
+}
+
+/**
+ * 반응 링크의 레터 몫 서명. "<레터 id>.<종류>" 에 서명해서, 독자가 주소를 고쳐
+ * 없는 레터나 없는 종류를 세게 하지 못하게 한다.
+ */
+export function signLetterKind(letterId: string, kind: string): string {
+  return sign(`letter.${letterId}.${kind}`).slice(0, 22);
+}
+
+export function verifyLetterKind(letterId: string, kind: string, sig: string | null | undefined): boolean {
+  if (!sig) return false;
+  const expected = Buffer.from(signLetterKind(letterId, kind));
+  const given = Buffer.from(sig);
+  return expected.length === given.length && timingSafeEqual(expected, given);
+}
+
+/**
+ * 중복 막기 해시(ds_reaction_dedupe.hash · 64자리 16진수). 구독자 id 나 주소를 그대로 두지 않는다.
+ * 비밀값이 서버 밖에 없으므로 해시에서 사람을 되찾을 수 없다.
+ */
+export function dedupeHash(...parts: string[]): string {
+  return createHmac("sha256", secret()).update(`dedupe.${parts.join(".")}`).digest("hex");
 }

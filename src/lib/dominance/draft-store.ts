@@ -76,3 +76,25 @@ export async function listArchives(db: SupabaseClient, letterId: string): Promis
   const { data } = await db.storage.from(DRAFT_BUCKET).list(`${letterId}/archive`);
   return (data ?? []).map((f) => f.name);
 }
+
+/**
+ * 다음 질문 투표 후보(26차 C-3). 운영자가 일정 달력에서 validated 질문 3개를 고른다.
+ * 스키마를 바꾸지 않으려고 글 행이 아니라 비공개 버킷의 <글 id>/votes.json 에 둔다.
+ * 발행할 때 질문 문장까지 공개 JSON 에 옮긴다.
+ */
+export type VoteCandidate = { id: string; question: string };
+
+export async function readVoteCandidates(db: SupabaseClient, letterId: string): Promise<VoteCandidate[]> {
+  const { data } = await db.storage.from(DRAFT_BUCKET).download(`${letterId}/votes.json`);
+  if (!data) return [];
+  try {
+    const v = JSON.parse(await data.text()) as { candidates?: VoteCandidate[] };
+    return (v.candidates ?? []).slice(0, 3);
+  } catch {
+    return [];
+  }
+}
+
+export async function writeVoteCandidates(db: SupabaseClient, letterId: string, candidates: VoteCandidate[]) {
+  await putJson(db, `${letterId}/votes.json`, { candidates: candidates.slice(0, 3), at: new Date().toISOString() });
+}

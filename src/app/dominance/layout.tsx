@@ -12,6 +12,7 @@ const NAV = [
   { href: "/dominance/review", label: "④ 리뷰" },
   { href: "/dominance/schedule", label: "⑤ 발행일" },
   { href: "/dominance/subscribers", label: "구독자" },
+  { href: "/dominance/reactions", label: "반응" },
   { href: "/dominance/runs", label: "크론 기록" },
   // 옛 방식(D24)의 후보. 새로 만들지 않는다. 기록으로만 남긴다.
   { href: "/dominance/candidates", label: "옛 후보(기록)" },

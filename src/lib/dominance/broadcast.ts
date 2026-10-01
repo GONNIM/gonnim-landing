@@ -8,11 +8,30 @@
 // 붙었다. 그래서 `segmentId` 와 `segments: [{ id }]` 를 쓴다.
 //
 // 열람률은 이 SDK 로 읽을 수 없다. `broadcasts.get` 이 주는 것은 status 와 sent_at
-// 뿐이고 sent_count · opened_count 필드가 아예 없다. 열람률은 email.opened 웹훅을
-// 받아야 하므로 2차로 미룬다 — 없는 값을 추측해서 넣지 않는다.
+// 뿐이고 sent_count · opened_count 필드가 아예 없다. 열람 · 클릭은 웹훅으로 센다
+// (26차 · /api/sangsik/resend-webhook · reactions.ts) — 없는 값을 추측해서 넣지 않는다.
 
 import { Resend } from "resend";
 import type { SupabaseClient } from "@supabase/supabase-js";
+
+import { signLink } from "@/lib/sangsik/token";
+
+/**
+ * 반응 · 투표 링크의 구독자 몫을 담는 연락처 속성(26차 C-3). 브로드캐스트 본문의
+ * {{{contact.ds_rk|web}}} 이 사람마다 이 값으로 바뀐다. 값은 서명 토큰이고 주소가 아니다.
+ */
+const READER_PROPERTY = "ds_rk";
+
+async function ensureReaderProperty(resend: Resend, errors: string[]): Promise<void> {
+  const list = await resend.contactProperties.list();
+  if (list.error) {
+    errors.push(`연락처 속성 목록: ${list.error.message}`);
+    return;
+  }
+  if ((list.data?.data ?? []).some((p) => p.key === READER_PROPERTY)) return;
+  const made = await resend.contactProperties.create({ key: READER_PROPERTY, type: "string", fallbackValue: "web" });
+  if (made.error) errors.push(`연락처 속성 만들기: ${made.error.message}`);
+}
 
 // 기본값은 Resend 에서 인증이 끝난 도메인만 쓴다. mail.gonnim.dev 는 DNS 기록이
 // 없어 발송이 거부된다 — 인증을 마치면 DS_FROM_EMAIL 로 그쪽을 가리키면 된다.
@@ -109,6 +128,7 @@ export async function syncAudience(
   if (error) throw new Error(`ds_subscribers 읽기 실패: ${error.message}`);
 
   let count = 0;
+  await ensureReaderProperty(resend, errors);
 
   for (const s of (data ?? []) as SubscriberRow[]) {
     const active = s.confirmed_at !== null && s.unsubscribed_at === null;
@@ -159,10 +179,11 @@ async function upsertContact(
   errors: string[],
   rowId: string,
 ): Promise<string | null> {
-  const created = await resend.contacts.create({ email, unsubscribed: false, segments: [{ id: segment }] });
+  const properties = { [READER_PROPERTY]: signLink(rowId, "react") };
+  const created = await resend.contacts.create({ email, unsubscribed: false, properties, segments: [{ id: segment }] });
   if (!created.error) return created.data?.id ?? null;
 
-  const updated = await resend.contacts.update({ email, unsubscribed: false });
+  const updated = await resend.contacts.update({ email, unsubscribed: false, properties });
   if (updated.error) {
     throw new Error(`create: ${created.error.message} · update: ${updated.error.message}`);
   }

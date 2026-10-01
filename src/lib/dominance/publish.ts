@@ -13,7 +13,9 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { sendBroadcast, syncAudience } from "./broadcast";
 import { dominanceLetterUrl } from "./db";
 import { kstToday } from "./kst";
+import { readVoteCandidates } from "./draft-store";
 import { loadLetterSources } from "./letters";
+import { reactionLinks } from "./reactions";
 import { toEmailHtml, toPayload, toPlainText } from "./render";
 import type { LetterBlock } from "./types";
 
@@ -21,6 +23,8 @@ const BUCKET = "ds-letters";
 // 수신자마다 Resend 가 자기 수신거부 주소로 바꿔 넣는다(Resend 문서의 병합 태그).
 // 누르면 Resend 연락처가 unsubscribed 가 되고, 크론이 원장으로 당겨 온다(pullResendUnsubscribes).
 const UNSUBSCRIBE_URL = "{{{RESEND_UNSUBSCRIBE_URL}}}";
+// 반응 · 투표 링크의 구독자 몫. 연락처 속성 ds_rk(syncAudience 가 채운다)가 없으면 web 으로 간다(26차 C-3).
+const READER_TOKEN = "{{{contact.ds_rk|web}}}";
 
 export type PublishOutcome = {
   letterId: string;
@@ -104,6 +108,7 @@ async function publishOne(
       .order("reported_at", { ascending: true });
 
     const publishedAt = new Date().toISOString();
+    const votes = await readVoteCandidates(db, letter.id);
 
     const payload = toPayload({
       slug: letter.slug,
@@ -117,7 +122,10 @@ async function publishOne(
         resolution: c.resolution,
         at: c.reported_at,
       })),
+      letterId: letter.id,
+      votes,
     });
+    const reactions = reactionLinks(letter.id, votes, READER_TOKEN);
 
     await uploadPayload(db, letter.slug, payload);
 
@@ -126,8 +134,9 @@ async function publishOne(
       html: toEmailHtml(payload, {
         webUrl: dominanceLetterUrl(letter.slug),
         unsubscribeUrl: UNSUBSCRIBE_URL,
+        reactions,
       }),
-      text: toPlainText(payload, UNSUBSCRIBE_URL),
+      text: toPlainText(payload, UNSUBSCRIBE_URL, reactions),
     });
 
     const { error } = await db
