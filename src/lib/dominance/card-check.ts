@@ -65,7 +65,13 @@ function matches(tok: NumToken, card: number[]): boolean {
 
 export type CardFactLike = { tag: string; text: string; ko: string | null; subject: string | null; year: number | null };
 
-export type NumberMismatch = { blockIndex: number; sentence: string; numbers: string[] };
+export type NumberMismatch = {
+  blockIndex: number;
+  sentence: string;
+  numbers: string[];
+  /** 33차 D48 · "odds_percent" 는 가능성 비를 % 로 옮긴 문장(표시만) */
+  kind?: "odds_percent";
+};
 
 /** 용어표 항목 중 대조에 필요한 것만(draft-card.ts 의 GlossaryItem 과 같은 이름) */
 export type GlossaryLike = { first?: string; plain?: string; original?: string };
@@ -126,6 +132,36 @@ export function cardNumberMismatches(
         return true;
       });
       if (bad.length) out.push({ blockIndex, sentence: s.text, numbers: bad.map((t) => t.text) });
+    }
+  });
+  return out;
+}
+
+/**
+ * D48(33차) · 가능성 비(odds ratio)를 "N%" 로 옮긴 문장. 표시만 하고 막지 않는다.
+ * 카드 원문에 "OR" · "odds" 가 있거나 뜻에 "가능성 비" 가 있는 문장의 비(0 과 3 사이 소수)를 가능성 비로 본다.
+ * 본문 문장의 % 가 그 비에서 센 백분율(1.21 → 21% · 0.53 → 47%, ±1%p)이면 잡는다.
+ * 근거: 30차 주말 잠 [E3](1.21 → "21% 높았다") · 31차 [E5](0.53 → "절반 가까이").
+ */
+export function oddsAsPercent(blocks: { text: string }[], facts: CardFactLike[]): NumberMismatch[] {
+  const isOdds = (f: CardFactLike) => /\bORs?\b/.test(f.text) || /odds/i.test(f.text) || /가능성\s*비/.test(f.ko ?? ""); // OR 는 대문자만(영어 or 와 구별)
+  const out: NumberMismatch[] = [];
+  blocks.forEach((b, blockIndex) => {
+    for (const s of sentencesOf(b.text)) {
+      const tags = tagsIn(s.text);
+      if (!tags.length) continue;
+      const ratios = facts
+        .filter((f) => tags.includes(f.tag) && isOdds(f))
+        .flatMap((f) => [...extractNumbers(f.text), ...extractNumbers(f.ko ?? "")].map((n) => n.value))
+        .filter((v) => v > 0 && v < 3 && !Number.isInteger(v));
+      if (!ratios.length) continue;
+      const hits = extractNumbers(s.text)
+        .filter((t) => t.pct)
+        .flatMap((t) => {
+          const r = ratios.find((c) => Math.abs(Math.abs(c - 1) * 100 - t.value) <= 1);
+          return r === undefined ? [] : [`가능성 비 ${r} → ${t.text}%`];
+        });
+      if (hits.length) out.push({ blockIndex, sentence: s.text, numbers: [...new Set(hits)], kind: "odds_percent" });
     }
   });
   return out;

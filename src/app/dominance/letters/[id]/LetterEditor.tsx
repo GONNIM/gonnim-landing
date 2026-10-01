@@ -271,7 +271,9 @@ export function LetterEditor({
               .filter((m) => m.blockIndex === i)
               .map((m, j) => (
                 <p key={j} className="mt-1 text-xs text-red-300">
-                  카드와 수치가 다름({m.numbers.join(" · ")}) · {m.sentence}
+                  {m.kind === "odds_percent"
+                    ? `가능성 비를 %로 옮김(${m.numbers.join(" · ")}) · "N배" 로 쓴다(D48) · ${m.sentence}`
+                    : `카드와 수치가 다름(${m.numbers.join(" · ")}) · ${m.sentence}`}
                 </p>
               ))}
           </section>

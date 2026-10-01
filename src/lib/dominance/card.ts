@@ -182,8 +182,12 @@ export async function numberMismatchesFor(
   if (!questionId) return [];
   const card = await loadQuestionCard(db, questionId);
   if (!card) return [];
-  const { cardNumberMismatches } = await import("./card-check");
-  return cardNumberMismatches(blocks, card.facts, card.sources.map((x) => ({ tag: x.tag, memo: x.memo })), card.vLine, glossary);
+  const { cardNumberMismatches, oddsAsPercent } = await import("./card-check");
+  return [
+    ...cardNumberMismatches(blocks, card.facts, card.sources.map((x) => ({ tag: x.tag, memo: x.memo })), card.vLine, glossary),
+    // 33차 D48 · 가능성 비를 % 로 옮긴 문장(표시만)
+    ...oddsAsPercent(blocks, card.facts),
+  ];
 }
 
 /**
