@@ -11,6 +11,7 @@ import {
   type ReactionRow,
 } from "@/lib/dominance/reactions";
 import { isMissingSchema, SchemaNotice } from "@/lib/dominance/schema-guard";
+import { LETTER_STATUS_LABEL, type LetterStatus } from "@/lib/dominance/types";
 import { RepliesInput } from "./RepliesInput";
 
 export const dynamic = "force-dynamic";
@@ -73,7 +74,7 @@ export default async function ReactionsPage() {
                     <td className="py-2 pr-3">
                       <span className="text-foreground/90">{l.title}</span>
                       <span className="block text-[11px] text-muted-foreground">
-                        {l.status}
+                        {LETTER_STATUS_LABEL[l.status as LetterStatus] ?? l.status}
                         {l.published_at ? ` · ${l.published_at.slice(0, 10)}` : ""}
                       </span>
                     </td>

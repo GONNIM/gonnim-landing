@@ -2,7 +2,7 @@
 
 import { useState, useTransition, createContext, useContext } from "react";
 import { useRouter } from "next/navigation";
-import type { EvidenceRun } from "@/lib/dominance/collect-types";
+import { PHASE_LABEL, type EvidenceRun } from "@/lib/dominance/collect-types";
 import {
   CARD_TARGET,
   EXT_KINDS,
@@ -221,7 +221,7 @@ function RunSummary({ run }: { run: EvidenceRun }) {
       <ul className="space-y-0.5">
         {run.phases.map((p, i) => (
           <li key={i}>
-            · {p.phase} ({(p.ms / 1000).toFixed(1)}초) — {p.note}
+            · {PHASE_LABEL[p.phase] ?? p.phase} ({(p.ms / 1000).toFixed(1)}초) — {p.note}
           </li>
         ))}
       </ul>
