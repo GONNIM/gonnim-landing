@@ -46,7 +46,7 @@ export default async function LetterEditPage({
   // 질문에서 나온 글(20차)은 왼쪽에 사실 카드를 둔다. 옛 글은 원천 초록을 둔다.
   const card = data.question_id ? await loadQuestionCard(db, data.question_id) : null;
   const meta = data.question_id ? await readDraftMeta(db, id) : null;
-  const mismatches = await numberMismatchesFor(db, data.question_id, data.blocks);
+  const mismatches = await numberMismatchesFor(db, data.question_id, data.blocks, meta?.glossary ?? []);
   // 24차 B-5 · 확인되지 않은 뜻으로 만든 초안이면 맨 위에 표시. 운영자가 뜻을 확인하면 사라진다.
   const unverified = card ? unverifiedInLetter(card, data.blocks) : 0;
 

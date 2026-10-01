@@ -58,7 +58,8 @@ export async function saveLetter(
 
   return {
     blocks,
-    mismatches: await numberMismatchesFor(db, await questionOf(db, letterId), blocks),
+    // 29차 B-2 · 용어표 괄호 풀이의 숫자는 대조에서 뺀다
+    mismatches: await numberMismatchesFor(db, await questionOf(db, letterId), blocks, (await readDraftMeta(db, letterId))?.glossary ?? []),
     flagCount: countFlags(blocks),
     savedAt: new Date().toISOString(),
     error: error?.message ?? null,

@@ -7,7 +7,7 @@ import { BLOCK_LABEL, type LetterBlock, type LetterStatus } from "@/lib/dominanc
 import type { CardFact, CardSource } from "@/lib/dominance/card";
 import type { GlossaryItem } from "@/lib/dominance/draft-card";
 import { SLOTS, SLOT_LABEL } from "@/lib/dominance/evidence";
-import { FACTUAL_KINDS } from "@/lib/dominance/filters";
+import { FACTUAL_KINDS, categoryMark } from "@/lib/dominance/filters";
 import { sentencesOf, tagsIn } from "@/lib/dominance/tags";
 import type { NumberMismatch } from "@/lib/dominance/card-check";
 
@@ -203,6 +203,7 @@ export function LetterEditor({
             }}
             className="w-full rounded-lg border border-[color:var(--border)]/70 bg-surface/30 px-3 py-2 text-sm text-foreground read-only:opacity-70"
           />
+          {categoryMark(summary) && <p className="text-xs text-red-300">{categoryMark(summary)}</p>}
           {meta && meta.titles.length > 0 && (
             <div className="space-y-1 text-xs text-muted-foreground">
               <p>제목 후보 · 누르면 제목 칸에 들어갑니다. 직접 써도 됩니다.</p>
@@ -250,6 +251,8 @@ export function LetterEditor({
                 {f}
               </p>
             ))}
+            {/* 29차 · 범주 이름은 입력하는 대로 다시 본다(표시만 · 잠그지 않음) */}
+            {categoryMark(b.text) && <p className="mt-1 text-xs text-red-300">{categoryMark(b.text)}</p>}
             <textarea
               value={b.text}
               readOnly={readOnly}

@@ -67,6 +67,25 @@ export type CardFactLike = { tag: string; text: string; ko: string | null; subje
 
 export type NumberMismatch = { blockIndex: number; sentence: string; numbers: string[] };
 
+/** 용어표 항목 중 대조에 필요한 것만(draft-card.ts 의 GlossaryItem 과 같은 이름) */
+export type GlossaryLike = { first?: string; plain?: string; original?: string };
+
+/**
+ * 29차 B-2 · 용어표 괄호 풀이에 든 숫자는 사실이 아니다(28차: "에너지 밀도(음식 1g당 들어 있는 열량)" 의 1).
+ * 대조 전에 문장에서 용어표의 첫 등장 문자열과 괄호 풀이를 지운다.
+ */
+export function stripGlossary(text: string, glossary: GlossaryLike[] = []): string {
+  let out = text;
+  for (const g of glossary) {
+    const pieces = [g.first, g.plain ? `(${g.plain})` : "", g.original && g.plain ? `${g.original}(${g.plain})` : ""]
+      .map((x) => (x ?? "").trim())
+      .filter((x) => x.length > 1)
+      .sort((a, b) => b.length - a.length);
+    for (const p of pieces) out = out.split(p).join(" ");
+  }
+  return out;
+}
+
 /**
  * 태그 문장마다 숫자가 그 태그의 카드에 있는지 본다. 없으면 어긋남.
  * 허용: 연도에서 센 햇수 — "N년" 이고 N 이 (카드 연도 또는 올해) − (카드 연도) 와 1 이내로 같을 때.
@@ -76,6 +95,7 @@ export function cardNumberMismatches(
   facts: CardFactLike[],
   memos: { tag: string; memo: string | null }[],
   vLine: string | null,
+  glossary: GlossaryLike[] = [],
 ): NumberMismatch[] {
   const thisYear = new Date().getFullYear();
   const out: NumberMismatch[] = [];
@@ -96,7 +116,7 @@ export function cardNumberMismatches(
       if (tags.includes("V") && vLine) pool.push(...extractNumbers(vLine).map((n) => n.value));
       pool.forEach((v) => v >= 1900 && v <= thisYear + 1 && years.push(v));
 
-      const bad = extractNumbers(s.text).filter((tok) => {
+      const bad = extractNumbers(stripGlossary(s.text, glossary)).filter((tok) => {
         if (matches(tok, pool)) return false;
         // 허용: 연도에서 센 햇수
         if (tok.unitYear && tok.value < 200) {

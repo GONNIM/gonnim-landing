@@ -77,10 +77,37 @@ export function flagBlock(block: LetterBlock): string[] {
   return flags;
 }
 
+/**
+ * 고르기 · 쓰기 지시문이 쓰는 범주 이름(29차 B-1). 본문이나 요약에 나오면 지시문의 말이 새어 나온 것이다.
+ * 28차 glm-5.3 초안의 요약이 "가장 반직관적인 것은" · "내 몸과의 연결로는" 으로 시작했다.
+ * 일상어로도 쓰이는 "통설" · "역설" 한 낱말은 넣지 않는다(훅이 정당하게 쓴다).
+ */
+export const CATEGORY_TERMS = [
+  "반직관",
+  "내 몸과의 연결",
+  "내 몸 연결",
+  "통설 파괴",
+  "통설을 깨는 것",
+  "놀라운 수치",
+  "독자의 몸으로 이어지는",
+  "독자의 판단으로 이어지는",
+] as const;
+
+export function categoryTerms(text: string): string[] {
+  return CATEGORY_TERMS.filter((t) => text.includes(t));
+}
+
+export function categoryMark(text: string): string | null {
+  const hits = categoryTerms(text);
+  return hits.length ? `범주 이름 — 지시문의 말이 본문에 나옴: ${hits.join(" · ")}` : null;
+}
+
 export function flagBlocks(blocks: LetterBlock[]): LetterBlock[] {
   return blocks.map((b) => {
     const flags = flagBlock(b);
-    return flags.length > 0 ? { ...b, flags } : { ...b, flags: undefined };
+    // 표시만(marks) · countFlags 에 들어가지 않는다 → [완성] 잠금 · 리뷰 12검사와 무관
+    const mark = categoryMark(b.text);
+    return { ...b, flags: flags.length > 0 ? flags : undefined, marks: mark ? [mark] : undefined };
   });
 }
 

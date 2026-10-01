@@ -177,12 +177,13 @@ export async function numberMismatchesFor(
   db: SupabaseClient,
   questionId: string | null,
   blocks: { text: string }[],
+  glossary: import("./card-check").GlossaryLike[] = [],
 ): Promise<import("./card-check").NumberMismatch[]> {
   if (!questionId) return [];
   const card = await loadQuestionCard(db, questionId);
   if (!card) return [];
   const { cardNumberMismatches } = await import("./card-check");
-  return cardNumberMismatches(blocks, card.facts, card.sources.map((x) => ({ tag: x.tag, memo: x.memo })), card.vLine);
+  return cardNumberMismatches(blocks, card.facts, card.sources.map((x) => ({ tag: x.tag, memo: x.memo })), card.vLine, glossary);
 }
 
 /**

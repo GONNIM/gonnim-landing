@@ -100,6 +100,8 @@ export type LetterBlock = {
   text: string;
   // 거절 필터에 걸린 사유. 비어 있어야 [완성] 버튼이 열린다.
   flags?: string[];
+  // 표시만 하는 경고(29차 · 범주 이름 노출). 붉게 보이지만 [완성] 을 잠그지 않고 리뷰 검사에 들어가지 않는다.
+  marks?: string[];
   // 이 블록이 인용한 원천. 사실 문장 블록은 비어 있으면 무출처 플래그가 붙는다.
   sourceIds?: string[];
 };
