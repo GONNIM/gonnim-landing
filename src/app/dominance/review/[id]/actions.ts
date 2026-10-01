@@ -15,6 +15,7 @@ import type {
   ReviewChecks,
 } from "@/lib/dominance/types";
 import { MODEL_MAIN } from "@/lib/dominance/llm";
+import { readDraftMeta } from "@/lib/dominance/draft-store";
 
 type LetterRow = {
   id: string;
@@ -59,7 +60,8 @@ export async function requestCrossReview(
     notes = await runCrossReview({
       title: letter.title,
       blocks: letter.blocks,
-      cards: await loadFactCards(db, letter.question_id, sources),
+      // 30차 B · [V] 카드에 검색어의 뜻을 붙인다
+      cards: await loadFactCards(db, letter.question_id, sources, { vMeaning: (await readDraftMeta(db, letterId))?.vMeaning }),
       // 22차 C-2 · "절반 · 배 · %" 문장은 카드 원문 · 확인된 뜻과 따로 대조한다
       numberPairs: letter.question_id
         ? numberPairs(letter.blocks, (await loadQuestionCard(db, letter.question_id))!)

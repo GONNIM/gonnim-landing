@@ -183,6 +183,8 @@ export async function loadFactCards(
   db: SupabaseClient,
   questionId: string | null,
   sources: LoadedSource[],
+  /** 30차 B · [V] 검색어의 뜻(초안 메타 vMeaning). 없으면 검색어 원문을 붙인다 */
+  opts: { vMeaning?: string | null } = {},
 ): Promise<FactCard[]> {
   // 태그마다 증거 표의 문장 전부(20차 · 한 행에 한 문장). 메모는 link_only 원천의 우리 말이다.
   const facts = new Map<string, string[]>();
@@ -190,6 +192,7 @@ export async function loadFactCards(
   const linkOnly = new Set<string>();
   let byYear: Record<string, number | null> | null = null;
   let papers5y: number | null = null;
+  let query: string | null = null;
 
   if (questionId) {
     const [ev, q] = await Promise.all([
@@ -197,7 +200,7 @@ export async function loadFactCards(
         .from("ds_question_evidence")
         .select("tag, fact_sentence, note, license, fact_subject, fact_year")
         .eq("question_id", questionId),
-      db.from("ds_questions").select("v4_by_year, v1_papers_5y").eq("id", questionId).maybeSingle(),
+      db.from("ds_questions").select("v4_by_year, v1_papers_5y, search_queries").eq("id", questionId).maybeSingle(),
     ]);
     type EvRow = {
       tag: string | null;
@@ -224,6 +227,7 @@ export async function loadFactCards(
     }
     byYear = (q.data?.v4_by_year as Record<string, number | null> | null) ?? null;
     papers5y = (q.data?.v1_papers_5y as number | null) ?? null;
+    query = ((q.data?.search_queries as string[] | null) ?? [])[0] ?? null;
   }
 
   return sources.map((s): FactCard => {
@@ -232,7 +236,10 @@ export async function loadFactCards(
       // 초안 카드의 [V] 줄과 같은 사실을 준다(21차: "최근 5년" 이 빠져 오지적이 났다).
       const curve = curveLine(byYear);
       const five = papers5y !== null ? ` · 최근 5년 ${papers5y.toLocaleString("ko-KR")}편` : "";
-      return { ...base, content: curve ? curve + five : "", linkOnly: false };
+      // 30차 B · 검색어가 무엇을 센 것인지 같이 준다. 없으면 교차 리뷰가 [V] 문장의 주제 서술을 "근거 없음" 으로 잡는다(28 · 29차).
+      const what = opts.vMeaning?.trim() ? `(뜻: ${opts.vMeaning.trim()})` : query ? `(검색어: ${query})` : "";
+      const line = curve && what ? curve.replace("Europe PMC 연도별 논문 수", `Europe PMC 검색어 ① ${what} 연도별 논문 수`) : curve;
+      return { ...base, content: line ? line + five : "", linkOnly: false };
     }
     if (s.tag && linkOnly.has(s.tag)) return { ...base, content: memos.get(s.tag) ?? "", linkOnly: true };
     // 질문의 증거 표에 문장이 있으면 그 문장(사실 카드)을 준다. 없으면(옛 글) 초록을 준다.

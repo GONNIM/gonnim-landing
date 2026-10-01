@@ -4,7 +4,7 @@
 // 편당 한 번만 부른다 — 주 3회면 한 달에 열두 번이다.
 
 import type { FactCard } from "./letters";
-import { chat, type Usage } from "./llm";
+import { chat, type Tier, type Usage } from "./llm";
 import type { CrossReviewNote, LetterBlock } from "./types";
 import { BLOCK_LABEL } from "./types";
 
@@ -42,6 +42,8 @@ export async function runCrossReview(input: {
   cards: FactCard[];
   numberPairs?: NumberPair[];
   usage?: (u: Usage) => void;
+  /** 30차 C · 시험용. 기본은 main(D46) */
+  tier?: Tier;
 }): Promise<CrossReviewNote[]> {
   const body = input.blocks
     .map((b, i) => `[${i}] ${BLOCK_LABEL[b.kind]}\n${b.text || "(비어 있음)"}`)
@@ -61,7 +63,7 @@ export async function runCrossReview(input: {
     system: SYSTEM_INSTRUCTIONS,
     user: `# 사실 카드\n${cards}\n\n# 레터 제목\n${input.title}\n\n# 레터 본문\n${body}${pairs(input.numberPairs)}`,
     maxTokens: 3000,
-    tier: "main",
+    tier: input.tier ?? "main",
     temperature: 0.2,
     usage: input.usage,
   });
