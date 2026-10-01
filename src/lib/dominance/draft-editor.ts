@@ -48,6 +48,8 @@ export async function editorPass(input: {
   examples?: { before: DraftText; after: DraftText }[];
   /** 26차 · 편집 규칙표 원문. 있으면 예시 대신 이것을 준다 */
   rules?: string;
+  /** 27차 D · 편집자 호출 시험을 Groq 로 */
+  provider?: "zai" | "groq";
 }): Promise<{ result: DraftText; ms: number; tokens: { input: number; output: number } }> {
   const tokens = { input: 0, output: 0 };
   const ex = input.rules
@@ -66,6 +68,7 @@ export async function editorPass(input: {
     9000,
     {
       temperature: 0.5,
+      provider: input.provider,
       usage: (u) => {
         tokens.input += u.input;
         tokens.output += u.output;

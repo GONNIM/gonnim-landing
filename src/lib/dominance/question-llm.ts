@@ -12,23 +12,32 @@ import { AREAS, type Area } from "./questions";
 
 const DEFAULT_MODEL = "glm-5.2";
 const DEFAULT_BASE_URL = "https://api.z.ai/api/paas/v4";
+// 27차 D · 편집자 호출 시험용 두 번째 공급자. 지금은 시험에서만 쓴다.
+const GROQ_MODEL = "openai/gpt-oss-120b";
+const GROQ_BASE_URL = "https://api.groq.com/openai/v1";
 
 export async function callJson(
   system: string,
   user: string,
   maxTokens: number,
-  opts: { temperature?: number; usage?: (u: { input: number; output: number }) => void } = {},
+  opts: {
+    temperature?: number;
+    usage?: (u: { input: number; output: number }) => void;
+    provider?: "zai" | "groq";
+  } = {},
 ): Promise<unknown> {
-  const apiKey = process.env.ZAI_API_KEY;
+  const groq = opts.provider === "groq";
+  const keyName = groq ? "GROQ_API_KEY" : "ZAI_API_KEY";
+  const apiKey = process.env[keyName];
   if (!apiKey) {
-    const err = new Error("ZAI_API_KEY 없음 · LLM 을 부를 수 없습니다");
+    const err = new Error(`${keyName} 없음 · LLM 을 부를 수 없습니다`);
     (err as { status?: number }).status = 503;
     throw err;
   }
-  const client = new OpenAI({ apiKey, baseURL: process.env.ZAI_BASE_URL || DEFAULT_BASE_URL });
+  const client = new OpenAI({ apiKey, baseURL: groq ? GROQ_BASE_URL : process.env.ZAI_BASE_URL || DEFAULT_BASE_URL });
 
   const response = await client.chat.completions.create({
-    model: process.env.ZAI_MODEL || DEFAULT_MODEL,
+    model: groq ? GROQ_MODEL : process.env.ZAI_MODEL || DEFAULT_MODEL,
     temperature: opts.temperature ?? 0.4,
     max_tokens: maxTokens,
     response_format: { type: "json_object" },
@@ -36,8 +45,8 @@ export async function callJson(
       { role: "system", content: system },
       { role: "user", content: user },
     ],
-    // @ts-expect-error z.ai 확장 파라미터 · OpenAI SDK 타입에는 없으나 서버는 수용
-    thinking: { type: "disabled" },
+    // z.ai 확장 파라미터 · OpenAI SDK 타입에는 없으나 서버는 수용. Groq 에는 보내지 않는다.
+    ...(groq ? {} : ({ thinking: { type: "disabled" } } as object)),
   });
 
   opts.usage?.({ input: response.usage?.prompt_tokens ?? 0, output: response.usage?.completion_tokens ?? 0 });
