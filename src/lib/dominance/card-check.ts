@@ -6,7 +6,7 @@
 
 import { sentencesOf, tagsIn } from "./tags";
 
-export type NumToken = { value: number; text: string; approx: "exact" | "about" | "over" | "under"; unitYear: boolean };
+export type NumToken = { value: number; text: string; approx: "exact" | "about" | "over" | "under"; unitYear: boolean; pct: boolean };
 
 const TAG = /\[[A-Z]{1,2}[0-9]{0,2}\]/g;
 const UNIT: Record<string, number> = { 억: 1e8, 만: 1e4, 천: 1e3 };
@@ -31,7 +31,7 @@ export function extractNumbers(raw: string): NumToken[] {
         : word("쯤|정도|안팎|가량").test(after) || /약\s*$/.test(before)
           ? "about"
           : "exact";
-    out.push({ value: group.value, text: text.slice(group.start, group.end).trim(), approx, unitYear: /^\s*년(?!도)/.test(after) });
+    out.push({ value: group.value, text: text.slice(group.start, group.end).trim(), approx, unitYear: /^\s*년(?!도)/.test(after), pct: /^\s*%/.test(after) });
     group = null;
   };
   while ((m = re.exec(text))) {
@@ -53,6 +53,8 @@ export function extractNumbers(raw: string): NumToken[] {
 }
 
 function matches(tok: NumToken, card: number[]): boolean {
+  // 허용 유형(26차): 비(ratio)에서 센 백분율 · 1.21 → 21% 높음 · 0.53 → 47% 낮음(±1%p)
+  if (tok.pct && card.some((c) => c > 0 && c < 3 && !Number.isInteger(c) && Math.abs(Math.abs(c - 1) * 100 - tok.value) <= 1)) return true;
   return card.some((c) => {
     if (tok.approx === "over") return c >= tok.value && c <= tok.value * 1.12;
     if (tok.approx === "under") return c <= tok.value && c >= tok.value * 0.88;

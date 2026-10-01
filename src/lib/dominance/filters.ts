@@ -16,8 +16,11 @@ const URL_LIKE = [
   /\b[\w-]+(?:\.[\w-]+)*\.(?:gov|org|com|net|edu|int|io|dev|kr|uk|eu|info|co|ac)\b/gi,
 ];
 
+// 단위 기호는 번역할 말이 아니다(26차 · 운동과 식욕 초안의 "kcal" 이 미번역으로 걸렸다).
+const UNIT_TOKENS = /(?<![A-Za-z])(?:kcal|kJ|km|kg|mg|ml|mL|mm|cm|ms|g)(?![A-Za-z])/g;
+
 function stripUrlLike(text: string): string {
-  return URL_LIKE.reduce((t, re) => t.replace(re, " "), text);
+  return URL_LIKE.reduce((t, re) => t.replace(re, " "), text).replace(UNIT_TOKENS, " ");
 }
 
 const RULES: {
