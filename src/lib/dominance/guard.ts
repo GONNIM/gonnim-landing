@@ -3,9 +3,11 @@
 // ds_* 표에는 RLS 정책이 하나도 없다(D22). DB 가 막아주지 않으므로 이 함수를 빼먹으면
 // 인증이 통째로 사라진다. /dominance 아래 모든 서버 컴포넌트·서버 액션·라우트가 여기를 지난다.
 
+import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { getServerAuthClient } from "@/lib/supabase/ssr-client";
 import { getDominanceClient } from "./db";
+import { localScreenshotEmail } from "./local-screenshot";
 
 function allowedEmails(): Set<string> {
   return new Set(
@@ -20,6 +22,10 @@ export type DominanceAdmin = { id: string; email: string };
 
 /** 로그인 + 허용 목록을 통과한 사용자를 돌려준다. 아니면 로그인 화면으로 보낸다. */
 export async function requireDominanceAdmin(): Promise<DominanceAdmin> {
+  // 38차 A-1 · localhost 개발 환경의 그림 찍기에서만 통한다. 배포에서는 절대 켜지지 않는다(local-screenshot.ts).
+  const local = localScreenshotEmail((await headers()).get("host"));
+  if (local) return { id: "local-screenshot", email: local };
+
   const supabase = await getServerAuthClient();
   const {
     data: { user },

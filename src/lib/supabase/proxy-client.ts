@@ -2,6 +2,7 @@
 
 import { NextResponse, type NextRequest } from "next/server";
 import { createServerClient } from "@supabase/ssr";
+import { localScreenshotEmail } from "@/lib/dominance/local-screenshot";
 
 // 인증이 필요한 앱 경로. /radar/login 이 공용 로그인 화면이므로 새 앱은 여기만 추가한다.
 const PROTECTED_PREFIXES = ["/radar", "/dominance"];
@@ -26,6 +27,11 @@ export async function updateSession(request: NextRequest) {
   let supabaseResponse = NextResponse.next({
     request: { headers: requestHeaders },
   });
+
+  // 38차 A-1 · localhost 개발 환경에서만 /dominance 세션 확인을 건너뛴다(배포에서는 꺼짐 · local-screenshot.ts).
+  if (path.startsWith("/dominance") && localScreenshotEmail(request.headers.get("host"))) {
+    return supabaseResponse;
+  }
 
   // Supabase env 부재 시 — landing 등 공용 라우트는 통과, 보호 경로는 login으로.
   if (!url || !anon) {
