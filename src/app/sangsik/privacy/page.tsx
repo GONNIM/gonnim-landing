@@ -6,7 +6,7 @@ export default function PrivacyPage() {
   return (
     <article className="space-y-5 text-[15px] leading-7">
       <h1 className="text-2xl font-bold">개인정보 처리 방침</h1>
-      <p className="text-sm text-[#6b7280]">시행 2026-09-28 · 지배상식 (gonnim.dev/sangsik)</p>
+      <p className="text-sm text-[#6b7280]">시행 2026-09-28 · 개정 2026-10-01(레터별 통계 절 추가) · 지배상식 (gonnim.dev/sangsik)</p>
 
       <section>
         <h2 className="font-semibold">수집하는 항목</h2>
@@ -14,7 +14,15 @@ export default function PrivacyPage() {
       </section>
       <section>
         <h2 className="font-semibold">쓰는 목적</h2>
-        <p>레터 발송에만 씁니다. 광고, 판매, 다른 서비스 안내에 쓰지 않습니다.</p>
+        <p>레터 발송과 아래의 레터별 통계 집계에만 씁니다. 광고, 판매, 다른 서비스 안내에 쓰지 않습니다.</p>
+      </section>
+      <section>
+        <h2 className="font-semibold">레터별 통계</h2>
+        <p>
+          메일 열람 · 링크 클릭 · 글 끝 도달 · 반응 버튼 · 다음 질문 투표를 레터별 숫자로만 집계합니다. 누가 눌렀는지는
+          저장하지 않습니다. 같은 사람의 중복만 막기 위해 되돌릴 수 없는 해시를 둡니다. 메일 열람 확인에는 작은 그림이
+          쓰입니다.
+        </p>
       </section>
       <section>
         <h2 className="font-semibold">보관 기간</h2>

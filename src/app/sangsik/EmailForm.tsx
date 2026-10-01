@@ -82,7 +82,7 @@ export function EmailForm({
             className="mt-1.5"
           />
           <span>
-            이메일을 레터 발송에만 쓰며 언제든 수신거부할 수 있다는{" "}
+            이메일을 레터 발송과 레터별 통계 집계(누가 눌렀는지는 저장하지 않음)에만 쓰며 언제든 수신거부할 수 있다는{" "}
             <Link href="/sangsik/privacy" className="underline">
               개인정보 처리 방침
             </Link>
