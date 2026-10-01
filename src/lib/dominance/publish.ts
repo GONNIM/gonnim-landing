@@ -48,6 +48,7 @@ export type PublishReport = {
 type DueLetter = {
   id: string;
   candidate_id: string | null;
+  question_id: string | null;
   slug: string;
   title: string;
   summary: string | null;
@@ -161,6 +162,16 @@ async function publishOne(
         .eq("id", letter.candidate_id);
     }
 
+    // 38차 D · 질문도 「발행됨」으로 옮긴다. 이 줄이 없어서 질문은 발행 뒤에도 「초안 있음」에 머물렀다.
+    // 메일은 이미 나갔으므로 여기서 실패해도 발행을 실패로 돌리지 않는다(다음 발행에 영향 없음).
+    if (letter.question_id) {
+      await db
+        .from("ds_questions")
+        .update({ status: "published" })
+        .eq("id", letter.question_id)
+        .in("status", ["adopted", "drafted"]);
+    }
+
     return { ...base, ok: true, error: null };
   } catch (err) {
     return {
@@ -179,7 +190,7 @@ export async function publishDue(
 
   const { data, error } = await db
     .from("ds_letters")
-    .select("id, candidate_id, slug, title, summary, blocks")
+    .select("id, candidate_id, question_id, slug, title, summary, blocks")
     .eq("scheduled_for", date)
     .eq("status", "approved")
     .order("created_at", { ascending: true });
