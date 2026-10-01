@@ -63,46 +63,84 @@ export async function saveRun(
   }
 }
 
-// ── 35차 D · JSON 다시 부른 기록 ────────────────────────────────────────────
+// ── 날짜별 기록 파일(35차 D · 36차 B) ─────────────────────────────────────────
 //
-// callJson 이 JSON 이 깨진 응답을 받고 한 번 다시 부를 때마다 한 줄을 남긴다(모델 · 단계 · 앞 80자).
 // ds_cron_runs 에 넣으면 /dominance/runs 에 가짜 크론 실행으로 보이므로 넣지 않는다.
 // 표를 새로 만들지 않으려고(DDL 은 운영자 몫) 비공개 버킷 ds-drafts 의 날짜별 파일에 쌓는다.
-//   ds-drafts/logs/json-retry/<KST 날짜>.json  →  [{ at, model, stage, head }]
-// 이 기록도 예외를 던지지 않는다. 기록 때문에 본 호출을 잃지 않는다.
+//   ds-drafts/logs/json-retry/<KST 날짜>.json  →  [{ at, model, stage, head }]       (JSON 다시 부른 기록)
+//   ds-drafts/logs/llm-calls/<KST 날짜>.json   →  [{ at, stage, model, input, … }]   (LLM 호출마다 · 36차)
+// 파일은 읽고-더하고-쓰기다. 같은 프로세스 안에서 동시에 쓰면(교차 리뷰 두 모델 등) 한 줄을 잃으므로
+// 파일마다 줄을 세워 하나씩 쓴다. 서로 다른 서버 인스턴스가 같은 순간에 쓰면 한 줄을 잃을 수 있다.
+// 기록은 예외를 던지지 않는다. 기록 때문에 본 호출을 잃지 않는다.
 
 export type JsonRetryLine = { at: string; model: string; stage: string; head: string };
+export type LlmCallLine = {
+  at: string;
+  stage: string;
+  model: string;
+  input: number;
+  output: number;
+  reasoning: number;
+  ms: number;
+  cost: number | null;
+};
 
 export const JSON_RETRY_DIR = "logs/json-retry";
+export const LLM_CALLS_DIR = "logs/llm-calls";
 
 export function kstDay(d = new Date()): string {
   return new Date(d.getTime() + 9 * 3600e3).toISOString().slice(0, 10);
 }
 
-export async function logJsonRetry(line: Omit<JsonRetryLine, "at">): Promise<string | null> {
-  try {
-    const { getDominanceClient } = await import("./db");
-    const db = getDominanceClient();
-    const path = `${JSON_RETRY_DIR}/${kstDay()}.json`;
-    const { data } = await db.storage.from("ds-drafts").download(path);
-    const lines: JsonRetryLine[] = data ? (JSON.parse(await data.text()) as JsonRetryLine[]) : [];
-    lines.push({ at: new Date().toISOString(), ...line, head: line.head.slice(0, 80) });
-    const { error } = await db.storage
-      .from("ds-drafts")
-      .upload(path, new Blob([JSON.stringify(lines, null, 1)], { type: "application/json" }), { upsert: true });
-    return error ? error.message : null;
-  } catch (err) {
-    return err instanceof Error ? err.message : String(err);
-  }
+const queues = new Map<string, Promise<unknown>>();
+
+async function appendDayLog<T>(dir: string, line: T): Promise<string | null> {
+  const path = `${dir}/${kstDay()}.json`;
+  const run = async (): Promise<string | null> => {
+    try {
+      const { getDominanceClient } = await import("./db");
+      const db = getDominanceClient();
+      const { data } = await db.storage.from("ds-drafts").download(path);
+      const lines: T[] = data ? (JSON.parse(await data.text()) as T[]) : [];
+      lines.push(line);
+      const { error } = await db.storage
+        .from("ds-drafts")
+        .upload(path, new Blob([JSON.stringify(lines, null, 1)], { type: "application/json" }), { upsert: true });
+      return error ? error.message : null;
+    } catch (err) {
+      return err instanceof Error ? err.message : String(err);
+    }
+  };
+  const next = (queues.get(path) ?? Promise.resolve()).then(run, run);
+  queues.set(path, next);
+  return next;
 }
 
-/** 그날(KST)의 JSON 다시 부른 기록 */
-export async function readJsonRetries(db: SupabaseClient, day: string): Promise<JsonRetryLine[]> {
-  const { data } = await db.storage.from("ds-drafts").download(`${JSON_RETRY_DIR}/${day}.json`);
+async function readDayLog<T>(db: SupabaseClient, dir: string, day: string): Promise<T[]> {
+  const { data } = await db.storage.from("ds-drafts").download(`${dir}/${day}.json`);
   if (!data) return [];
   try {
-    return JSON.parse(await data.text()) as JsonRetryLine[];
+    return JSON.parse(await data.text()) as T[];
   } catch {
     return [];
   }
+}
+
+export function logJsonRetry(line: Omit<JsonRetryLine, "at">): Promise<string | null> {
+  return appendDayLog<JsonRetryLine>(JSON_RETRY_DIR, { at: new Date().toISOString(), ...line, head: line.head.slice(0, 80) });
+}
+
+/** 36차 B · LLM 호출 한 번 */
+export function logLlmCall(line: Omit<LlmCallLine, "at">): Promise<string | null> {
+  return appendDayLog<LlmCallLine>(LLM_CALLS_DIR, { at: new Date().toISOString(), ...line });
+}
+
+/** 그날(KST)의 JSON 다시 부른 기록 */
+export function readJsonRetries(db: SupabaseClient, day: string): Promise<JsonRetryLine[]> {
+  return readDayLog<JsonRetryLine>(db, JSON_RETRY_DIR, day);
+}
+
+/** 그날(KST)의 LLM 호출 기록 */
+export function readLlmCalls(db: SupabaseClient, day: string): Promise<LlmCallLine[]> {
+  return readDayLog<LlmCallLine>(db, LLM_CALLS_DIR, day);
 }

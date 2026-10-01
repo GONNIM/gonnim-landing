@@ -100,6 +100,7 @@ async function reviewCall(input: ReviewInput, tier: Tier, usage: (u: Usage) => v
     user: `# 사실 카드\n${cards}\n\n# 레터 제목\n${input.title}\n\n# 레터 본문\n${body}${pairs(input.numberPairs)}`,
     maxTokens: 3000,
     tier,
+    stage: `교차 리뷰(${tier})`,
     temperature: 0.2,
     usage,
   });

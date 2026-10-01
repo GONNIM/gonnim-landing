@@ -68,6 +68,8 @@ export async function chat(input: {
   temperature?: number;
   provider?: Provider;
   usage?: (u: Usage) => void;
+  /** 36차 B · 호출 기록에 남길 단계 이름. 없으면 unknown */
+  stage?: string;
 }): Promise<string> {
   const groq = input.provider === "groq";
   const keyName = groq ? "GROQ_API_KEY" : "ZAI_API_KEY";
@@ -106,6 +108,9 @@ export async function chat(input: {
   };
   input.usage?.(used);
   meter?.(used);
+  // 36차 B · 호출마다 한 줄(시각 · 단계 · 모델 · 토큰 · 시간 · 비용). 실패해도 본 호출은 계속
+  const { logLlmCall } = await import("./runlog");
+  await logLlmCall({ stage: input.stage ?? "unknown", model, input: used.input, output: used.output, reasoning: used.reasoning, ms: used.ms, cost: costOf(used) });
   const content = response.choices[0]?.message?.content;
   if (!content) throw new Error("LLM 응답이 비었습니다");
   return content;
@@ -132,9 +137,9 @@ export async function callJson(
   },
 ): Promise<unknown> {
   let last = "";
-  const { stage, ...callOpts } = opts;
+  const { stage } = opts;
   for (let attempt = 0; attempt < 2; attempt++) {
-    const content = await chat({ system, user, maxTokens, ...callOpts });
+    const content = await chat({ system, user, maxTokens, ...opts, stage: attempt === 0 ? stage : `${stage ?? "unknown"}(다시)` });
     try {
       return JSON.parse(content.trim().replace(/^```(?:json)?\n?|\n?```$/g, ""));
     } catch {
