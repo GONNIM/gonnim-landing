@@ -6,7 +6,7 @@
 //
 // 모델이 낸 문장은 믿지 않는다. 프로그램이 원문과 글자 그대로 대조해 통과한 것만 저장한다.
 
-import { callJson } from "./question-llm";
+import { callJson } from "./llm";
 import type { Slot } from "./evidence";
 
 const str = (v: unknown) => (typeof v === "string" ? v.trim() : "");
@@ -119,6 +119,7 @@ ${KO_RULES}
     system,
     `질문: ${input.question}\n통설: ${input.premise ?? "-"}\n되묻기: ${input.twist ?? "-"}\n\n${papers}`,
     14000,
+    { tier: "light" },
   )) as { items?: unknown[] };
 
   const keys = new Set(input.papers.map((p) => p.key));
@@ -170,6 +171,7 @@ ${KO_RULES}
     system,
     `질문: ${input.question}\n통설: ${input.premise ?? "-"}\n\n${body}`,
     3000,
+    { tier: "light" },
   )) as { items?: unknown[] };
   const keys = new Set(input.intros.map((p) => p.key));
   return (o.items ?? []).flatMap((it) => {
@@ -203,7 +205,7 @@ export async function industryLeads(input: { question: string; premise: string |
 # 출력 형식 (엄수)
 { "items": [ { "name": "...", "query": "...", "ko_name": "", "why": "..." } ] }`;
 
-  const o = (await callJson(system, `질문: ${input.question}\n통설: ${input.premise ?? "-"}`, 1200)) as {
+  const o = (await callJson(system, `질문: ${input.question}\n통설: ${input.premise ?? "-"}`, 1200, { tier: "light" })) as {
     items?: unknown[];
   };
   return (o.items ?? [])
@@ -234,7 +236,7 @@ ${KO_RULES}
   const body = facts
     .map((f) => `[${f.id}] (출처: ${f.source} · 대상: ${f.subject ?? "-"} · ${f.year ?? "연도 없음"}) ${f.text}`)
     .join("\n");
-  const o = (await callJson(system, `질문: ${question}\n\n${body}`, 6000, { temperature: 0.2 })) as { items?: unknown[] };
+  const o = (await callJson(system, `질문: ${question}\n\n${body}`, 6000, { tier: "light", temperature: 0.2 })) as { items?: unknown[] };
   const out = new Map<string, string>();
   const ids = new Set(facts.map((f) => f.id));
   for (const it of o.items ?? []) {

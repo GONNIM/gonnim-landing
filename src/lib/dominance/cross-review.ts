@@ -3,13 +3,10 @@
 // 고치지 않는다. 의견만 낸다. 고칠지는 사람이 판단한다.
 // 편당 한 번만 부른다 — 주 3회면 한 달에 열두 번이다.
 
-import OpenAI from "openai";
 import type { FactCard } from "./letters";
+import { chat, type Usage } from "./llm";
 import type { CrossReviewNote, LetterBlock } from "./types";
 import { BLOCK_LABEL } from "./types";
-
-const DEFAULT_MODEL = "glm-5.2";
-const DEFAULT_BASE_URL = "https://api.z.ai/api/paas/v4";
 
 const SYSTEM_INSTRUCTIONS = `당신은 한국어 연구·보건 뉴스레터의 교정자다. 글을 고치지 않고 문제만 지적한다.
 
@@ -44,19 +41,8 @@ export async function runCrossReview(input: {
   blocks: LetterBlock[];
   cards: FactCard[];
   numberPairs?: NumberPair[];
+  usage?: (u: Usage) => void;
 }): Promise<CrossReviewNote[]> {
-  const apiKey = process.env.ZAI_API_KEY;
-  if (!apiKey) {
-    const err = new Error("ZAI_API_KEY 없음 · 교차 리뷰를 부를 수 없습니다");
-    (err as { status?: number }).status = 503;
-    throw err;
-  }
-
-  const client = new OpenAI({
-    apiKey,
-    baseURL: process.env.ZAI_BASE_URL || DEFAULT_BASE_URL,
-  });
-
   const body = input.blocks
     .map((b, i) => `[${i}] ${BLOCK_LABEL[b.kind]}\n${b.text || "(비어 있음)"}`)
     .join("\n\n");
@@ -70,24 +56,15 @@ export async function runCrossReview(input: {
       )
       .join("\n\n---\n\n") || "(사실 카드 없음)";
 
-  const response = await client.chat.completions.create({
-    model: process.env.ZAI_MODEL || DEFAULT_MODEL,
+  // main 모델 · 추론 강도 low (llm.ts · D46)
+  const content = await chat({
+    system: SYSTEM_INSTRUCTIONS,
+    user: `# 사실 카드\n${cards}\n\n# 레터 제목\n${input.title}\n\n# 레터 본문\n${body}${pairs(input.numberPairs)}`,
+    maxTokens: 3000,
+    tier: "main",
     temperature: 0.2,
-    max_tokens: 3000,
-    response_format: { type: "json_object" },
-    messages: [
-      { role: "system", content: SYSTEM_INSTRUCTIONS },
-      {
-        role: "user",
-        content: `# 사실 카드\n${cards}\n\n# 레터 제목\n${input.title}\n\n# 레터 본문\n${body}${pairs(input.numberPairs)}`,
-      },
-    ],
-    // @ts-expect-error z.ai 확장 파라미터 · OpenAI SDK 타입에는 없으나 서버는 수용
-    thinking: { type: "disabled" },
+    usage: input.usage,
   });
-
-  const content = response.choices[0]?.message?.content;
-  if (!content) throw new Error("교차 리뷰 응답이 비었습니다");
 
   return parseNotes(content, input.blocks.length);
 }

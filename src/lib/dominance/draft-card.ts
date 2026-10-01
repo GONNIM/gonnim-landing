@@ -9,7 +9,7 @@ import { flagBlocks } from "./filters";
 import { V_TAG, type CardFact, type QuestionCard } from "./card";
 import { SLOT_LABEL } from "./evidence";
 import { countNumbers, hasSampleOrFollowup } from "./numbers";
-import { callJson } from "./question-llm";
+import { callJson } from "./llm";
 import { normalizePunct, sentencesOf, tagsIn } from "./tags";
 import { BLOCK_ORDER, type LetterBlock } from "./types";
 
@@ -76,6 +76,7 @@ async function makeGlossary(
   const facts = picked.map((f) => `[${f.tag}] ${f.text}${f.ko ? `\n   뜻: ${f.ko}` : ""}`).join("\n");
   const q0 = card.question.searchQueries[0] ?? "";
   const o = (await callJson(GLOSSARY_SYSTEM, `질문: ${card.question.question}\n[V] 검색어: ${q0}\n\n# 사실 카드\n${facts}`, 2000, {
+    tier: "light",
     temperature: 0.3,
     usage: (u) => {
       tokens.input += u.input;
@@ -332,6 +333,7 @@ async function pickFacts(
     `질문: ${q.question}\n통설: ${q.premise ?? "-"}\n되묻기: ${q.twist ?? "-"}\n\n# 재료\n${list}`,
     3000,
     {
+      tier: "light",
       temperature: 0.3,
       usage: (u) => {
         tokens.input += u.input;
@@ -387,6 +389,7 @@ export async function generateCardDraft(card: QuestionCard): Promise<CardDraft> 
     `질문: ${q.question}\n독자의 통설 (훅용, 출처 불필요): ${q.premise ?? "-"}\n되묻기: ${q.twist ?? "-"}\n\n# 블록별 재료 (확인된 뜻 · 태그 · 대상)\n${material}\n\n# 용어표 (참고용 · 용어를 바꾸지 말고 그대로 쓴다. 괄호 풀이는 프로그램이 붙인다)\n${gl}\n\n위 재료만으로 「지배상식」 한 편의 초고를 JSON 으로 쓰시오.`,
     9000,
     {
+      tier: "main",
       temperature: 0.6,
       usage: (u) => {
         tokens.input += u.input;

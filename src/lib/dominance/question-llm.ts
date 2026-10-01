@@ -1,4 +1,4 @@
-// ① 이슈 고르기의 LLM 호출 네 가지. 모두 z.ai GLM 한 번씩이다.
+// ① 이슈 고르기의 LLM 호출 네 가지. 모두 light 모델 한 번씩이다(llm.ts · D46).
 //
 // - proposeQuestions  ⓪-1 [새 이슈 10개 제안] · 1회로 10개
 // - fillIssue         [이슈 만들기] 의 [채우기] · 1회
@@ -7,57 +7,8 @@
 //
 // 기계는 제안만 한다(넘지 않는 선 8). 여기서 나온 값은 모두 사람이 고칠 수 있는 칸에 들어간다.
 
-import OpenAI from "openai";
+import { callJson } from "./llm";
 import { AREAS, type Area } from "./questions";
-
-const DEFAULT_MODEL = "glm-5.2";
-const DEFAULT_BASE_URL = "https://api.z.ai/api/paas/v4";
-// 27차 D · 편집자 호출 시험용 두 번째 공급자. 지금은 시험에서만 쓴다.
-const GROQ_MODEL = "openai/gpt-oss-120b";
-const GROQ_BASE_URL = "https://api.groq.com/openai/v1";
-
-export async function callJson(
-  system: string,
-  user: string,
-  maxTokens: number,
-  opts: {
-    temperature?: number;
-    usage?: (u: { input: number; output: number }) => void;
-    provider?: "zai" | "groq";
-  } = {},
-): Promise<unknown> {
-  const groq = opts.provider === "groq";
-  const keyName = groq ? "GROQ_API_KEY" : "ZAI_API_KEY";
-  const apiKey = process.env[keyName];
-  if (!apiKey) {
-    const err = new Error(`${keyName} 없음 · LLM 을 부를 수 없습니다`);
-    (err as { status?: number }).status = 503;
-    throw err;
-  }
-  const client = new OpenAI({ apiKey, baseURL: groq ? GROQ_BASE_URL : process.env.ZAI_BASE_URL || DEFAULT_BASE_URL });
-
-  const response = await client.chat.completions.create({
-    model: groq ? GROQ_MODEL : process.env.ZAI_MODEL || DEFAULT_MODEL,
-    temperature: opts.temperature ?? 0.4,
-    max_tokens: maxTokens,
-    response_format: { type: "json_object" },
-    messages: [
-      { role: "system", content: system },
-      { role: "user", content: user },
-    ],
-    // z.ai 확장 파라미터 · OpenAI SDK 타입에는 없으나 서버는 수용. Groq 에는 보내지 않는다.
-    ...(groq ? {} : ({ thinking: { type: "disabled" } } as object)),
-  });
-
-  opts.usage?.({ input: response.usage?.prompt_tokens ?? 0, output: response.usage?.completion_tokens ?? 0 });
-  const content = response.choices[0]?.message?.content;
-  if (!content) throw new Error("LLM 응답이 비었습니다");
-  try {
-    return JSON.parse(content.trim().replace(/^```(?:json)?\n?|\n?```$/g, ""));
-  } catch {
-    throw new Error("LLM 응답이 JSON 이 아닙니다");
-  }
-}
 
 const str = (v: unknown): string => (typeof v === "string" ? v.trim() : "");
 // 모델이 "AI · 미래" · "AI" 처럼 조금 다르게 쓰는 경우가 있다(18차 검증 실측). 가운뎃점과 공백을 빼고 맞춘다.
@@ -136,6 +87,7 @@ ${COMMON_RULES}
     system,
     `# 제외 목록 (이미 채택 · 기각 · 보류한 질문)\n${exclude}${reviews}\n\n질문 후보 10개를 JSON 으로 내시오.`,
     6000,
+    { tier: "light" },
   )) as { items?: unknown[] };
 
   return (parsed.items ?? [])
@@ -195,7 +147,7 @@ ${COMMON_RULES}
 { "question": "...", "premise": "...", "twist": "...", "series": "...", "area": "...", "queries": ["...", "..."] }`;
 
   const label = { sentence: "질문 문장", topic: "주제어", link: "페이지 제목" }[input.mode];
-  const o = (await callJson(system, `${label}: ${input.text}`, 1500)) as Record<string, unknown>;
+  const o = (await callJson(system, `${label}: ${input.text}`, 1500, { tier: "light" })) as Record<string, unknown>;
 
   return {
     question: input.mode === "sentence" ? input.text.trim() : str(o.question),
@@ -248,6 +200,7 @@ export async function judgeRelevance(input: {
     system,
     `질문: ${input.question}\n통설: ${input.premise ?? "-"}\n\n${papers || "(논문 없음)"}`,
     2500,
+    { tier: "light" },
   )) as Record<string, unknown>;
 
   const ids = new Set(input.papers.map((p) => p.id));
@@ -287,6 +240,7 @@ export async function rewriteQueries(input: {
     system,
     `질문: ${input.question}\n지금 검색어: ${input.queries.join(" / ")}\n실패 이유: ${input.failure}\n판정 근거:\n${input.reasons.map((r) => `- ${r}`).join("\n") || "(없음)"}`,
     800,
+    { tier: "light" },
   )) as Record<string, unknown>;
 
   const q = toQueries(o.queries);

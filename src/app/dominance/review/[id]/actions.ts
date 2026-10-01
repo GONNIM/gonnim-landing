@@ -14,6 +14,7 @@ import type {
   LetterBlock,
   ReviewChecks,
 } from "@/lib/dominance/types";
+import { MODEL_MAIN } from "@/lib/dominance/llm";
 
 type LetterRow = {
   id: string;
@@ -90,7 +91,7 @@ export async function requestCrossReview(
   await db.from("ds_letter_audit").insert({
     letter_id: letterId,
     event: "cross_review",
-    model: process.env.ZAI_MODEL || "glm-5.2",
+    model: MODEL_MAIN,
     raw_output: JSON.stringify(notes),
     passed: notes.length === 0,
   });

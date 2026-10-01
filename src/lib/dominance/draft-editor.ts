@@ -4,7 +4,7 @@
 // 시험 2(26차 B-2): 예시 짝 대신 사람이 쓴 편집 규칙표(docs/03-build/editor-rules.md)를 준다.
 // 목적: 사람 편집(병목)을 기계로 옮길 수 있는지 본다. 결과는 운영자가 판정한다.
 
-import { callJson } from "./question-llm";
+import { callJson } from "./llm";
 import { flagBlocks } from "./filters";
 import { normalizePunct, tagsIn } from "./tags";
 import { BLOCK_LABEL, BLOCK_ORDER, type LetterBlock } from "./types";
@@ -67,6 +67,7 @@ export async function editorPass(input: {
     `${ex}\n\n---\n\n# 고칠 기계 초안\n${renderDraft(input.draft)}\n\n# 이 글의 카드(고른 문장 · 원문 · 뜻 · 대상 · 연도)\n${cards}\n\n${input.rules ? "위 기계 초안을 편집 규칙표대로" : "위 기계 초안을 예시의 편집처럼"} 고쳐 쓰시오.`,
     9000,
     {
+      tier: "main",
       temperature: 0.5,
       provider: input.provider,
       usage: (u) => {

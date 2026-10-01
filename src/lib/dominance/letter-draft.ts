@@ -12,6 +12,7 @@ import { archiveDraft, readDraftMeta, writeDraftMeta, type DraftMeta } from "./d
 import { SLOTS, loadEvidence, type SourceRef } from "./evidence";
 import { makeSlug } from "./letters";
 import type { LetterBlock } from "./types";
+import { MODEL_LIGHT, MODEL_MAIN } from "./llm";
 
 export const MIN_SLOTS = 3;
 
@@ -117,7 +118,8 @@ export async function writeDraftFromCard(
     ms: gen.ms,
     tokens: gen.tokens,
     cardFacts: card.facts.length,
-    model: process.env.ZAI_MODEL || "glm-5.2",
+    // 쓰기는 main, 고르기 · 용어표는 light (D46)
+    model: `${MODEL_MAIN} · ${MODEL_LIGHT}`,
     generation,
   };
   await writeDraftMeta(db, letterId, meta);
