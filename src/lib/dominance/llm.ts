@@ -3,7 +3,7 @@
 // - main  (glm-5.3)       : ②-2 쓰기 · ④ 교차 리뷰 · 편집자 호출 시험
 // - light (glm-5.3-flash) : ⓪-1 제안 · 이슈 만들기 채우기 · ⓪-2 V2 관련도 · 검색어 다시 쓰기 ·
 //                           ① 배정(칸 · 관련도 · 뜻) · 본문 정설 · 산업 단서 · ②-1 뜻 · ②-2 고르기 · 용어표
-// 운영자는 ZAI_MODEL · ZAI_MODEL_LIGHT 두 환경변수로 바꾼다(런북 17).
+// 운영자는 DS_MODEL · DS_MODEL_LIGHT 두 환경변수로 바꾼다(런북 17). ZAI_MODEL 은 지배상식 밖 기능이 읽는 변수이며 여기서는 읽지 않는다(29차).
 //
 // GLM-5.3 계열은 추론을 끌 수 없다(thinking:disabled 를 보내면 400). 그래서 추론 강도를
 // reasoning_effort "low" 로 고정한다. 기본값이 "max" 여서 지정하지 않으면 느리고 비싸진다.
@@ -11,8 +11,8 @@
 
 import OpenAI from "openai";
 
-export const MODEL_MAIN = process.env.ZAI_MODEL || "glm-5.3";
-export const MODEL_LIGHT = process.env.ZAI_MODEL_LIGHT || "glm-5.3-flash";
+export const MODEL_MAIN = process.env.DS_MODEL || "glm-5.3";
+export const MODEL_LIGHT = process.env.DS_MODEL_LIGHT || "glm-5.3-flash";
 export const BASE_URL = process.env.ZAI_BASE_URL || "https://api.z.ai/api/paas/v4";
 /** 추론 강도 · z.ai glm-5.3 안내의 reasoning_effort("low" | "high" | "max") */
 export const REASONING_EFFORT = "low";
@@ -33,7 +33,7 @@ export function setUsageMeter(fn: ((u: Usage) => void) | null) {
 
 /**
  * 추론 설정. glm-5.3 계열은 끌 수 없으므로 reasoning_effort "low".
- * glm-5.2 이하로 되돌릴 때(ZAI_MODEL=glm-5.2)는 예전처럼 추론을 끈다 — 그 모델은 reasoning_effort 를 모른다.
+ * glm-5.2 이하로 되돌릴 때(DS_MODEL=glm-5.2)는 예전처럼 추론을 끈다 — 그 모델은 reasoning_effort 를 모른다.
  */
 function reasoningParams(model: string): object {
   const legacy = /^glm-(4\.|5$|5-|5\.[0-2](\D|$))/.test(model);
