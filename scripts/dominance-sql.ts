@@ -23,9 +23,13 @@ async function main() {
   if (!file.startsWith(path.join(ROOT, "db") + path.sep) || !file.endsWith(".sql")) throw new Error("db/ 안의 .sql 파일만 실행한다");
   const url = process.env.DS_DATABASE_URL;
   if (!url) throw new Error("DS_DATABASE_URL 없음 · .env.local 에 넣어 주십시오(값은 어디에도 적지 않는다)");
+  if (!/^postgres(ql)?:\/\//.test(url))
+    throw new Error(
+      "DS_DATABASE_URL 이 Postgres 연결 문자열(postgresql://… 로 시작)이 아닙니다 · Supabase → Connect → Session pooler 의 문자열을 넣어 주십시오",
+    );
 
   const sql = readFileSync(file, "utf8");
-  const client = new pg.Client({ connectionString: url, ssl: { rejectUnauthorized: false } });
+  const client = new pg.Client({ connectionString: url, ssl: { rejectUnauthorized: false }, connectionTimeoutMillis: 20_000 });
   const notices: string[] = [];
   client.on("notice", (n) => notices.push(n.message ?? String(n)));
   await client.connect();
@@ -51,6 +55,7 @@ async function main() {
 }
 
 main().catch((err) => {
-  console.error(err instanceof Error ? err.message : String(err));
+  const e = err as { message?: string; code?: string; name?: string };
+  console.error(e?.message || e?.code || e?.name || String(err));
   process.exit(1);
 });
