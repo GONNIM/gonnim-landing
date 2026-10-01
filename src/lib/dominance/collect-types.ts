@@ -38,7 +38,16 @@ export type EvidenceRun = {
   industry: IndustryLink[];
   errors: string[];
   /** 배정 결과 · 논문마다 칸과 이유 한 줄(21차부터 남긴다) */
-  assignments?: { id: string; title: string; slot: string; reason: string; saved: number }[];
+  assignments?: {
+    id: string;
+    title: string;
+    slot: string;
+    reason: string;
+    /** 26차 A-3 · 0 무관(저장 안 함) · 1 주변 · 2 직접 */
+    relevance?: number;
+    relevanceReason?: string;
+    saved: number;
+  }[];
   /** 이미 본 논문(다시 LLM 에 넣지 않는다) */
   seen: string[];
   done: boolean;

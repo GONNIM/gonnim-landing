@@ -27,6 +27,8 @@ export type CardFact = {
   subject: string | null;
   year: number | null;
   hasNumber: boolean | null;
+  /** 주변 자료(관련도 1 · 26차 A-3) · 카드에 "주변" 으로 보이고 고르기에서 뒤로 민다 */
+  peripheral: boolean;
 };
 
 export type CardSource = {
@@ -114,6 +116,7 @@ export async function loadQuestionCard(db: SupabaseClient, questionId: string): 
           subject: f.subject,
           year: f.year,
           hasNumber: f.hasNumber,
+          peripheral: f.peripheral,
         });
       }
     }

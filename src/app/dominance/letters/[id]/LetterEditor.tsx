@@ -339,7 +339,8 @@ function CardPanel({ card, active }: { card: EditorCard; active: string[] }) {
                   on(f.tag) ? "border-[color:var(--accent)] bg-[color:var(--accent)]/10 text-foreground" : "border-[color:var(--border)]/50 text-muted-foreground"
                 }`}
               >
-                <b className="font-mono">[{f.tag}]</b> {f.subject ? `(${f.subject}${f.year ? ` · ${f.year}` : ""}) ` : ""}
+                <b className="font-mono">[{f.tag}]</b> {f.peripheral && <span className="text-amber-300">주변 </span>}
+                {f.subject ? `(${f.subject}${f.year ? ` · ${f.year}` : ""}) ` : ""}
                 {f.text}
                 {/* 22차 C-3 · 켜진 카드는 원문과 확인된 뜻을 함께 보인다 */}
                 {on(f.tag) && f.ko && (

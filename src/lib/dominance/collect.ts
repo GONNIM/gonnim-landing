@@ -115,7 +115,15 @@ async function searchPhase(db: SupabaseClient, q: Question, run: EvidenceRun, qu
   run.assignments ??= [];
   for (const a of assigned) {
     const title = pool.find((x) => x.externalId === a.key)?.title ?? a.key;
-    run.assignments.push({ id: a.key, title, slot: a.slot, reason: a.reason, saved: 0 });
+    run.assignments.push({
+      id: a.key,
+      title,
+      slot: a.slot,
+      reason: a.reason,
+      relevance: a.relevance,
+      relevanceReason: a.relevanceReason,
+      saved: 0,
+    });
     if (a.slot === "none") continue;
     if (used(a.slot) >= SLOT_CAP) {
       capped += a.sentences.length;
@@ -145,6 +153,7 @@ async function searchPhase(db: SupabaseClient, q: Question, run: EvidenceRun, qu
           verifiedAt: new Date().toISOString(),
           sourcePart: "abstract",
           ko: s.ko,
+          relevance: a.relevance === 1 ? 1 : 2,
         },
         "search",
       );
@@ -159,7 +168,8 @@ async function searchPhase(db: SupabaseClient, q: Question, run: EvidenceRun, qu
   run.verifyFailed += failed;
   run.duplicates += dup;
   const assignedCount = assigned.filter((a) => a.slot !== "none").length;
-  return `논문 ${pool.length}편(리뷰 ${Math.min(reviews.length, 10)}) · 배정 ${assignedCount}편 · 저장 ${added}문장 (${Object.entries(bySlot)
+  const rel = (n: number) => assigned.filter((a) => a.relevance === n).length;
+  return `논문 ${pool.length}편(리뷰 ${Math.min(reviews.length, 10)}) · 배정 ${assignedCount}편(관련도 직접 ${rel(2)} · 주변 ${rel(1)} · 무관 ${rel(0)}) · 저장 ${added}문장 (${Object.entries(bySlot)
     .map(([k, v]) => `${k} ${v}`)
     .join(" · ") || "없음"}) · 대조 실패 ${failed} · 중복 ${dup}${capped ? ` · 칸 상한으로 뺀 후보 ${capped}` : ""}`;
 }

@@ -205,6 +205,8 @@ export type PickItem = {
   numbers: number;
   sample: boolean;
   verified: boolean;
+  /** 주변 자료(관련도 1) · 직접 자료(2)가 먼저다(26차 A-3) */
+  peripheral?: boolean;
 };
 
 export function pickItems(card: QuestionCard, vMeaning: string | null): PickItem[] {
@@ -219,6 +221,7 @@ export function pickItems(card: QuestionCard, vMeaning: string | null): PickItem
     numbers: countNumbers(f.ko ?? f.text),
     sample: hasSampleOrFollowup(f.text) || hasSampleOrFollowup(f.ko ?? ""),
     verified: !!f.koVerifiedAt,
+    peripheral: f.peripheral,
   }));
   for (const s of card.sources.filter((x) => x.linkOnly && x.memo)) {
     items.push({ id: `L-${s.tag}`, tag: s.tag, slot: "링크만(메모)", ko: s.memo, original: s.memo!, subject: null, year: null, numbers: countNumbers(s.memo!), sample: false, verified: true });
@@ -239,6 +242,7 @@ const PICK_SYSTEM = `당신은 한국어 연구·보건 뉴스레터 「지배�
 - hook 은 통설과 놀라운 수치 하나([V] 등). research 는 정설 → 예외. mechanism 은 왜 그런지(기전 칸 우선). industry 는 산업 · 링크만 메모. practice 는 독자의 판단으로 이어지는 관찰.
 - 한 블록의 수치는 합쳐 3개 이하가 되게 고른다. 표본 크기 · 추적 기간이 든 재료는 같은 원천에서 한 번만 고른다.
 - 같은 재료를 두 블록에 쓰지 않는다.
+- "주변" 표시 재료는 질문을 직접 다루지 않는다. 직접 재료로 블록을 채울 수 없을 때만 고른다(26차).
 - why 는 고른 이유 한 줄(한국어).
 
 # 출력 형식 (엄수)
@@ -262,7 +266,9 @@ export function enforcePicks(
     // 7판 · 은유 블록에는 사실 재료를 주지 않는다
     const max = b === "metaphor" ? 0 : 4;
     const list: { item: PickItem; why: string }[] = [];
-    for (const r of raw[b] ?? []) {
+    // 26차 A-3 · 직접 자료(관련도 2)를 먼저 넣는다. 주변 자료는 자리가 남을 때만 들어간다.
+    const ordered = [...(raw[b] ?? [])].sort((x, y) => Number(!!byId.get(x.id)?.peripheral) - Number(!!byId.get(y.id)?.peripheral));
+    for (const r of ordered) {
       const item = byId.get(r.id);
       if (!item) {
         log.push({ block: b, id: r.id, tag: "?", why: r.why, kept: false, reason: "없는 id" });
@@ -318,7 +324,7 @@ async function pickFacts(
 ): Promise<Record<PickBlock, { id: string; why: string }[]>> {
   const list = items
     .filter((i) => i.ko)
-    .map((i) => `${i.id} [${i.tag}] (${i.slot} · 대상: ${i.subject ?? "-"} · ${i.year ?? "-"} · 수치 ${i.numbers}${i.sample ? " · 표본/추적" : ""}) ${i.ko}`)
+    .map((i) => `${i.id} [${i.tag}] (${i.slot} · 대상: ${i.subject ?? "-"} · ${i.year ?? "-"} · 수치 ${i.numbers}${i.sample ? " · 표본/추적" : ""}${i.peripheral ? " · 주변" : ""}) ${i.ko}`)
     .join("\n");
   const q = card.question;
   const o = (await callJson(

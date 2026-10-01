@@ -413,6 +413,7 @@ function FactRow({ f, slot, questionId, busy, act }: { f: Fact; slot: Slot; ques
             className={`${input} w-44`}
           />
         </label>
+        {f.peripheral && <span className="rounded bg-amber-500/20 px-1 text-amber-300" title="관련도 1 · 질문의 한쪽만 다룬다">주변</span>}
         <span>연도 {f.year ?? "—"}</span>
         <span>수치 {f.hasNumber === null ? "—" : f.hasNumber ? "있음" : "없음"}</span>
         <span className={f.verifiedAt ? "text-emerald-300" : ""}>

@@ -67,6 +67,8 @@ type FactMeta = {
   /** 확인된 뜻(D44) · SQL(2026-10-01) 전에는 메타 줄에 산다 */
   ko?: string | null;
   ko_verified_at?: string | null;
+  /** 질문과의 관련도(26차 A-3) · 1 = 주변(카드에 "주변" 표시) · 2 = 직접. 없으면 직접으로 본다 */
+  rel?: 1 | 2 | null;
 };
 
 export type Fact = {
@@ -82,6 +84,8 @@ export type Fact = {
   /** 한국어 뜻(D44). 증거 단계에서 만들고 사람이 확인한다 */
   ko: string | null;
   koVerifiedAt: string | null;
+  /** 주변 자료(관련도 1) · 고르기 단계에서 뒤로 민다 */
+  peripheral: boolean;
 };
 
 export type SourceRef = {
@@ -277,6 +281,7 @@ function factsOf(r: Row): Fact[] {
       addedBy: r.added_by,
       ko: r.fact_ko ?? km.ko ?? null,
       koVerifiedAt: r.fact_ko_verified_at ?? km.ko_verified_at ?? null,
+      peripheral: km.rel === 1,
     };
   });
 }
@@ -402,6 +407,8 @@ export type NewFact = {
   /** 확인된 뜻 후보(미확인) · D44 */
   ko?: string | null;
   koVerifiedAt?: string | null;
+  /** 관련도(26차 A-3) · 1 = 주변 · 2 = 직접. 0 은 저장하지 않는다 */
+  relevance?: 1 | 2 | null;
 };
 
 type SourceFields = {
@@ -427,6 +434,7 @@ const toMeta = (f: NewFact): FactMeta => ({
   source_part: f.sourcePart,
   ko: f.ko ?? null,
   ko_verified_at: f.koVerifiedAt ?? null,
+  rel: f.relevance === 1 ? 1 : null,
 });
 
 /**
@@ -458,11 +466,11 @@ export async function storeFact(
       verified_at: fact.verifiedAt,
       source_part: fact.sourcePart,
     };
-    if (fact.ko) {
-      // 확인된 뜻 칸이 없으면(SQL 2026-10-01 전) 메타 줄에 둔다.
-      if (koCols) Object.assign(cols, { fact_ko: fact.ko, fact_ko_verified_at: fact.koVerifiedAt ?? null });
-      else cols.note = joinNote(bare ? splitNote(bare.note).memo : null, [{ ko: fact.ko, ko_verified_at: fact.koVerifiedAt ?? null }]);
-    }
+    const rel = fact.relevance === 1 ? 1 : null;
+    if (fact.ko && koCols) Object.assign(cols, { fact_ko: fact.ko, fact_ko_verified_at: fact.koVerifiedAt ?? null });
+    // 확인된 뜻 칸이 없으면(SQL 2026-10-01 전) 뜻을 메타 줄에 둔다. 주변 표시(관련도 1)는 늘 메타 줄에 둔다.
+    const kMeta = fact.ko && !koCols ? { ko: fact.ko, ko_verified_at: fact.koVerifiedAt ?? null } : {};
+    if (Object.keys(kMeta).length || rel) cols.note = joinNote(bare ? splitNote(bare.note).memo : null, [{ ...kMeta, rel }]);
     const { error } = bare
       ? await db.from("ds_question_evidence").update(cols).eq("id", bare.id)
       : await db

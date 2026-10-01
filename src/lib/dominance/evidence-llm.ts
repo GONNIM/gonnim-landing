@@ -39,6 +39,9 @@ export type Assignment = {
   key: string;
   slot: Exclude<Slot, "industry"> | "none";
   reason: string;
+  /** 질문과의 관련도(26차 A-3) · 0 무관 · 1 주변 · 2 직접 */
+  relevance: 0 | 1 | 2;
+  relevanceReason: string;
   sentences: SentenceCandidate[];
 };
 
@@ -80,6 +83,13 @@ export async function assignAndExtract(input: {
             용량-반응 연구가 기전 칸의 재료다. 그때는 배정 이유에 "용량-반응" 이라고 적는다
 - none      해당 없음: 질문과 관련이 약하다
 
+# 관련도 (논문마다 엄수)
+- 2 직접: 질문의 원인과 결과를 그대로 다룬다(예: 질문이 "수면과 기억" 이면 잠을 바꿔 기억이 어떻게 되는지 본 연구).
+- 1 주변: 질문의 한쪽만 다루거나, 대상 · 상황이 질문과 다르지만 글의 배경으로 쓸 수 있다.
+- 0 무관: 질문의 낱말이 겹칠 뿐 다른 원인을 본다(예: 수면과 기억 질문에 카페인 음료 · 수면제 성분 · 조명 색 실험).
+  **질문의 원인(예: 운동 · 수면)이 아니라 다른 것(먹을거리 · 약 · 성분 · 순서)을 바꾼 실험은 0 이다.**
+- relevance_reason 에 한국어 한 문장으로 이유를 적는다. 0 이면 slot 은 none, sentences 는 빈 배열.
+
 # 사실 문장 규칙 (엄수)
 - 초록에 있는 문장을 **한 글자도 바꾸지 않고** 그대로 옮긴다. 줄이거나 이어 붙이거나 번역하지 않는다.
 - 한 문장씩, 논문마다 1~3개. none 이면 빈 배열.
@@ -97,7 +107,7 @@ ${KO_RULES}
 
 # 출력 형식 (엄수)
 다른 설명 없이 JSON 만 반환한다. key 는 받은 값을 그대로 쓴다.
-{ "items": [ { "key": "...", "slot": "exception", "reason": "...", "sentences": [ { "text": "...", "subject": "...", "year": 2024, "has_number": true, "ko": "..." } ] } ] }`;
+{ "items": [ { "key": "...", "relevance": 2, "relevance_reason": "...", "slot": "exception", "reason": "...", "sentences": [ { "text": "...", "subject": "...", "year": 2024, "has_number": true, "ko": "..." } ] } ] }`;
 
   const papers = input.papers
     .map(
@@ -116,10 +126,23 @@ ${KO_RULES}
     const r = (it ?? {}) as Record<string, unknown>;
     const key = str(r.key);
     if (!keys.has(key)) return [];
-    const slot = ["premise", "exception", "mechanism"].includes(str(r.slot))
-      ? (str(r.slot) as Assignment["slot"])
-      : "none";
-    return [{ key, slot, reason: str(r.reason) || "이유 없음", sentences: slot === "none" ? [] : toSentences(r.sentences, 3) }];
+    const rel = Number(r.relevance);
+    // 관련도를 안 적었으면 주변(1)으로 본다. 0 이면 칸을 비운다.
+    const relevance: Assignment["relevance"] = rel === 0 || rel === 1 || rel === 2 ? rel : 1;
+    const slot =
+      relevance > 0 && ["premise", "exception", "mechanism"].includes(str(r.slot))
+        ? (str(r.slot) as Assignment["slot"])
+        : "none";
+    return [
+      {
+        key,
+        slot,
+        reason: str(r.reason) || "이유 없음",
+        relevance,
+        relevanceReason: str(r.relevance_reason) || "이유 없음",
+        sentences: slot === "none" ? [] : toSentences(r.sentences, 3),
+      },
+    ];
   });
 }
 
