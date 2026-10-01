@@ -127,16 +127,24 @@ export async function callJson(
     temperature?: number;
     usage?: (u: Usage) => void;
     provider?: Provider;
+    /** 35차 D · 다시 부른 기록에 남길 단계 이름(제안 · 검증 · 배정 · 고르기 · 용어표 · 쓰기 · 이슈 만들기 …). 없으면 unknown */
+    stage?: string;
   },
 ): Promise<unknown> {
   let last = "";
+  const { stage, ...callOpts } = opts;
   for (let attempt = 0; attempt < 2; attempt++) {
-    const content = await chat({ system, user, maxTokens, ...opts });
+    const content = await chat({ system, user, maxTokens, ...callOpts });
     try {
       return JSON.parse(content.trim().replace(/^```(?:json)?\n?|\n?```$/g, ""));
     } catch {
       last = content;
-      if (attempt === 0) jsonRetries++;
+      if (attempt === 0) {
+        jsonRetries++;
+        // 35차 D · 다시 부를 때 한 줄을 남긴다(실패해도 본 호출은 계속)
+        const { logJsonRetry } = await import("./runlog");
+        await logJsonRetry({ model: modelFor(opts.tier, opts.provider), stage: stage ?? "unknown", head: content });
+      }
     }
   }
   throw new Error(`LLM 응답이 JSON 이 아닙니다 (길이 ${last.length} · 앞: ${last.slice(0, 80)} · 끝: ${last.slice(-80)})`);

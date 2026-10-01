@@ -62,3 +62,47 @@ export async function saveRun(
     return err instanceof Error ? err.message : String(err);
   }
 }
+
+// ── 35차 D · JSON 다시 부른 기록 ────────────────────────────────────────────
+//
+// callJson 이 JSON 이 깨진 응답을 받고 한 번 다시 부를 때마다 한 줄을 남긴다(모델 · 단계 · 앞 80자).
+// ds_cron_runs 에 넣으면 /dominance/runs 에 가짜 크론 실행으로 보이므로 넣지 않는다.
+// 표를 새로 만들지 않으려고(DDL 은 운영자 몫) 비공개 버킷 ds-drafts 의 날짜별 파일에 쌓는다.
+//   ds-drafts/logs/json-retry/<KST 날짜>.json  →  [{ at, model, stage, head }]
+// 이 기록도 예외를 던지지 않는다. 기록 때문에 본 호출을 잃지 않는다.
+
+export type JsonRetryLine = { at: string; model: string; stage: string; head: string };
+
+export const JSON_RETRY_DIR = "logs/json-retry";
+
+export function kstDay(d = new Date()): string {
+  return new Date(d.getTime() + 9 * 3600e3).toISOString().slice(0, 10);
+}
+
+export async function logJsonRetry(line: Omit<JsonRetryLine, "at">): Promise<string | null> {
+  try {
+    const { getDominanceClient } = await import("./db");
+    const db = getDominanceClient();
+    const path = `${JSON_RETRY_DIR}/${kstDay()}.json`;
+    const { data } = await db.storage.from("ds-drafts").download(path);
+    const lines: JsonRetryLine[] = data ? (JSON.parse(await data.text()) as JsonRetryLine[]) : [];
+    lines.push({ at: new Date().toISOString(), ...line, head: line.head.slice(0, 80) });
+    const { error } = await db.storage
+      .from("ds-drafts")
+      .upload(path, new Blob([JSON.stringify(lines, null, 1)], { type: "application/json" }), { upsert: true });
+    return error ? error.message : null;
+  } catch (err) {
+    return err instanceof Error ? err.message : String(err);
+  }
+}
+
+/** 그날(KST)의 JSON 다시 부른 기록 */
+export async function readJsonRetries(db: SupabaseClient, day: string): Promise<JsonRetryLine[]> {
+  const { data } = await db.storage.from("ds-drafts").download(`${JSON_RETRY_DIR}/${day}.json`);
+  if (!data) return [];
+  try {
+    return JSON.parse(await data.text()) as JsonRetryLine[];
+  } catch {
+    return [];
+  }
+}

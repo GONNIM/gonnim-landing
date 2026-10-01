@@ -68,6 +68,7 @@ export async function editorPass(input: {
     9000,
     {
       tier: "main",
+      stage: "편집자 호출(시험)",
       temperature: 0.5,
       provider: input.provider,
       usage: (u) => {

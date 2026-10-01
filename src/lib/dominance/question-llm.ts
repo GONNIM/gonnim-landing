@@ -87,7 +87,7 @@ ${COMMON_RULES}
     system,
     `# 제외 목록 (이미 채택 · 기각 · 보류한 질문)\n${exclude}${reviews}\n\n질문 후보 10개를 JSON 으로 내시오.`,
     6000,
-    { tier: "light" },
+    { tier: "light", stage: "제안" },
   )) as { items?: unknown[] };
 
   return (parsed.items ?? [])
@@ -147,7 +147,7 @@ ${COMMON_RULES}
 { "question": "...", "premise": "...", "twist": "...", "series": "...", "area": "...", "queries": ["...", "..."] }`;
 
   const label = { sentence: "질문 문장", topic: "주제어", link: "페이지 제목" }[input.mode];
-  const o = (await callJson(system, `${label}: ${input.text}`, 1500, { tier: "light" })) as Record<string, unknown>;
+  const o = (await callJson(system, `${label}: ${input.text}`, 1500, { tier: "light", stage: "이슈 만들기" })) as Record<string, unknown>;
 
   return {
     question: input.mode === "sentence" ? input.text.trim() : str(o.question),
@@ -200,7 +200,7 @@ export async function judgeRelevance(input: {
     system,
     `질문: ${input.question}\n통설: ${input.premise ?? "-"}\n\n${papers || "(논문 없음)"}`,
     2500,
-    { tier: "light" },
+    { tier: "light", stage: "검증" },
   )) as Record<string, unknown>;
 
   const ids = new Set(input.papers.map((p) => p.id));
@@ -240,7 +240,7 @@ export async function rewriteQueries(input: {
     system,
     `질문: ${input.question}\n지금 검색어: ${input.queries.join(" / ")}\n실패 이유: ${input.failure}\n판정 근거:\n${input.reasons.map((r) => `- ${r}`).join("\n") || "(없음)"}`,
     800,
-    { tier: "light" },
+    { tier: "light", stage: "검증(검색어 다시 쓰기)" },
   )) as Record<string, unknown>;
 
   const q = toQueries(o.queries);

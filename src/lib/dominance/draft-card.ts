@@ -77,6 +77,7 @@ async function makeGlossary(
   const q0 = card.question.searchQueries[0] ?? "";
   const o = (await callJson(GLOSSARY_SYSTEM, `질문: ${card.question.question}\n[V] 검색어: ${q0}\n\n# 사실 카드\n${facts}`, 2000, {
     tier: "light",
+    stage: "용어표",
     temperature: 0.3,
     usage: (u) => {
       tokens.input += u.input;
@@ -335,6 +336,7 @@ async function pickFacts(
     3000,
     {
       tier: "light",
+      stage: "고르기",
       temperature: 0.3,
       usage: (u) => {
         tokens.input += u.input;
@@ -391,6 +393,7 @@ export async function generateCardDraft(card: QuestionCard): Promise<CardDraft> 
     9000,
     {
       tier: "main",
+      stage: "쓰기",
       temperature: 0.6,
       usage: (u) => {
         tokens.input += u.input;
