@@ -1,6 +1,7 @@
 // ③ 편집자 호출 시험 (25차 D-3) · 기계 초안을 Fable 편집본처럼 고쳐 쓰게 한다. LLM 1회.
 //
 // 입력: 기계 초안 · 고른 문장의 카드(원문 · 뜻 · 대상 · 연도 · 태그) · 예시 두 짝(기계 초안 → 편집본 전문).
+// 시험 2(26차 B-2): 예시 짝 대신 사람이 쓴 편집 규칙표(docs/03-build/editor-rules.md)를 준다.
 // 목적: 사람 편집(병목)을 기계로 옮길 수 있는지 본다. 결과는 운영자가 판정한다.
 
 import { callJson } from "./question-llm";
@@ -12,7 +13,7 @@ export type DraftText = { title: string; summary: string; blocks: LetterBlock[] 
 export type EditorCardFact = { tag: string; text: string; ko: string | null; subject: string | null; year: number | null };
 
 export const EDITOR_SYSTEM = `당신은 한국어 연구·보건 뉴스레터 「지배상식」의 편집자다. 기계가 쓴 초안을 고쳐 쓴다.
-예시 두 짝(기계 초안 → 사람 편집본)을 먼저 읽고, 편집이 무엇을 했는지 보고 **같은 방식으로** 고쳐 쓴다.
+⟦방식⟧
 
 # 규칙 (엄수)
 - 통설을 세우고 되묻기로 끝난다(훅은 물음표로 끝난다).
@@ -30,6 +31,9 @@ export const EDITOR_SYSTEM = `당신은 한국어 연구·보건 뉴스레터 �
 다른 설명 없이 JSON 만 반환한다.
 { "title": "...", "summary": "한 문장 요약 · 태그 포함", "blocks": { "summary": "...", "hook": "...", "research": "...", "mechanism": "...", "industry": "...", "practice": "...", "metaphor": "..." } }`;
 
+const MODE_EXAMPLES = "예시 두 짝(기계 초안 → 사람 편집본)을 먼저 읽고, 편집이 무엇을 했는지 보고 **같은 방식으로** 고쳐 쓴다.";
+const MODE_RULES = "사람 편집자가 한 일을 적은 **편집 규칙표**를 먼저 읽고, 규칙을 하나씩 지켜 고쳐 쓴다. 규칙표와 아래 규칙이 부딪치면 아래 규칙이 먼저다.";
+
 export function renderDraft(d: DraftText): string {
   return [
     `제목: ${d.title}`,
@@ -41,19 +45,24 @@ export function renderDraft(d: DraftText): string {
 export async function editorPass(input: {
   draft: DraftText;
   cards: EditorCardFact[];
-  examples: { before: DraftText; after: DraftText }[];
+  examples?: { before: DraftText; after: DraftText }[];
+  /** 26차 · 편집 규칙표 원문. 있으면 예시 대신 이것을 준다 */
+  rules?: string;
 }): Promise<{ result: DraftText; ms: number; tokens: { input: number; output: number } }> {
   const tokens = { input: 0, output: 0 };
-  const ex = input.examples
-    .map((e, i) => `# 예시 ${i + 1} · 기계 초안\n${renderDraft(e.before)}\n\n# 예시 ${i + 1} · 편집본\n${renderDraft(e.after)}`)
-    .join("\n\n---\n\n");
+  const ex = input.rules
+    ? `# 편집 규칙표\n${input.rules.trim()}`
+    : (input.examples ?? [])
+        .map((e, i) => `# 예시 ${i + 1} · 기계 초안\n${renderDraft(e.before)}\n\n# 예시 ${i + 1} · 편집본\n${renderDraft(e.after)}`)
+        .join("\n\n---\n\n");
   const cards = input.cards
     .map((c) => `[${c.tag}] (대상: ${c.subject ?? "-"}${c.year ? ` · ${c.year}` : ""}) 원문: ${c.text}\n     뜻: ${c.ko ?? "(없음)"}`)
     .join("\n");
   const t0 = Date.now();
+  const system = EDITOR_SYSTEM.replace("⟦방식⟧", input.rules ? MODE_RULES : MODE_EXAMPLES);
   const o = (await callJson(
-    EDITOR_SYSTEM,
-    `${ex}\n\n---\n\n# 고칠 기계 초안\n${renderDraft(input.draft)}\n\n# 이 글의 카드(고른 문장 · 원문 · 뜻 · 대상 · 연도)\n${cards}\n\n위 기계 초안을 예시의 편집처럼 고쳐 쓰시오.`,
+    system,
+    `${ex}\n\n---\n\n# 고칠 기계 초안\n${renderDraft(input.draft)}\n\n# 이 글의 카드(고른 문장 · 원문 · 뜻 · 대상 · 연도)\n${cards}\n\n${input.rules ? "위 기계 초안을 편집 규칙표대로" : "위 기계 초안을 예시의 편집처럼"} 고쳐 쓰시오.`,
     9000,
     {
       temperature: 0.5,
