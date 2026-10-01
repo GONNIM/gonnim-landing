@@ -7,6 +7,7 @@ export const dynamic = "force-dynamic";
 
 const NAV = [
   { href: "/dominance", label: "현황" },
+  { href: "/dominance/needs", label: "⓪-0 Needs" },
   { href: "/dominance/questions", label: "① 이슈" },
   { href: "/dominance/letters", label: "③ 글" },
   { href: "/dominance/review", label: "④ 리뷰" },

@@ -49,11 +49,15 @@ export async function fillAction(input: {
   return fillFromInput(input);
 }
 
+/** 36차 C · ⓪-0 Needs 지도의 신호 하나 */
+export type IssueSignal = { src: string; title: string; views: number; delta: number | null; week: string };
+
 export async function saveIssueAction(input: {
   mode: FillMode;
   text: string;
   linkTitle: string | null;
   fields: IssueFields;
+  signal?: IssueSignal | null;
 }): Promise<SaveResult> {
   const { db } = await dominanceContext();
   const r = await saveIssue(db, input);

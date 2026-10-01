@@ -148,6 +148,8 @@ export async function saveIssue(
     text: string;
     linkTitle: string | null;
     fields: IssueFields;
+    /** 36차 C · ⓪-0 신호에서 왔으면 seed_kind=trend · 원래 입력에 신호 출처 */
+    signal?: { src: string; title: string; views: number; delta: number | null; week: string } | null;
   },
 ): Promise<SaveResult> {
   const f = input.fields;
@@ -165,8 +167,10 @@ export async function saveIssue(
   }
 
   // 원래 입력을 남긴다. 링크는 주소와 읽은 제목만 둔다(본문 없음).
-  const sourceInput =
-    input.mode === "link"
+  const sg = input.signal;
+  const sourceInput = sg
+    ? `신호 · ${sg.src === "wiki-ko" ? "위키 ko" : "위키 en"} · ${sg.title} · 7일 조회 ${sg.views} · 지난주 대비 ${sg.delta === null ? "첫 주" : sg.delta} · 주 시작 ${sg.week}`
+    : input.mode === "link"
       ? `${input.text.trim()}${input.linkTitle ? ` · 제목: ${input.linkTitle}` : ""}`
       : input.text.trim();
 
@@ -178,7 +182,7 @@ export async function saveIssue(
       twist: f.twist.trim() || null,
       series: f.series.trim() || null,
       searchQueries: f.queries.map((q) => q.trim()).filter(Boolean),
-      seedKind: "owner",
+      seedKind: sg ? "trend" : "owner",
       memo: null,
     },
     {

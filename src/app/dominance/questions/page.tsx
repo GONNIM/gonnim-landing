@@ -6,12 +6,22 @@ import { dominanceContext } from "@/lib/dominance/guard";
 import { loadQuestions } from "@/lib/dominance/questions";
 import { isMissingSchema, SchemaNotice } from "@/lib/dominance/schema-guard";
 import { QuestionBoard } from "./QuestionBoard";
+import type { IssueSignal } from "./actions";
 
 export const dynamic = "force-dynamic";
 // [검증] 은 Europe PMC 5~10회와 LLM 1~3회를 부른다. 서버 액션의 시간 상한을 이 페이지에서 올린다.
 export const maxDuration = 300;
 
-export default async function QuestionsPage() {
+export default async function QuestionsPage({ searchParams }: { searchParams: Promise<{ signal?: string }> }) {
+  // 36차 C · ⓪-0 의 [이 신호로 이슈 만들기] 가 넘긴 신호(위키 문서 · 조회 · 증감)
+  const { signal: raw } = await searchParams;
+  let signal: IssueSignal | null = null;
+  try {
+    const o = raw ? (JSON.parse(raw) as IssueSignal) : null;
+    if (o && typeof o.title === "string" && /^wiki-(ko|en)$/.test(o.src)) signal = o;
+  } catch {
+    signal = null;
+  }
   const { db } = await dominanceContext();
   const { questions, extColumns, error } = await loadQuestions(db);
 
@@ -37,7 +47,7 @@ export default async function QuestionsPage() {
           원래 입력 · V2 근거는 메모 칸 끝에 임시로 적습니다. SQL 을 실행하면 제자리로 옮겨집니다(런북 10번).
         </p>
       )}
-      <QuestionBoard questions={questions} />
+      <QuestionBoard questions={questions} signal={signal} />
     </div>
   );
 }

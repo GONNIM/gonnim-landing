@@ -27,6 +27,7 @@ import {
 } from "./actions";
 import { runCollect } from "./runCollect";
 import { IssueMaker } from "./IssueMaker";
+import type { IssueSignal } from "./actions";
 import { Btn, FieldsEditor } from "./ui";
 
 type SortKey = "area" | "series" | "v5" | "created";
@@ -44,7 +45,7 @@ const VALIDATE_CONCURRENCY = 2;
 
 const OPEN = new Set(["cc0", "cc by", "cc-by", "public domain", "pd"]);
 
-export function QuestionBoard({ questions }: { questions: Question[] }) {
+export function QuestionBoard({ questions, signal = null }: { questions: Question[]; signal?: IssueSignal | null }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [statusFilter, setStatusFilter] = useState<QuestionStatus | "all" | "open">("open");
@@ -56,7 +57,8 @@ export function QuestionBoard({ questions }: { questions: Question[] }) {
   const [running, setRunning] = useState<Set<string>>(new Set());
   const [banner, setBanner] = useState<string | null>(null);
   const [branch, setBranch] = useState<ProposeBranch>("editorial");
-  const [makerOpen, setMakerOpen] = useState(false);
+  // 36차 C · 신호를 받고 들어오면 이슈 만들기 칸을 연 채로 시작한다
+  const [makerOpen, setMakerOpen] = useState(!!signal);
   const [focusId, setFocusId] = useState<string | null>(null);
   const [editing, setEditing] = useState<string | null>(null);
 
@@ -225,6 +227,7 @@ export function QuestionBoard({ questions }: { questions: Question[] }) {
 
       {makerOpen && (
         <IssueMaker
+          signal={signal}
           onSaved={(id) => {
             setMakerOpen(false);
             router.refresh();

@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { dominanceContext } from "@/lib/dominance/guard";
+import { loadLatestNeeds } from "@/lib/dominance/needs";
 import { kstToday, formatKstDate, formatKstDateTime } from "@/lib/dominance/kst";
 import { isMissingSchema, SchemaNotice } from "@/lib/dominance/schema-guard";
 import {
@@ -65,9 +66,23 @@ export default async function DominanceHome() {
   const approved = byStatus("approved");
   const dueToday = approved.filter((l) => l.scheduled_for === today);
 
+  // 36차 C · 이번 주 Needs 신호 한 줄
+  const needs = await loadLatestNeeds(db).catch(() => null);
+
   return (
     <div className="space-y-8">
       <Heading />
+
+      <p className="text-xs text-muted-foreground">
+        이번 주 Needs 신호:{" "}
+        {needs ? (
+          <Link href="/dominance/needs" className="underline">
+            수집일 {needs.collectedAt.slice(0, 10)} · 문서 {needs.items.length}개(주 시작 {needs.weekStart})
+          </Link>
+        ) : (
+          "아직 없음(월요일 07:30 크론)"
+        )}
+      </p>
 
       <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
         <Card

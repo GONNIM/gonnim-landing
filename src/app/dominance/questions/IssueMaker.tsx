@@ -6,7 +6,7 @@
 
 import { useState, useTransition } from "react";
 import type { FillMode } from "@/lib/dominance/question-llm";
-import { fillAction, saveIssueAction, type IssueFields } from "./actions";
+import { fillAction, saveIssueAction, type IssueFields, type IssueSignal } from "./actions";
 import { Btn, FieldsEditor } from "./ui";
 
 const MODES: { key: FillMode; label: string; placeholder: string }[] = [
@@ -20,12 +20,15 @@ const EMPTY: IssueFields = { question: "", premise: "", twist: "", series: "", a
 export function IssueMaker({
   onSaved,
   onDuplicate,
+  signal = null,
 }: {
   onSaved: (id: string) => void;
   onDuplicate: (id: string) => void;
+  /** 36차 C · ⓪-0 신호에서 왔으면 주제어 칸에 문서명을 넣고 출처를 보인다. 질문 문장은 비운다(D41) */
+  signal?: IssueSignal | null;
 }) {
-  const [mode, setMode] = useState<FillMode>("sentence");
-  const [text, setText] = useState("");
+  const [mode, setMode] = useState<FillMode>(signal ? "topic" : "sentence");
+  const [text, setText] = useState(signal ? signal.title.replace(/_/g, " ") : "");
   const [manualTitle, setManualTitle] = useState("");
   const [needTitle, setNeedTitle] = useState(false);
   const [linkTitle, setLinkTitle] = useState<string | null>(null);
@@ -59,7 +62,7 @@ export function IssueMaker({
     setMsg(null);
     start(async () => {
       const f = mode === "sentence" && !fields.question.trim() ? { ...fields, question: text } : fields;
-      const r = await saveIssueAction({ mode, text, linkTitle: linkTitle ?? (manualTitle.trim() || null), fields: f });
+      const r = await saveIssueAction({ mode, text, linkTitle: linkTitle ?? (manualTitle.trim() || null), fields: f, signal });
       if (r.ok) {
         setText("");
         setFields(EMPTY);
@@ -73,6 +76,13 @@ export function IssueMaker({
 
   return (
     <section className="space-y-3 rounded-xl border border-[color:var(--accent)]/60 bg-surface/40 p-5">
+      {signal && (
+        <p className="rounded-md border border-sky-500/40 bg-sky-500/5 px-3 py-2 text-xs text-foreground/85">
+          신호에서: {signal.src === "wiki-ko" ? "위키 ko" : "위키 en"} · {signal.title.replace(/_/g, " ")} · 7일 조회{" "}
+          {signal.views.toLocaleString("ko-KR")} · 지난주 대비 {signal.delta === null ? "첫 주" : signal.delta.toLocaleString("ko-KR")} ·
+          주 시작 {signal.week}. 저장하면 갈래가 S5 트렌드(trend)로 들어갑니다. 질문 문장은 직접 쓰십시오.
+        </p>
+      )}
       <div className="flex flex-wrap gap-2">
         {MODES.map((m) => (
           <button
