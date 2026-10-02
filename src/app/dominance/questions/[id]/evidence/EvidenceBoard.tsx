@@ -366,6 +366,11 @@ function SourceCard({
   );
 }
 
+/** 41차 B · 파파고 번역 화면 주소(영어 → 한국어). 입력 한도 1,000자에 맞춰 앞부분만 넣는다. */
+function papagoUrl(text: string): string {
+  return `https://papago.naver.com/?sl=en&tl=ko&text=${encodeURIComponent(text.slice(0, 1000))}`;
+}
+
 function FactRow({ f, slot, questionId, busy, act }: { f: Fact; slot: Slot; questionId: string; busy: boolean; act: Act }) {
   const [subject, setSubject] = useState(f.subject ?? "");
   const [ko, setKo] = useState(f.ko ?? "");
@@ -375,7 +380,18 @@ function FactRow({ f, slot, questionId, busy, act }: { f: Fact; slot: Slot; ques
     <li className="rounded-lg border border-[color:var(--border)]/50 p-2.5">
       {/* 33차 F · 지시어(these cases 등)가 맞게 풀렸는지 보려고 초록의 바로 앞 문장을 보인다 */}
       {prev && <p className="mb-1 text-[11px] leading-relaxed text-muted-foreground">앞 문장: {prev}</p>}
-      <p className="text-sm text-foreground">{f.text}</p>
+      <p className="text-sm text-foreground">
+        {f.text}{" "}
+        {/* 41차 B · 원문을 파파고에 넘겨 뜻을 견주어 본다. 저장 · DB 변경은 없다. 파파고 입력 한도에 맞춰 앞 1,000자만. */}
+        <a
+          href={papagoUrl(f.text)}
+          target="_blank"
+          rel="noopener"
+          className="ml-1 whitespace-nowrap text-[11px] text-muted-foreground underline decoration-dotted hover:text-[color:var(--accent)]"
+        >
+          파파고에서 보기 ↗
+        </a>
+      </p>
       {/* D44 · 확인된 뜻. 초안은 이 칸만 받는다. 미확인은 노랑 */}
       <div className={`mt-2 rounded-md border p-2 ${f.koVerifiedAt && !changed ? "border-emerald-500/40" : "border-amber-500/50 bg-amber-500/5"}`}>
         <textarea
