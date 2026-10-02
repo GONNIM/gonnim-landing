@@ -279,7 +279,7 @@ export function ReviewPanel({
               {notes.map((n, i) => (
                 <li
                   key={i}
-                  className="rounded border-l-2 border-amber-500/60 bg-amber-950/20 px-2.5 py-1.5"
+                  className="rounded border-l-2 border-amber-500/60 bg-amber-50 dark:bg-amber-950/20 px-2.5 py-1.5"
                 >
                   <p className="text-[10px] font-semibold text-amber-700 dark:text-amber-300">
                     {CROSS_REVIEW_KIND_LABEL[n.kind]}

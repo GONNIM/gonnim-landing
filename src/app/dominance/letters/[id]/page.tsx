@@ -90,7 +90,15 @@ export default async function LetterEditPage({
 
       {unverified > 0 && (
         <p className="rounded-lg border border-amber-500/60 bg-amber-500/10 p-3 text-sm text-amber-700 dark:text-amber-200">
-          확인 전 초안 · 뜻 {unverified}개 미확인. 증거 표에서 뜻을 확인하시면 이 표시가 사라집니다.
+          확인 전 초안 · 뜻 {unverified}개 미확인.{" "}
+          {data.question_id ? (
+            <Link href={`/dominance/questions/${data.question_id}/evidence`} className="font-medium underline">
+              증거 표
+            </Link>
+          ) : (
+            "증거 표"
+          )}
+          에서 뜻을 확인하시면 이 표시가 사라집니다.
         </p>
       )}
 

@@ -237,7 +237,7 @@ export function LetterEditor({
             key={b.kind}
             className={`rounded-xl border p-4 ${
               b.flags?.length
-                ? "border-red-500/60 bg-red-950/10"
+                ? "border-red-500/60 bg-red-50 dark:bg-red-950/10"
                 : "border-[color:var(--border)]/70 bg-surface/30"
             }`}
           >
@@ -283,7 +283,7 @@ export function LetterEditor({
         ))}
 
         {message && (
-          <p className="rounded-lg border border-red-500/40 bg-red-950/20 p-3 text-sm text-red-700 dark:text-red-300">
+          <p className="rounded-lg border border-red-500/40 bg-red-50 dark:bg-red-950/20 p-3 text-sm text-red-700 dark:text-red-300">
             {message}
           </p>
         )}

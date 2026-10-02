@@ -17,7 +17,7 @@ export function SchemaNotice({
   hint?: string;
 } = {}) {
   return (
-    <div className="rounded-xl border border-dashed border-amber-500/40 bg-amber-950/20 p-8 text-sm">
+    <div className="rounded-xl border border-dashed border-amber-500/40 bg-amber-50 dark:bg-amber-950/20 p-8 text-sm">
       <p className="font-medium text-amber-700 dark:text-amber-200">스키마가 아직 없습니다.</p>
       <p className="mt-2 text-muted-foreground">
         Supabase SQL Editor 에서{" "}

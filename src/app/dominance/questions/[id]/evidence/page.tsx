@@ -55,9 +55,20 @@ export default async function EvidencePage({ params }: { params: Promise<{ id: s
   return (
     <div className="space-y-6">
       <div>
-        <Link href="/dominance/questions" className="text-xs text-muted-foreground hover:text-foreground">
-          ← ① 이슈 고르기
-        </Link>
+        <div className="flex items-center justify-between gap-3">
+          <Link href="/dominance/questions" className="text-xs text-muted-foreground hover:text-foreground">
+            ← ① 이슈 고르기
+          </Link>
+          {/* 42차 C · 글이 있으면 편집 화면으로 바로 간다(「초안 열기」 는 진행 상자 안에 있어 멀다) */}
+          {letter && (
+            <Link
+              href={`/dominance/letters/${letter.id}`}
+              className="rounded-md border border-[color:var(--border)] px-3 py-1.5 text-xs text-foreground/85 hover:border-[color:var(--accent)]"
+            >
+              ③ 편집 화면 →
+            </Link>
+          )}
+        </div>
         <h1 className="mt-2 text-2xl font-semibold tracking-tight">② 증거 표</h1>
         <p className="mt-2 text-base font-medium text-foreground">{q.question}</p>
         {(q.premise || q.twist) && (

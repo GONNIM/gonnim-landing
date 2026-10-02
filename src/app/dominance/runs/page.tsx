@@ -95,8 +95,8 @@ export default async function DominanceRuns() {
       <section
         className={`rounded-xl border p-5 ${
           stale
-            ? "border-red-500/40 bg-red-950/20"
-            : "border-emerald-500/30 bg-emerald-950/10"
+            ? "border-red-500/40 bg-red-50 dark:bg-red-950/20"
+            : "border-emerald-500/30 bg-emerald-50 dark:bg-emerald-950/10"
         }`}
       >
         {last ? (
@@ -118,7 +118,7 @@ export default async function DominanceRuns() {
       </section>
 
       {missing.length > 0 && (
-        <section className="rounded-xl border border-amber-500/30 bg-amber-950/10 p-5">
+        <section className="rounded-xl border border-amber-500/30 bg-amber-50 dark:bg-amber-950/10 p-5">
           <p className="text-sm font-medium text-amber-700 dark:text-amber-200">
             최근 {LOOKBACK_DAYS}일 중 기록이 없는 날이 {missing.length}일 있습니다.
           </p>

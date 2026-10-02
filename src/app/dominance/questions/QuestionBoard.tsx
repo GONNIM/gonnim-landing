@@ -64,7 +64,8 @@ export function QuestionBoard({ questions, signal = null }: { questions: Questio
 
   const shown = useMemo(() => {
     const list = questions.filter((q) => {
-      if (statusFilter === "open" && !["proposed", "validated", "held"].includes(q.status)) return false;
+      // 42차 C · 글을 쓰는 중인 질문(초안 있음)도 기본 목록에 보인다. 뜻 확인 · 판정 때 「전부」로 바꾸지 않아도 된다.
+      if (statusFilter === "open" && !["proposed", "validated", "held", "drafted"].includes(q.status)) return false;
       if (statusFilter !== "all" && statusFilter !== "open" && q.status !== statusFilter) return false;
       if (seedFilter !== "all" && q.seedKind !== seedFilter) return false;
       if (areaFilter !== "all" && (q.area ?? "") !== areaFilter) return false;
@@ -246,7 +247,7 @@ export function QuestionBoard({ questions, signal = null }: { questions: Questio
 
       <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
         <Filter label="상태" value={statusFilter} onChange={(v) => setStatusFilter(v as never)}>
-          <option value="open">고를 것(제안 · 통과 · 보류)</option>
+          <option value="open">고를 것(제안 · 통과 · 보류 · 초안 있음)</option>
           <option value="all">전부</option>
           {Object.entries(STATUS_LABEL).map(([k, v]) => (
             <option key={k} value={k}>
