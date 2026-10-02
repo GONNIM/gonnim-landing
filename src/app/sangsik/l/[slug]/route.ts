@@ -32,7 +32,7 @@ export async function GET(_request: Request, ctx: { params: Promise<{ slug: stri
   const id = payload.letterId;
   const html = toEmailHtml(payload, {
     unsubscribeUrl: "https://gonnim.dev/sangsik/unsubscribe",
-    variant: "web", // 41차 C · 웹은 화면이 넓어 본문을 17px 로 한 단계 크게
+    variant: "web", // 41차 C · 42차 · 웹은 화면이 넓어 본문을 16px 로 한 단계 크게(메일 15px)
     ...(id ? { reactions: reactionLinks(id, payload.votes ?? [], "web"), tail: endSignal(id) } : {}),
   });
   return new Response(html, {

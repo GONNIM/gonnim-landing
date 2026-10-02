@@ -136,18 +136,18 @@ const KEEP = "word-break:keep-all;overflow-wrap:anywhere";
 /** 반응 · 투표 상자(26차 C-5 · 41차 새 틀). 단추는 inline-block 이라 좁은 화면에서 줄을 바꿔 들어간다. */
 function reactionBlock(r: ReactionLinks): string {
   const btn = (l: { label: string; url: string }) =>
-    `<a href="${escapeHtml(l.url)}" style="display:inline-block;margin:0 6px 8px 0;padding:9px 14px;border:1.5px solid ${BRAND};border-radius:10px;font-size:15px;font-weight:600;line-height:1.3;color:${BRAND};text-decoration:none">${escapeHtml(l.label)}</a>`;
+    `<a href="${escapeHtml(l.url)}" style="display:inline-block;margin:0 6px 8px 0;padding:10px 14px;border:1.5px solid ${BRAND};border-radius:10px;font-size:14px;font-weight:600;line-height:1.3;color:${BRAND};text-decoration:none">${escapeHtml(l.label)}</a>`;
   const votes = r.votes.length
-    ? `<p style="margin:16px 0 8px;font-size:15px;font-weight:700;color:${INK}">다음 글, 무엇이 궁금하세요</p>
+    ? `<p style="margin:16px 0 8px;font-size:14.5px;font-weight:700;color:${INK}">다음 글, 무엇이 궁금하세요</p>
        ${r.votes
          .map(
            (v, i) =>
-             `<a href="${escapeHtml(v.url)}" style="display:block;margin:0 0 8px;padding:10px 12px;border:1px solid ${LINE};border-radius:10px;font-size:15px;line-height:1.5;color:${INK};text-decoration:none;${KEEP}"><span style="color:${BRAND};font-weight:700">${i + 1}</span>&nbsp;&nbsp;${escapeHtml(v.label)}</a>`,
+             `<a href="${escapeHtml(v.url)}" style="display:block;margin:0 0 8px;padding:11px 14px;border:1px solid ${LINE};border-radius:10px;font-size:14px;line-height:1.5;color:${INK};text-decoration:none;${KEEP}"><span style="color:${BRAND};font-weight:700">${i + 1}</span>&nbsp;&nbsp;${escapeHtml(v.label)}</a>`,
          )
          .join("")}`
     : "";
   return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:8px 0 28px;border:1px solid ${LINE};border-radius:12px;border-collapse:separate"><tr><td style="padding:18px 16px">
-      <p style="margin:0 0 4px;font-size:17px;font-weight:700;color:${INK}">이 글, 어땠나요</p>
+      <p style="margin:0 0 4px;font-size:16px;font-weight:700;color:${INK}">이 글, 어땠나요</p>
       <p style="margin:0 0 12px;font-size:13px;line-height:1.6;color:${SUB}">누른 사람이 아니라 글마다 숫자만 셉니다.</p>
       <div>${r.reacts.map(btn).join("")}</div>
       ${votes}
@@ -170,18 +170,18 @@ function superscripts(escaped: string, urlOf: Map<number, string>): string {
     const links = nums
       .map((n) => `<a href="${escapeHtml(urlOf.get(n)!)}" style="color:${BRAND};text-decoration:none;font-weight:700">${n}</a>`)
       .join(",");
-    return `<sup style="font-size:10.5px;line-height:0;color:${BRAND};font-weight:700">${links}</sup>`;
+    return `<sup style="font-size:10px;line-height:0;color:${BRAND};font-weight:700">${links}</sup>`;
   });
 }
 
-function paragraphs(text: string, urlOf: Map<number, string>, size: number, gap = 14): string {
+function paragraphs(text: string, urlOf: Map<number, string>, size: number, gap = 14, lh = 1.8): string {
   return text
     .split(/\n+/)
     .map((line) => line.trim())
     .filter(Boolean)
     .map(
       (line) =>
-        `<p style="margin:0 0 ${gap}px;font-size:${size}px;line-height:1.8;letter-spacing:-0.3px;color:${INK};${KEEP}">${superscripts(escapeHtml(line), urlOf)}</p>`,
+        `<p style="margin:0 0 ${gap}px;font-size:${size}px;line-height:${lh};letter-spacing:-0.3px;color:${INK};${KEEP}">${superscripts(escapeHtml(line), urlOf)}</p>`,
     )
     .join("");
 }
@@ -210,26 +210,26 @@ function blockHtml(b: LetterPayload["blocks"][number], urlOf: Map<number, string
     const rows = lines
       .map(
         (l, i) =>
-          `<tr><td valign="top" style="width:22px;padding:0 0 8px;font-size:15.5px;line-height:1.7;font-weight:700;color:${BRAND}">${i + 1}</td><td valign="top" style="padding:0 0 8px;font-size:15.5px;line-height:1.7;letter-spacing:-0.3px;color:${INK};${KEEP}">${superscripts(escapeHtml(l), urlOf)}</td></tr>`,
+          `<tr><td valign="top" style="width:22px;padding:0 0 8px;font-size:13px;line-height:1.9;font-weight:700;color:${BRAND}">${i + 1}</td><td valign="top" style="padding:0 0 8px;font-size:14.5px;line-height:1.7;letter-spacing:-0.3px;color:${INK};${KEEP}">${superscripts(escapeHtml(l), urlOf)}</td></tr>`,
       )
       .join("");
     return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 30px;background:#eef6f6;border-radius:10px;border-collapse:separate"><tr><td style="padding:16px 16px 8px">
-        <p style="margin:0 0 10px;font-size:13px;font-weight:700;color:${BRAND}">먼저 세 줄</p>
+        <p style="margin:0 0 10px;font-size:12.5px;font-weight:700;color:${BRAND}">먼저 세 줄</p>
         <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">${rows}</table>
       </td></tr></table>`;
   }
-  if (b.kind === "hook") return `<div style="margin:0 0 30px">${paragraphs(b.text, urlOf, 17)}</div>`;
+  if (b.kind === "hook") return `<div style="margin:0 0 30px">${paragraphs(b.text, urlOf, 16)}</div>`;
   if (b.kind === "metaphor")
-    return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 30px;background:#fafbfb;border-left:3px solid ${BRAND}"><tr><td style="padding:14px 16px 2px">${paragraphs(b.text, urlOf, 17, 12)}</td></tr></table>`;
+    return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 30px;background:#fafbfb;border-left:3px solid ${BRAND}"><tr><td style="padding:14px 16px 2px">${paragraphs(b.text, urlOf, 16, 12, 1.75)}</td></tr></table>`;
   const label = b.label
     ? `<div style="width:18px;height:2px;background:${BRAND};margin:0 0 8px;font-size:0;line-height:0">&nbsp;</div>
-       <p style="margin:0 0 10px;font-size:13px;font-weight:700;color:${BRAND}">${escapeHtml(b.label)}</p>`
+       <p style="margin:0 0 10px;font-size:12.5px;font-weight:700;color:${BRAND}">${escapeHtml(b.label)}</p>`
     : "";
   return `<div style="margin:0 0 30px">${label}${paragraphs(b.text, urlOf, body)}</div>`;
 }
 
 /**
- * 이메일 HTML(41차 새 틀). 웹 페이지(/sangsik/l/[slug])도 같은 함수를 쓴다(variant "web" 은 본문 17px).
+ * 이메일 HTML(41차 새 틀). 웹 페이지(/sangsik/l/[slug])도 같은 함수를 쓴다(42차 · 메일 본문 15px · variant "web" 은 16px).
  */
 export function toEmailHtml(
   payload: LetterPayload,
@@ -243,7 +243,7 @@ export function toEmailHtml(
     test?: boolean;
   },
 ): string {
-  const body = options.variant === "web" ? 17 : 16;
+  const body = options.variant === "web" ? 16 : 15; // 42차 · 본문 15px 기준(웹 16px)
   const urlOf = new Map(
     payload.sources.filter((s) => s.number !== null).map((s) => [s.number as number, s.url]),
   );
@@ -255,10 +255,10 @@ export function toEmailHtml(
   const sources = payload.sources
     .map(
       (s) =>
-        `<tr><td valign="top" style="width:24px;padding:0 0 10px;font-size:13px;line-height:1.6;font-weight:700;color:${BRAND}">${s.number ?? "·"}</td>
-           <td valign="top" style="padding:0 0 10px;font-size:13px;line-height:1.6;color:${SUB};${KEEP}">
+        `<tr><td valign="top" style="width:24px;padding:0 0 10px;font-size:12.5px;line-height:1.55;font-weight:700;color:${BRAND}">${s.number ?? "·"}</td>
+           <td valign="top" style="padding:0 0 10px;font-size:12.5px;line-height:1.55;color:${SUB};${KEEP}">
              <a href="${escapeHtml(s.url)}" style="color:${INK};text-decoration:none;border-bottom:1px solid #b8c4c9;word-break:break-word">${escapeHtml(s.title)}</a><br>
-             <span style="color:${SUB}">${escapeHtml(sourceLine(s))}</span>
+             <span style="font-size:11.5px;color:${SUB}">${escapeHtml(sourceLine(s))}</span>
            </td></tr>`,
     )
     .join("");
@@ -289,19 +289,19 @@ ${preheader(payload.summary)}
     <td align="right" style="padding:0 0 10px;font-size:12.5px;color:${SUB}">${escapeHtml(dateLine)}</td>
   </tr></table>
 
-  <h1 style="margin:22px 0 14px;font-size:26px;line-height:1.35;letter-spacing:-0.02em;font-weight:800;color:${INK};${KEEP}">${escapeHtml(payload.title)}</h1>
-  ${payload.summary ? `<p style="margin:0 0 28px;padding:2px 0 2px 12px;border-left:3px solid ${BRAND};font-size:16px;line-height:1.7;letter-spacing:-0.3px;color:${SUB};${KEEP}">${superscripts(escapeHtml(payload.summary), urlOf)}</p>` : ""}
+  <h1 style="margin:22px 0 14px;font-size:24px;line-height:1.35;letter-spacing:-0.02em;font-weight:800;color:${INK};${KEEP}">${escapeHtml(payload.title)}</h1>
+  ${payload.summary ? `<p style="margin:0 0 28px;padding:2px 0 2px 12px;border-left:3px solid ${BRAND};font-size:15px;line-height:1.7;letter-spacing:-0.3px;color:${SUB};${KEEP}">${superscripts(escapeHtml(payload.summary), urlOf)}</p>` : ""}
   ${corrections}
   ${blocks}
   ${options.reactions ? reactionBlock(options.reactions) : ""}
 
-  <p style="margin:6px 0 4px;font-size:15px;font-weight:700;color:${INK}">이 글이 기댄 원천 ${payload.sources.length}개</p>
+  <p style="margin:6px 0 4px;font-size:14px;font-weight:700;color:${INK}">이 글이 기댄 원천 ${payload.sources.length}개</p>
   <p style="margin:0 0 12px;font-size:13px;line-height:1.6;color:${SUB}">본문의 작은 번호가 아래 번호와 같습니다. 제목을 누르면 원문이 열립니다.</p>
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 20px">${sources}</table>
 
-  <p style="margin:0 0 14px;padding:12px 0 0;border-top:1px solid ${LINE};font-size:12.5px;line-height:1.7;color:${SUB};${KEEP}">${escapeHtml(DISCLAIMER)}</p>
-  <p style="margin:0 0 6px;font-size:12.5px;color:#8a989e">${escapeHtml(SENDER_LINE)}</p>
-  <p style="margin:0;font-size:12.5px;color:#8a989e">
+  <p style="margin:0 0 14px;padding:12px 0 0;border-top:1px solid ${LINE};font-size:12px;line-height:1.6;color:${SUB};${KEEP}">${escapeHtml(DISCLAIMER)}</p>
+  <p style="margin:0 0 6px;font-size:12px;line-height:1.8;color:#8a989e">${escapeHtml(SENDER_LINE)}</p>
+  <p style="margin:0;font-size:12px;line-height:1.8;color:#8a989e">
     ${options.webUrl ? `<a href="${escapeHtml(options.webUrl)}" style="color:${SUB}">웹에서 보기</a>
     · ` : ""}<a href="${escapeHtml(options.unsubscribeUrl)}" style="color:${SUB}">수신거부</a>
   </p>
