@@ -159,7 +159,7 @@ export function LetterEditor({
               href={s.url}
               target="_blank"
               rel="noreferrer noopener"
-              className="mt-1 block text-sm text-foreground underline decoration-dotted hover:text-white"
+              className="mt-1 block text-sm text-foreground underline decoration-dotted hover:text-[color:var(--accent)] dark:hover:text-white"
             >
               {s.title} ↗
             </a>

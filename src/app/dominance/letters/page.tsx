@@ -86,7 +86,7 @@ export default async function LettersPage() {
                           ? `/dominance/review/${r.id}`
                           : `/dominance/letters/${r.id}`
                       }
-                      className="min-w-0 flex-1 truncate text-sm text-foreground hover:text-white"
+                      className="min-w-0 flex-1 truncate text-sm text-foreground hover:text-[color:var(--accent)] dark:hover:text-white"
                     >
                       {r.title}
                     </Link>

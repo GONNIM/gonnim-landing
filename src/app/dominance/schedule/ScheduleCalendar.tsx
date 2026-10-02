@@ -250,7 +250,7 @@ export function ScheduleCalendar({
                             key={row.id}
                             type="button"
                             onClick={() => openApproval(row, date)}
-                            className="block w-full text-left text-[10px] leading-snug text-foreground/85 hover:text-white"
+                            className="block w-full text-left text-[10px] leading-snug text-foreground/85 hover:text-[color:var(--accent)] dark:hover:text-white"
                           >
                             {row.title}
                           </button>
@@ -352,7 +352,7 @@ function Pool({
               </span>
               <Link
                 href={`/dominance/review/${row.id}`}
-                className="min-w-0 flex-1 truncate text-sm text-foreground hover:text-white"
+                className="min-w-0 flex-1 truncate text-sm text-foreground hover:text-[color:var(--accent)] dark:hover:text-white"
               >
                 {row.title}
               </Link>

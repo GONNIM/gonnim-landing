@@ -165,7 +165,7 @@ export default async function DominanceHome() {
                 <StatusBadge status={l.status} />
                 <Link
                   href={`/dominance/letters/${l.id}`}
-                  className="min-w-0 flex-1 truncate text-sm text-foreground hover:text-white"
+                  className="min-w-0 flex-1 truncate text-sm text-foreground hover:text-[color:var(--accent)] dark:hover:text-white"
                 >
                   {l.title}
                 </Link>
