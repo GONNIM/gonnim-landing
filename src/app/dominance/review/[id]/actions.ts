@@ -133,6 +133,7 @@ export async function sendTestEmail(
     webUrl: dominanceLetterUrl(letter.slug),
     // 테스트 발송은 브로드캐스트가 아니라서 Resend 병합 태그가 바뀌지 않는다. 우리 수신거부 화면을 건다.
     unsubscribeUrl: "https://gonnim.dev/sangsik/unsubscribe",
+    test: true, // 41차 C · 머리의 호수 자리에 「테스트」
   });
 
   try {

@@ -110,6 +110,11 @@ async function publishOne(
 
     const publishedAt = new Date().toISOString();
     const votes = await readVoteCandidates(db, letter.id);
+    // 41차 C · 호수 = 이미 발행된 글 수 + 1. 메일 머리 「… · n호」 에 쓴다.
+    const { count: publishedBefore } = await db
+      .from("ds_letters")
+      .select("id", { count: "exact", head: true })
+      .eq("status", "published");
 
     const payload = toPayload({
       slug: letter.slug,
@@ -125,6 +130,7 @@ async function publishOne(
       })),
       letterId: letter.id,
       votes,
+      issue: (publishedBefore ?? 0) + 1,
     });
     const reactions = reactionLinks(letter.id, votes, READER_TOKEN);
 
