@@ -380,14 +380,14 @@ function FactRow({ f, slot, questionId, busy, act }: { f: Fact; slot: Slot; ques
     <li className="rounded-lg border border-[color:var(--border)]/50 p-2.5">
       {/* 33차 F · 지시어(these cases 등)가 맞게 풀렸는지 보려고 초록의 바로 앞 문장을 보인다 */}
       {prev && <p className="mb-1 text-[11px] leading-relaxed text-muted-foreground">앞 문장: {prev}</p>}
-      <p className="text-sm text-foreground">
-        {f.text}{" "}
-        {/* 41차 B · 원문을 파파고에 넘겨 뜻을 견주어 본다. 저장 · DB 변경은 없다. 파파고 입력 한도에 맞춰 앞 1,000자만. */}
+      <p className="text-sm text-foreground">{f.text}</p>
+      {/* 41차 B · 42차 B · 원문 줄 아래 오른쪽 끝에 둔다(원문 길이와 상관없이 같은 자리). 저장 · DB 변경은 없다. 앞 1,000자만. */}
+      <p className="mt-0.5 text-right text-[11px]">
         <a
           href={papagoUrl(f.text)}
           target="_blank"
           rel="noopener"
-          className="ml-1 whitespace-nowrap text-[11px] text-muted-foreground underline decoration-dotted hover:text-[color:var(--accent)]"
+          className="text-muted-foreground underline decoration-dotted hover:text-[color:var(--accent)]"
         >
           파파고에서 보기 ↗
         </a>
