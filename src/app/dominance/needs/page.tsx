@@ -49,7 +49,7 @@ export default async function NeedsPage() {
   return (
     <div className="space-y-6">
       <section>
-        <h1 className="text-2xl font-semibold tracking-tight">⓪-0 Needs 지도</h1>
+        <h1 className="text-2xl font-semibold tracking-tight">⓪ Needs 지도</h1>
         <p className="mt-1 text-sm text-muted-foreground">
           독자가 무엇을 찾아보는지 영역별로 봅니다. 신호를 보고 질문은 직접 씁니다(D41). 순서는 사람이 정합니다(D39).
         </p>

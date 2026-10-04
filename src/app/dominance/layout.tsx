@@ -7,8 +7,10 @@ export const dynamic = "force-dynamic";
 
 const NAV = [
   { href: "/dominance", label: "현황" },
-  { href: "/dominance/needs", label: "⓪-0 Needs" },
+  { href: "/dominance/needs", label: "⓪ Needs" },
   { href: "/dominance/questions", label: "① 이슈" },
+  // 48차 H · D53 · 증거 표 모음(메뉴에서 바로 들어간다)
+  { href: "/dominance/evidence", label: "② 증거·뜻" },
   { href: "/dominance/letters", label: "③ 글" },
   { href: "/dominance/review", label: "④ 리뷰" },
   { href: "/dominance/schedule", label: "⑤ 발행일" },

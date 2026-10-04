@@ -56,9 +56,14 @@ export default async function EvidencePage({ params }: { params: Promise<{ id: s
     <div className="space-y-6">
       <div>
         <div className="flex items-center justify-between gap-3">
-          <Link href="/dominance/questions" className="text-xs text-muted-foreground hover:text-foreground">
-            ← ① 이슈 고르기
-          </Link>
+          <span className="flex gap-3">
+            <Link href="/dominance/questions" className="text-xs text-muted-foreground hover:text-foreground">
+              ← ① 이슈 고르기
+            </Link>
+            <Link href="/dominance/evidence" className="text-xs text-muted-foreground hover:text-foreground">
+              ← ② 증거·뜻
+            </Link>
+          </span>
           {/* 42차 C · 글이 있으면 편집 화면으로 바로 간다(「초안 열기」 는 진행 상자 안에 있어 멀다) */}
           {letter && (
             <Link
