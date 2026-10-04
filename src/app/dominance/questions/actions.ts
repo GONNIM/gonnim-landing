@@ -8,6 +8,7 @@ import {
   proposeAndInsert,
   saveIssue,
   suggestEmptyFields,
+  suggestQueriesForHeld,
   type FillResult,
   type IssueFields,
   type ProposeResult,
@@ -98,6 +99,21 @@ export async function editQuestionAction(id: string, f: IssueFields): Promise<{ 
   );
   revalidatePath(PATH);
   return { error };
+}
+
+// ── 48차 B · 보류 카드의 [검색어 제안 받기] ──────────────────────────────────
+
+export async function suggestQueriesAction(
+  id: string,
+): Promise<{ ok: true; queries: string[]; ms: number } | { ok: false; error: string }> {
+  const { db } = await dominanceContext();
+  try {
+    const r = await suggestQueriesForHeld(db, id);
+    revalidatePath(PATH);
+    return { ok: true, ...r };
+  } catch (e) {
+    return { ok: false, error: errText(e) };
+  }
 }
 
 // ── [빈 칸 채우기] ─────────────────────────────────────────────────────────

@@ -416,6 +416,43 @@ export function curveLine(byYear: Record<string, number | null> | null): string 
 }
 
 /** 넘지 않는 선 7 · 8: 검증 통과 질문만 채택할 수 있다. */
+/** D31 검증 통과 기준(V1 5년 논문 수 · V2 상위 5편 중 관련 수). validate.ts 가 이 값을 쓴다 */
+export const VALIDATION_PASS = { v1: 100, v2: 3 } as const;
+
+/**
+ * 48차 B · D52 · 보류 이유. 저장된 V1 · V2 · V3 와 VALIDATION_PASS 로 validate.ts 와 같은 글자를 다시 만든다.
+ * 값이 모두 기준 이상인데 보류면 사람이 누른 보류다(「운영자 보류」). 보류가 아니면 null.
+ */
+export function holdReason(q: Question): string | null {
+  if (q.status !== "held") return null;
+  const parts = [
+    q.v1Papers5y !== null && q.v1Papers5y < VALIDATION_PASS.v1 ? `V1 ${q.v1Papers5y}편 (기준 ${VALIDATION_PASS.v1})` : "",
+    q.v2RelevantOf5 !== null && q.v2RelevantOf5 < VALIDATION_PASS.v2 ? `V2 ${q.v2RelevantOf5}/5 (기준 ${VALIDATION_PASS.v2})` : "",
+    q.v3EvidenceOk === false ? "V3 관련 있는 공개 라이선스 논문 없음" : "",
+  ].filter(Boolean);
+  return parts.length ? parts.join(" · ") : "운영자 보류";
+}
+
+/** 48차 B · D52 · 보류 카드의 「다음 할 일」 */
+export function holdNext(q: Question): string[] {
+  if (q.status !== "held") return [];
+  const out: string[] = [];
+  if (q.v1Papers5y !== null && q.v1Papers5y < VALIDATION_PASS.v1) out.push("검색어(영어)를 더 넓게 고치고 다시 검증");
+  if (q.v2RelevantOf5 !== null && q.v2RelevantOf5 < VALIDATION_PASS.v2) out.push("질문이나 검색어를 더 좁게 고치고 다시 검증");
+  if (q.v3EvidenceOk === false)
+    out.push("공개 라이선스 논문이 없어 문장을 인용할 수 없습니다. 검색어를 바꿔 다시 검증하거나 기각");
+  return out.length ? out : ["검증을 다시 누르거나 기각"];
+}
+
+/** 48차 B · 카드 상태 글자 옆 작은 회색 글자(다음 동작). STATUS_LABEL 은 그대로 둔다 */
+export const STATUS_NEXT: Partial<Record<QuestionStatus, string>> = {
+  proposed: "검증 전",
+  validated: "채택 가능",
+  held: "이유 아래",
+  adopted: "글 작성 가능",
+  drafted: "글 있음",
+};
+
 export function canAdopt(q: Question): boolean {
   return q.status === "validated" && q.v3EvidenceOk === true;
 }

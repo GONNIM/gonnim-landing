@@ -9,7 +9,10 @@ import {
   CREATED_VIA_LABEL,
   SEED_LABEL,
   STATUS_LABEL,
+  STATUS_NEXT,
   canAdopt,
+  holdNext,
+  holdReason,
   curveLine,
   validationLine,
   type Question,
@@ -22,6 +25,7 @@ import {
   proposeAction,
   setStatusAction,
   suggestFillAction,
+  suggestQueriesAction,
   validateAction,
   type IssueFields,
 } from "./actions";
@@ -162,6 +166,16 @@ export function QuestionBoard({ questions, signal = null }: { questions: Questio
       note(id, "빈 칸을 채우는 중…");
       const r = await suggestFillAction(id);
       note(id, r.ok ? `제안을 받았습니다(${(r.ms / 1000).toFixed(1)}초). [고치기]에서 확인하고 저장하십시오` : `실패 · ${r.error}`);
+      router.refresh();
+    });
+  }
+
+  // 48차 B · 보류 카드의 [검색어 제안 받기] · suggested 칸에만 저장
+  function suggestQueries(id: string) {
+    startTransition(async () => {
+      note(id, "검색어 제안을 받는 중…");
+      const r = await suggestQueriesAction(id);
+      note(id, r.ok ? "검색어 제안을 받았습니다. [고치기]에서 확인하고 저장한 뒤 검증하십시오" : `실패 · ${r.error}`);
       router.refresh();
     });
   }
@@ -370,6 +384,11 @@ export function QuestionBoard({ questions, signal = null }: { questions: Questio
                       <Btn onClick={() => setEditing(q.id)} disabled={busy}>
                         고치기
                       </Btn>
+                      {q.status === "held" && (
+                        <Btn onClick={() => suggestQueries(q.id)} disabled={busy}>
+                          검색어 제안 받기
+                        </Btn>
+                      )}
                       {hasEmpty(q) && !q.suggested && (
                         <Btn onClick={() => suggest(q.id)} disabled={busy}>
                           빈 칸 채우기
@@ -396,10 +415,21 @@ function Card({ q }: { q: Question }) {
     <>
       <div className="flex items-baseline justify-between gap-3">
         <h3 className="text-base font-medium text-foreground">{q.question}</h3>
-        <span className="shrink-0 rounded border border-[color:var(--border)] px-1.5 py-0.5 text-xs text-muted-foreground">
-          {STATUS_LABEL[q.status]}
+        <span className="flex shrink-0 items-baseline gap-1.5">
+          <span className="rounded border border-[color:var(--border)] px-1.5 py-0.5 text-xs text-muted-foreground">
+            {STATUS_LABEL[q.status]}
+          </span>
+          {STATUS_NEXT[q.status] && <span className="text-[11px] text-muted-foreground/80">{STATUS_NEXT[q.status]}</span>}
         </span>
       </div>
+
+      {/* 48차 B · D52 · 보류 이유는 저장된 V 값에서 다시 계산해 항상 보인다 */}
+      {q.status === "held" && (
+        <div className="mt-2 rounded-md border border-amber-500/40 bg-amber-50 px-2.5 py-1.5 text-xs text-amber-800 dark:bg-amber-950/20 dark:text-amber-200">
+          <p>보류 이유 · {holdReason(q)}</p>
+          <p className="mt-0.5">다음 할 일 · {holdNext(q).join(" / ")}</p>
+        </div>
+      )}
 
       {/* 역설 줄은 제목과 같은 글자색이다(16차). 통설 → 되묻기 */}
       {(q.premise || q.twist) && (

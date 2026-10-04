@@ -8,6 +8,7 @@ import { readLinkTitle } from "./link-title";
 import {
   fillIssue,
   proposeQuestions,
+  rewriteQueries,
   type FillMode,
   type Filled,
   type ProposeBranch,
@@ -15,6 +16,7 @@ import {
 import {
   AREAS,
   findSameQuestion,
+  holdReason,
   insertQuestion,
   loadQuestion,
   normalizeQuestion,
@@ -228,4 +230,27 @@ export async function suggestEmptyFields(
   const { error } = await updateQuestion(db, id, {}, { suggested });
   if (error) throw new Error(`제안을 저장하지 못했습니다: ${error}`);
   return { suggested, ms: Date.now() - t0 };
+}
+
+// ── 48차 B · 보류 카드의 [검색어 제안 받기] ─────────────────────────────────
+
+/**
+ * 보류 이유와 V2 판정 근거로 light 모델이 영어 검색어 2개를 제안한다(rewriteQueries · LLM 1회).
+ * suggested.queries 에만 저장한다. 질문 칸 · 검색어 칸 · 상태는 바꾸지 않는다.
+ */
+export async function suggestQueriesForHeld(db: SupabaseClient, id: string): Promise<{ queries: string[]; ms: number }> {
+  const q = await loadQuestion(db, id);
+  if (!q) throw new Error("질문을 찾지 못했습니다");
+  if (q.status !== "held") throw new Error("보류 상태의 질문만 검색어 제안을 받습니다");
+  const t0 = Date.now();
+  const queries = await rewriteQueries({
+    question: q.question,
+    queries: q.searchQueries,
+    failure: holdReason(q) ?? "",
+    reasons: (q.v2Reasons ?? []).map((r) => `${r.relevant ? "관련" : "무관"} · ${r.title} · ${r.reason}`),
+  });
+  const suggested: Suggested = { ...(q.suggested ?? {}), queries: queries.slice(0, 2), at: new Date().toISOString() };
+  const { error } = await updateQuestion(db, id, {}, { suggested });
+  if (error) throw new Error(`제안을 저장하지 못했습니다: ${error}`);
+  return { queries: suggested.queries ?? [], ms: Date.now() - t0 };
 }

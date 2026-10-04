@@ -7,12 +7,13 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { judgeRelevance, rewriteQueries } from "./question-llm";
-import { loadQuestion, updateQuestion, type V2Reason } from "./questions";
+import { loadQuestion, updateQuestion, VALIDATION_PASS, type V2Reason } from "./questions";
 
 const EPMC = "https://www.ebi.ac.uk/europepmc/webservices/rest/search";
 const UA = "gonnim-dominance-validation/1.0 (hi@gonnim.dev)";
 
-export const PASS = { v1: 100, v2: 3 } as const;
+// 48차 B · 기준 숫자는 화면도 읽으므로 questions.ts 에 둔다(값은 그대로 · D31)
+export const PASS = VALIDATION_PASS;
 
 /** 재사용과 발췌를 허락하는 라이선스만 V3 로 센다 (넘지 않는 선 3). */
 const OPEN_LICENSES = new Set(["cc0", "cc by", "cc-by", "public domain", "pd"]);
