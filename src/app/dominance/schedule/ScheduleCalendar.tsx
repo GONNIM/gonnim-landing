@@ -8,7 +8,8 @@ import Link from "next/link";
 import { formatKstDate, formatKstDateTime } from "@/lib/dominance/kst";
 import type { LetterStatus } from "@/lib/dominance/types";
 import { sendTestEmail } from "../review/[id]/actions";
-import { approveLetter, loadVoteChoices, recheckLinks, saveVoteChoices, unapproveLetter } from "./actions";
+import { approveLetter, checkMeanings, loadVoteChoices, recheckLinks, saveVoteChoices, unapproveLetter } from "./actions";
+import type { MeaningStatus } from "@/lib/dominance/card";
 
 type Row = {
   id: string;
@@ -410,6 +411,20 @@ function ApprovalDialog({
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+  // 45차 C · D50 · 셋째 칸: 쓰인 문장 뜻 확인(옛 글은 해당 없음)
+  const [meaning, setMeaning] = useState<MeaningStatus | null>(null);
+  const [meaningTicked, setMeaningTicked] = useState(false);
+  useEffect(() => {
+    let live = true;
+    checkMeanings(letter.id).then((m) => {
+      if (live) setMeaning(m);
+    });
+    return () => {
+      live = false;
+    };
+  }, [letter.id]);
+  const meaningComplete = meaning !== null && (!meaning.applicable || meaning.verified >= meaning.used);
+  const meaningOk = meaning !== null && (!meaning.applicable || (meaningComplete && meaningTicked));
 
   // 승인 시점에 링크를 한 번 더 확인한다. ④ 이후에 원천이 내려갈 수 있다.
   useEffect(() => {
@@ -422,7 +437,7 @@ function ApprovalDialog({
     };
   }, [letter.id]);
 
-  const ready = links?.ok === true && ticked.every(Boolean) && !pending;
+  const ready = links?.ok === true && ticked.every(Boolean) && meaningOk && !pending;
 
   function onTestSend() {
     setError(null);
@@ -475,6 +490,37 @@ function ApprovalDialog({
               </label>
             </li>
           ))}
+          <li>
+            {meaning === null ? (
+              <span className="text-xs text-muted-foreground">쓰인 문장 뜻 확인 수를 세는 중…</span>
+            ) : !meaning.applicable ? (
+              <span className="flex gap-2 text-xs leading-relaxed text-muted-foreground">
+                <input type="checkbox" checked disabled className="mt-0.5 size-3.5 shrink-0" />
+                이 글에 쓰인 문장의 뜻을 모두 확인했습니다 · 해당 없음(질문 카드가 없는 글)
+              </span>
+            ) : (
+              <span className="flex flex-wrap items-start gap-2 text-xs leading-relaxed text-foreground/85">
+                <label className={`flex gap-2 ${meaningComplete ? "cursor-pointer" : "cursor-not-allowed opacity-60"}`}>
+                  <input
+                    type="checkbox"
+                    checked={meaningTicked}
+                    disabled={!meaningComplete}
+                    onChange={(e) => setMeaningTicked(e.target.checked)}
+                    className="mt-0.5 size-3.5 shrink-0 accent-[color:var(--accent)]"
+                  />
+                  이 글에 쓰인 문장의 뜻을 모두 확인했습니다 ({meaning.verified}/{meaning.used})
+                </label>
+                {!meaningComplete && meaning.questionId && (
+                  <Link
+                    href={`/dominance/questions/${meaning.questionId}/evidence`}
+                    className="text-amber-700 underline dark:text-amber-300"
+                  >
+                    증거 표에서 뜻을 확인하십시오 →
+                  </Link>
+                )}
+              </span>
+            )}
+          </li>
         </ul>
 
         <VotePicker letterId={letter.id} />

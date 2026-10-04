@@ -1,5 +1,6 @@
 // ④ 리뷰 화면 · 왼쪽에 글, 오른쪽에 점검 결과. 여기서는 글을 고치지 않는다.
 
+import { meaningStatus } from "@/lib/dominance/card";
 import { loadCardSentences } from "@/lib/dominance/card";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -57,6 +58,9 @@ export default async function ReviewDetailPage({
     summary: data.summary,
     cardSentences: await loadCardSentences(db, data.question_id),
   });
+
+  // 45차 C · D50 · 쓰인 문장 뜻 확인 수(알림만)
+  const meaning = await meaningStatus(db, id);
 
   return (
     <div className="space-y-6">
@@ -120,6 +124,7 @@ export default async function ReviewDetailPage({
         checks={checks}
         savedCrossReview={data.review_checks?.crossReview ?? null}
         savedRuns={data.review_checks?.crossReviewRuns ?? null}
+        meaning={meaning.applicable ? { used: meaning.used, verified: meaning.verified } : null}
       />
     </div>
   );

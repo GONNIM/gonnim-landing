@@ -40,6 +40,7 @@ export function ReviewPanel({
   checks,
   savedCrossReview,
   savedRuns = null,
+  meaning = null,
 }: {
   letterId: string;
   status: LetterStatus;
@@ -51,6 +52,8 @@ export function ReviewPanel({
   savedCrossReview: CrossReviewNote[] | null;
   /** D47 · 모델별 실행 기록(실패 표시용) */
   savedRuns?: CrossReviewRun[] | null;
+  /** 45차 C · D50 · 쓰인 문장 뜻 확인 수(알림만 · 리뷰 통과는 막지 않음). 해당 없는 글은 null */
+  meaning?: { used: number; verified: number } | null;
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -305,6 +308,17 @@ export function ReviewPanel({
         </section>
 
         <section className="rounded-lg border border-[color:var(--border)]/70 bg-surface/30 p-4">
+          {meaning && (
+            <p
+              className={`mb-3 rounded-md border px-2.5 py-1.5 text-xs ${
+                meaning.verified < meaning.used
+                  ? "border-amber-500/50 bg-amber-50 text-amber-700 dark:bg-amber-950/20 dark:text-amber-200"
+                  : "border-emerald-500/40 bg-emerald-50 text-emerald-700 dark:bg-emerald-950/10 dark:text-emerald-300"
+              }`}
+            >
+              쓰인 문장 뜻 확인 {meaning.verified}/{meaning.used} · 발행 승인 전에 모두 확인해야 합니다
+            </p>
+          )}
           <h2 className="text-sm font-medium">내가 직접 확인할 것</h2>
           <ul className="mt-3 space-y-2">
             {SELF_CHECKS.map((label, i) => (

@@ -234,3 +234,24 @@ export function usedFacts(card: QuestionCard, blocks: { text: string }[]): CardF
 export function unverifiedInLetter(card: QuestionCard, blocks: { text: string }[]): number {
   return usedFacts(card, blocks).filter((f) => !f.koVerifiedAt).length;
 }
+
+/**
+ * 45차 C · D50 · 발행 승인의 조건인 "쓰인 문장 뜻 확인" 수. 증거 표 노란 상자와 같은 계산(usedFacts · fact_ko_verified_at)이다.
+ * 질문에서 나오지 않은 옛 글이나 카드가 없는 글은 applicable=false(해당 없음 · 막지 않음).
+ */
+export type MeaningStatus = { applicable: boolean; used: number; verified: number; questionId: string | null };
+
+export async function meaningStatus(db: SupabaseClient, letterId: string): Promise<MeaningStatus> {
+  const { data: letter } = await db
+    .from("ds_letters")
+    .select("question_id, blocks")
+    .eq("id", letterId)
+    .maybeSingle<{ question_id: string | null; blocks: { text: string }[] }>();
+  const questionId = letter?.question_id ?? null;
+  if (!letter || !questionId) return { applicable: false, used: 0, verified: 0, questionId };
+  const card = await loadQuestionCard(db, questionId);
+  if (!card) return { applicable: false, used: 0, verified: 0, questionId };
+  const used = usedFacts(card, letter.blocks);
+  if (used.length === 0) return { applicable: false, used: 0, verified: 0, questionId };
+  return { applicable: true, used: used.length, verified: used.filter((f) => f.koVerifiedAt).length, questionId };
+}

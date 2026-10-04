@@ -1,5 +1,6 @@
 "use server";
 
+import { meaningStatus, type MeaningStatus } from "@/lib/dominance/card";
 import { PRE_PUBLISHING_REASON, publishingStarted } from "@/lib/dominance/publishing";
 import { revalidatePath } from "next/cache";
 import { dominanceContext } from "@/lib/dominance/guard";
@@ -63,6 +64,12 @@ export async function recheckLinks(
   };
 }
 
+/** 45차 C · 승인 창의 셋째 칸(쓰인 문장 뜻 확인 수) */
+export async function checkMeanings(letterId: string): Promise<MeaningStatus> {
+  const { db } = await dominanceContext();
+  return meaningStatus(db, letterId);
+}
+
 /** [승인하고 날짜 확정] · 여기를 지나면 크론이 그날 07시에 내보낸다. */
 export async function approveLetter(
   letterId: string,
@@ -100,6 +107,12 @@ export async function approveLetter(
   const links = await recheckLinks(letterId);
   if (!links.ok) {
     return { error: `원천 링크 문제: ${links.detail}`, warning: null };
+  }
+
+  // 45차 C · D50 · 쓰인 문장의 뜻을 모두 확인해야 승인한다(옛 글 · 카드 없는 글은 해당 없음).
+  const meaning = await meaningStatus(db, letterId);
+  if (meaning.applicable && meaning.verified < meaning.used) {
+    return { error: `쓰인 문장의 뜻 ${meaning.used - meaning.verified}개가 확인되지 않았습니다`, warning: null };
   }
 
   const now = new Date().toISOString();
