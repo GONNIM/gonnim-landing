@@ -10,6 +10,7 @@
 // 추론 글은 message.reasoning_content 로 따로 오므로 JSON 은 message.content 만 읽는다.
 
 import OpenAI from "openai";
+import Anthropic from "@anthropic-ai/sdk";
 
 // 44차 · 환경변수 끝의 줄바꿈 · 공백을 자른다(29차에 Vercel 값 끝에 줄바꿈이 붙어 가격표 짝을 못 찾고 비용이 0 으로 기록됐다).
 export const MODEL_MAIN = process.env.DS_MODEL?.trim() || "glm-5.3";
@@ -17,6 +18,12 @@ export const MODEL_LIGHT = process.env.DS_MODEL_LIGHT?.trim() || "glm-5.3-flash"
 export const BASE_URL = process.env.ZAI_BASE_URL || "https://api.z.ai/api/paas/v4";
 /** 추론 강도 · z.ai glm-5.3 안내의 reasoning_effort("low" | "high" | "max") */
 export const REASONING_EFFORT = "low";
+
+// 48차 A · D51 · 제목 · 한 문장 요약 추천만 Anthropic Claude 가 한다. 키가 없으면 그 기능이 꺼진다.
+export const ANTHROPIC_MODEL = process.env.DS_ANTHROPIC_MODEL?.trim() || "claude-sonnet-5";
+export function anthropicReady(): boolean {
+  return Boolean(process.env.ANTHROPIC_API_KEY?.trim());
+}
 
 // 27차 D · 편집자 호출 시험용 두 번째 공급자. 지금은 시험에서만 쓴다.
 const GROQ_MODEL = "openai/gpt-oss-120b";
@@ -30,6 +37,9 @@ const PRICE: Record<string, { input: number; output: number }> = {
   "glm-5.3-flash": { input: 0.15, output: 0.5 },
   "glm-5.3-flashx": { input: 0.37, output: 1.25 },
   "glm-5.2": { input: 1.4, output: 4.4 },
+  // 48차 · Anthropic 가격표(platform.claude.com/docs/en/about-claude/pricing · 2026-10-04 확인 · 기본 입력 · 출력)
+  "claude-sonnet-5": { input: 2, output: 10 },
+  "claude-sonnet-5-5": { input: 2, output: 10 },
 };
 
 /** 한 호출의 추정 비용(달러). 가격표에 없는 모델이면 null */
@@ -37,7 +47,7 @@ export function costOf(u: { input: number; output: number; model: string }): num
   const p = PRICE[u.model];
   return p ? (u.input * p.input + u.output * p.output) / 1e6 : null;
 }
-export type Provider = "zai" | "groq";
+export type Provider = "zai" | "groq" | "anthropic";
 export type Usage = { input: number; output: number; reasoning: number; model: string; ms: number };
 
 // 시험 스크립트가 모든 호출의 시간 · 토큰을 모으려고 건다. 평소에는 비어 있다.
@@ -57,6 +67,7 @@ function reasoningParams(model: string): object {
 
 export function modelFor(tier: Tier, provider: Provider = "zai"): string {
   if (provider === "groq") return GROQ_MODEL;
+  if (provider === "anthropic") return ANTHROPIC_MODEL;
   return tier === "main" ? MODEL_MAIN : MODEL_LIGHT;
 }
 
@@ -72,6 +83,7 @@ export async function chat(input: {
   /** 36차 B · 호출 기록에 남길 단계 이름. 없으면 unknown */
   stage?: string;
 }): Promise<string> {
+  if (input.provider === "anthropic") return chatAnthropic(input);
   const groq = input.provider === "groq";
   const keyName = groq ? "GROQ_API_KEY" : "ZAI_API_KEY";
   const apiKey = process.env[keyName];
@@ -114,6 +126,39 @@ export async function chat(input: {
   await logLlmCall({ stage: input.stage ?? "unknown", model, input: used.input, output: used.output, reasoning: used.reasoning, ms: used.ms, cost: costOf(used) });
   const content = response.choices[0]?.message?.content;
   if (!content) throw new Error("LLM 응답이 비었습니다");
+  return content;
+}
+
+/**
+ * 48차 A · Anthropic 호출 하나. JSON 모드가 없으므로 지시문에서 JSON 만 내라고 하고, 응답 글을 그대로 돌려준다.
+ * 호출 기록은 같은 llm-calls 로그에 provider "anthropic" 으로 남긴다.
+ */
+async function chatAnthropic(input: { system: string; user: string; maxTokens: number; usage?: (u: Usage) => void; stage?: string }): Promise<string> {
+  const apiKey = process.env.ANTHROPIC_API_KEY?.trim();
+  if (!apiKey) {
+    const err = new Error("ANTHROPIC_API_KEY 없음 · 제목 · 요약 추천을 쓸 수 없습니다");
+    (err as { status?: number }).status = 503;
+    throw err;
+  }
+  const client = new Anthropic({ apiKey });
+  const model = ANTHROPIC_MODEL;
+  const t0 = Date.now();
+  const response = await client.messages.create({
+    model,
+    max_tokens: input.maxTokens,
+    system: `${input.system}\n\n응답은 JSON 하나만 낸다. 앞뒤에 다른 글이나 코드 블록 표시를 붙이지 않는다.`,
+    messages: [{ role: "user", content: input.user }],
+  });
+  const used: Usage = { input: response.usage.input_tokens, output: response.usage.output_tokens, reasoning: 0, model, ms: Date.now() - t0 };
+  input.usage?.(used);
+  meter?.(used);
+  const { logLlmCall } = await import("./runlog");
+  await logLlmCall({ stage: input.stage ?? "unknown", provider: "anthropic", model, input: used.input, output: used.output, reasoning: 0, ms: used.ms, cost: costOf(used) });
+  const content = response.content
+    .map((b) => (b.type === "text" ? b.text : ""))
+    .join("")
+    .trim();
+  if (!content) throw new Error("Claude 응답이 비었습니다");
   return content;
 }
 

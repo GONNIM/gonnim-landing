@@ -16,6 +16,9 @@ import {
   type ReviewChecks,
 } from "@/lib/dominance/types";
 import { ReviewPanel } from "./ReviewPanel";
+import { TitleSummaryEditor } from "./TitleSummaryEditor";
+import { readDraftMeta } from "@/lib/dominance/draft-store";
+import { anthropicReady } from "@/lib/dominance/llm";
 
 export const dynamic = "force-dynamic";
 
@@ -61,6 +64,9 @@ export default async function ReviewDetailPage({
 
   // 45차 C · D50 · 쓰인 문장 뜻 확인 수(알림만)
   const meaning = await meaningStatus(db, id);
+  // 48차 A · D51 · 리뷰 대기 · 리뷰 통과 글은 제목 · 요약만 여기서 고칠 수 있다
+  const titleEditable = data.status === "review" || data.status === "reviewed";
+  const draftMeta = titleEditable ? await readDraftMeta(db, id) : null;
 
   return (
     <div className="space-y-6">
@@ -107,6 +113,16 @@ export default async function ReviewDetailPage({
           이 글은 리뷰 대기 상태가 아닙니다. 점검 결과는 볼 수 있지만 [리뷰 통과]
           는 누를 수 없습니다.
         </p>
+      )}
+
+      {titleEditable && (
+        <TitleSummaryEditor
+          letterId={id}
+          initialTitle={data.title}
+          initialSummary={data.summary ?? ""}
+          suggestReady={anthropicReady()}
+          suggestions={draftMeta?.title_suggestions ?? null}
+        />
       )}
 
       <ReviewPanel

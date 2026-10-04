@@ -28,6 +28,8 @@ export type DraftMeta = {
   model: string;
   /** 이 판이 몇 번째 생성인지(1부터) */
   generation: number;
+  /** 48차 A · D51 · 제목 · 한 문장 요약 추천(Claude) 마지막 결과 */
+  title_suggestions?: import("./title-suggest").TitleSuggestions;
 };
 
 async function ensureBucket(db: SupabaseClient) {
