@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition, createContext, useContext } from "react";
+import { useState, useTransition, createContext, useContext, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { PHASE_LABEL, type EvidenceRun } from "@/lib/dominance/collect-types";
 import {
@@ -61,10 +61,11 @@ export function EvidenceBoard({
   const [msg, setMsg] = useState<string | null>(null);
   const canCollect = ["validated", "adopted", "drafted"].includes(status);
 
-  const act = (fn: () => Promise<{ error: string | null }>, ok?: string) =>
+  const act: Act = (fn, ok, onOk) =>
     start(async () => {
       const r = await fn();
       setMsg(r.error ? `실패 · ${r.error}` : ok ?? null);
+      if (!r.error) onOk?.();
       router.refresh();
     });
 
@@ -114,13 +115,24 @@ export function EvidenceBoard({
     <div className="space-y-6">
       {letter && (
         <section className="space-y-3 rounded-xl border border-amber-500/40 bg-amber-500/5 p-4">
-          <h2 className="text-base font-medium">
-            글에 쓰인 문장 {usedList.length}개 중 확인 {usedVerified}개
-          </h2>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h2 className="text-base font-medium">
+              글에 쓰인 문장 {usedList.length}개 중 확인 {usedVerified}개
+            </h2>
+            {usedVerified < usedList.length && (
+              <button
+                type="button"
+                onClick={() => focusNextUnverified()}
+                className="rounded-md border border-amber-500/50 px-2.5 py-1 text-xs text-amber-800 hover:bg-amber-500/10 dark:text-amber-200"
+              >
+                다음 미확인 문장으로
+              </button>
+            )}
+          </div>
           <p className="text-xs text-muted-foreground">
             뜻 확인은 이 문장들만 하시면 됩니다. 나머지 카드 문장은 확인하지 않아도 됩니다(런북 13번).
           </p>
-          <ol className="space-y-2">
+          <ol id="used-facts" className="space-y-2">
             {usedList.map(({ f, slot, tag, title }) => (
               <div key={`${f.rowId}-${f.line}`}>
                 <p className="text-[11px] text-muted-foreground">
@@ -261,7 +273,21 @@ function RunSummary({ run }: { run: EvidenceRun }) {
   );
 }
 
-type Act = (fn: () => Promise<{ error: string | null }>, ok?: string) => void;
+type Act = (fn: () => Promise<{ error: string | null }>, ok?: string, onOk?: () => void) => void;
+
+/**
+ * 48차 D · 노란 상자(글에 쓰인 문장) 안의 다음 미확인 문장으로 화면을 내리고 그 뜻 칸에 포커스를 둔다.
+ * after 가 있으면 그 줄 뒤의 첫 미확인, 없으면 맨 앞 미확인. 저장 동작은 바꾸지 않는다(자동 저장 없음).
+ */
+function focusNextUnverified(after?: HTMLElement | null) {
+  const box = document.getElementById("used-facts");
+  if (!box) return;
+  const rows = [...box.querySelectorAll<HTMLElement>('[data-fact-row][data-verified="false"]')].filter((r) => r !== after);
+  const next = after ? (rows.find((r) => after.compareDocumentPosition(r) & Node.DOCUMENT_POSITION_FOLLOWING) ?? rows[0]) : rows[0];
+  if (!next) return;
+  next.scrollIntoView({ behavior: "smooth", block: "center" });
+  next.querySelector<HTMLTextAreaElement>('textarea[aria-label="확인된 뜻"]')?.focus({ preventScroll: true });
+}
 
 function SlotSection({
   slot,
@@ -376,8 +402,9 @@ function FactRow({ f, slot, questionId, busy, act }: { f: Fact; slot: Slot; ques
   const [ko, setKo] = useState(f.ko ?? "");
   const changed = ko.trim() !== (f.ko ?? "");
   const prev = useContext(PrevContext)[`${f.rowId}:${f.line}`];
+  const rowRef = useRef<HTMLLIElement>(null);
   return (
-    <li className="rounded-lg border border-[color:var(--border)]/50 p-2.5">
+    <li ref={rowRef} data-fact-row="" data-verified={f.koVerifiedAt ? "true" : "false"} className="rounded-lg border border-[color:var(--border)]/50 p-2.5">
       {/* 33차 F · 지시어(these cases 등)가 맞게 풀렸는지 보려고 초록의 바로 앞 문장을 보인다 */}
       {prev && <p className="mb-1 text-[11px] leading-relaxed text-muted-foreground">앞 문장: {prev}</p>}
       <p className="text-sm text-foreground">{f.text}</p>
@@ -409,7 +436,16 @@ function FactRow({ f, slot, questionId, busy, act }: { f: Fact; slot: Slot; ques
           <button
             type="button"
             disabled={busy || !ko.trim() || (!!f.koVerifiedAt && !changed)}
-            onClick={() => act(() => setFactKoAction(questionId, f.rowId, f.line, ko, true), "뜻을 확인했습니다")}
+            onClick={() =>
+              act(
+                () => setFactKoAction(questionId, f.rowId, f.line, ko, true),
+                "뜻을 확인했습니다",
+                // 48차 D · 노란 상자 안에서 확인했으면 다음 미확인 문장으로
+                () => {
+                  if (rowRef.current?.closest("#used-facts")) focusNextUnverified(rowRef.current);
+                },
+              )
+            }
             className="rounded border border-[color:var(--border)] px-2 py-0.5 hover:border-emerald-400 disabled:opacity-40"
           >
             확인
