@@ -11,8 +11,9 @@
 
 import OpenAI from "openai";
 
-export const MODEL_MAIN = process.env.DS_MODEL || "glm-5.3";
-export const MODEL_LIGHT = process.env.DS_MODEL_LIGHT || "glm-5.3-flash";
+// 44차 · 환경변수 끝의 줄바꿈 · 공백을 자른다(29차에 Vercel 값 끝에 줄바꿈이 붙어 가격표 짝을 못 찾고 비용이 0 으로 기록됐다).
+export const MODEL_MAIN = process.env.DS_MODEL?.trim() || "glm-5.3";
+export const MODEL_LIGHT = process.env.DS_MODEL_LIGHT?.trim() || "glm-5.3-flash";
 export const BASE_URL = process.env.ZAI_BASE_URL || "https://api.z.ai/api/paas/v4";
 /** 추론 강도 · z.ai glm-5.3 안내의 reasoning_effort("low" | "high" | "max") */
 export const REASONING_EFFORT = "low";
