@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { dominanceContext } from "@/lib/dominance/guard";
 import { loadLatestNeeds } from "@/lib/dominance/needs";
+import { loadNextActions, type NextAction } from "@/lib/dominance/next-actions";
 import { kstToday, formatKstDate, formatKstDateTime, hoursSince } from "@/lib/dominance/kst";
 import { isMissingSchema, SchemaNotice } from "@/lib/dominance/schema-guard";
 import {
@@ -66,6 +67,8 @@ export default async function DominanceHome() {
 
   // 36차 C · 이번 주 Needs 신호 한 줄
   const needs = await loadLatestNeeds(db).catch(() => null);
+  // 48차 G · D53 · 다음 할 일(글 먼저 · 질문 나중 · 최대 10줄)
+  const nextActions = await loadNextActions(db).catch(() => [] as NextAction[]);
 
   return (
     <div className="space-y-8">
@@ -81,6 +84,8 @@ export default async function DominanceHome() {
           "아직 없음(월요일 07:30 크론)"
         )}
       </p>
+
+      <NextActions items={nextActions} />
 
       <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
         <Card
@@ -257,5 +262,47 @@ function StatusBadge({ status }: { status: LetterStatus }) {
     >
       {LETTER_STATUS_LABEL[status]}
     </span>
+  );
+}
+
+/** 48차 G · D53 · 현황 맨 위 「다음 할 일」. 줄마다 종류 · 제목 · 한 줄 글자 · 오른쪽 「열기」 */
+function NextActions({ items }: { items: NextAction[] }) {
+  const shown = items.slice(0, 10);
+  const rest = items.length - shown.length;
+  return (
+    <section className="space-y-2">
+      <h2 className="text-sm font-medium text-foreground/90">다음 할 일</h2>
+      {items.length === 0 ? (
+        <p className="text-sm text-muted-foreground">지금 할 일이 없습니다.</p>
+      ) : (
+        <ul className="divide-y divide-[color:var(--border)]/60 rounded-lg border border-[color:var(--border)]/70">
+          {shown.map((a) => (
+            <li key={`${a.kind}-${a.id}`} className="flex items-center gap-3 px-4 py-2.5">
+              <span className="shrink-0 rounded border border-[color:var(--border)] px-1.5 py-0.5 text-[10px] text-muted-foreground">
+                {a.kind === "letter" ? "글" : "질문"}
+              </span>
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm text-foreground">{a.title}</p>
+                <p className="text-xs text-muted-foreground">{a.line}</p>
+                {a.sub && (
+                  <Link href={a.sub.href} className="text-[11px] text-amber-700 underline dark:text-amber-300">
+                    {a.sub.line}
+                  </Link>
+                )}
+              </div>
+              {a.href && a.buttonLabel && (
+                <Link
+                  href={a.href}
+                  className="shrink-0 rounded-md border border-[color:var(--border)] px-3 py-1 text-xs text-foreground/85 hover:border-[color:var(--accent)]"
+                >
+                  {a.buttonLabel}
+                </Link>
+              )}
+            </li>
+          ))}
+          {rest > 0 && <li className="px-4 py-2 text-xs text-muted-foreground">그 밖에 {rest}건</li>}
+        </ul>
+      )}
+    </section>
   );
 }
