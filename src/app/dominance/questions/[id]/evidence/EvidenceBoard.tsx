@@ -31,6 +31,8 @@ import {
   setFactKoAction,
   setTagAction,
   updateFactMetaAction,
+  refillMeaningsAction,
+  confirmAllMeaningsAction,
 } from "./actions";
 
 const input = "rounded-md border border-[color:var(--border)] bg-background px-2 py-1 text-xs text-foreground";
@@ -110,6 +112,34 @@ export function EvidenceBoard({
   );
   const usedVerified = usedList.filter((x) => x.f.koVerifiedAt).length;
 
+  // 53차 G · 「뜻 초안 다시 받기」 · 빈 뜻만
+  function refill() {
+    start(async () => {
+      setMsg("뜻 초안을 받는 중…");
+      const r = await refillMeaningsAction(questionId);
+      setMsg(r.error ? `실패 · ${r.error}` : r.text);
+      router.refresh();
+    });
+  }
+  // 53차 H · 「위 문장 n개를 모두 읽고 확인했습니다」 · 화면의 뜻 칸 글자를 그대로 확인 처리
+  function confirmAll() {
+    const box = document.getElementById("used-facts");
+    if (!box) return;
+    const items = [...box.querySelectorAll<HTMLElement>("[data-fact-row]")].map((r) => ({
+      rowId: r.dataset.rowId ?? "",
+      line: Number(r.dataset.line),
+      ko: r.querySelector<HTMLTextAreaElement>('textarea[aria-label="확인된 뜻"]')?.value ?? "",
+    }));
+    const n = items.filter((x) => x.ko.trim()).length;
+    const m = items.length - n;
+    if (!window.confirm(`${n}개 문장의 뜻을 지금 글자 그대로 확인 처리합니다. 뜻이 빈 문장 ${m}개는 건너뜁니다.`)) return;
+    start(async () => {
+      const r = await confirmAllMeaningsAction(questionId, items);
+      setMsg(r.error ? `실패 · ${r.error}` : `${r.done}개 문장의 뜻을 확인했습니다`);
+      router.refresh();
+    });
+  }
+
   return (
     <PrevContext.Provider value={prevById}>
     <div className="space-y-6">
@@ -119,6 +149,14 @@ export function EvidenceBoard({
             <h2 className="text-base font-medium">
               글에 쓰인 문장 {usedList.length}개 중 확인 {usedVerified}개
             </h2>
+            <button
+              type="button"
+              disabled={pending}
+              onClick={refill}
+              className="rounded-md border border-[color:var(--border)] px-2.5 py-1 text-xs text-foreground/85 hover:border-[color:var(--accent)] disabled:opacity-40"
+            >
+              뜻 초안 다시 받기
+            </button>
             {usedVerified < usedList.length && (
               <button
                 type="button"
@@ -138,10 +176,21 @@ export function EvidenceBoard({
                 <p className="text-[11px] text-muted-foreground">
                   {tag} · {SLOT_LABEL[slot]} · {title.slice(0, 80)}
                 </p>
-                <FactRow f={f} slot={slot} questionId={questionId} busy={pending} act={act} />
+                <FactRow f={f} slot={slot} questionId={questionId} busy={pending} act={act} wide />
               </div>
             ))}
           </ol>
+          {/* 53차 H · D54 · 화면에 보이는 뜻 글자 그대로 한 번에 확인(빈 뜻은 건너뜀) */}
+          <div className="flex flex-wrap items-center gap-2 border-t border-amber-500/30 pt-3">
+            <button
+              type="button"
+              disabled={pending || usedList.length === 0}
+              onClick={confirmAll}
+              className="rounded-md border border-emerald-500/60 px-3 py-1.5 text-xs text-emerald-800 hover:bg-emerald-500/10 disabled:opacity-40 dark:text-emerald-200"
+            >
+              위 문장 {usedList.length}개를 모두 읽고 확인했습니다
+            </button>
+          </div>
         </section>
       )}
 
@@ -397,14 +446,23 @@ function papagoUrl(text: string): string {
   return `https://papago.naver.com/?sl=en&tl=ko&text=${encodeURIComponent(text.slice(0, 1000))}`;
 }
 
-function FactRow({ f, slot, questionId, busy, act }: { f: Fact; slot: Slot; questionId: string; busy: boolean; act: Act }) {
+function FactRow({ f, slot, questionId, busy, act, wide = false }: { f: Fact; slot: Slot; questionId: string; busy: boolean; act: Act; /** 53차 H · 노란 상자: 왼쪽 원문 · 오른쪽 뜻 두 칸 */ wide?: boolean }) {
   const [subject, setSubject] = useState(f.subject ?? "");
   const [ko, setKo] = useState(f.ko ?? "");
   const changed = ko.trim() !== (f.ko ?? "");
   const prev = useContext(PrevContext)[`${f.rowId}:${f.line}`];
   const rowRef = useRef<HTMLLIElement>(null);
   return (
-    <li ref={rowRef} data-fact-row="" data-verified={f.koVerifiedAt ? "true" : "false"} className="rounded-lg border border-[color:var(--border)]/50 p-2.5">
+    <li
+      ref={rowRef}
+      data-fact-row=""
+      data-verified={f.koVerifiedAt ? "true" : "false"}
+      data-row-id={f.rowId}
+      data-line={f.line}
+      className="rounded-lg border border-[color:var(--border)]/50 p-2.5"
+    >
+      <div className={wide ? "grid gap-3 md:grid-cols-2" : ""}>
+      <div>
       {/* 33차 F · 지시어(these cases 등)가 맞게 풀렸는지 보려고 초록의 바로 앞 문장을 보인다 */}
       {prev && <p className="mb-1 text-[11px] leading-relaxed text-muted-foreground">앞 문장: {prev}</p>}
       <p className="text-sm text-foreground">{f.text}</p>
@@ -419,8 +477,9 @@ function FactRow({ f, slot, questionId, busy, act }: { f: Fact; slot: Slot; ques
           파파고에서 보기 ↗
         </a>
       </p>
+      </div>
       {/* D44 · 확인된 뜻. 초안은 이 칸만 받는다. 미확인은 노랑 */}
-      <div className={`mt-2 rounded-md border p-2 ${f.koVerifiedAt && !changed ? "border-emerald-500/40" : "border-amber-500/50 bg-amber-500/5"}`}>
+      <div className={`${wide ? "" : "mt-2 "}rounded-md border p-2 ${f.koVerifiedAt && !changed ? "border-emerald-500/40" : "border-amber-500/50 bg-amber-500/5"}`}>
         <textarea
           value={ko}
           onChange={(e) => setKo(e.target.value)}
@@ -461,6 +520,7 @@ function FactRow({ f, slot, questionId, busy, act }: { f: Fact; slot: Slot; ques
             </button>
           )}
         </div>
+      </div>
       </div>
       <div className="mt-1.5 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
         <label className="flex items-center gap-1">

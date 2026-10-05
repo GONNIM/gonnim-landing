@@ -221,12 +221,13 @@ export async function industryLeads(input: { question: string; premise: string |
 
 // ── 확인된 뜻 일괄 생성 (D44 · 22차 A-5) ─────────────────────────────────────
 
-export type KoInput = { id: string; text: string; subject: string | null; year: number | null; source: string };
+export type KoInput = { id: string; text: string; subject: string | null; year: number | null; source: string; /** 53차 · 초록의 바로 앞 문장(지시어를 풀 때 씀) */ prev?: string | null };
 
 /** 이미 저장된 문장들의 한국어 뜻을 한 번에 만든다. 확인은 사람이 한다. */
 export async function translateFacts(
   question: string,
   facts: KoInput[],
+  usage?: (u: import("./llm").Usage) => void,
 ): Promise<Map<string, string>> {
   const system = `당신은 한국어 연구·보건 뉴스레터의 증거 담당이다. 논문 문장(원문)마다 한국어 뜻 한 줄을 만든다.
 
@@ -235,9 +236,9 @@ ${KO_RULES}
 # 출력 형식 (엄수)
 { "items": [ { "id": "...", "ko": "..." } ] }  · id 는 받은 값 그대로`;
   const body = facts
-    .map((f) => `[${f.id}] (출처: ${f.source} · 대상: ${f.subject ?? "-"} · ${f.year ?? "연도 없음"}) ${f.text}`)
+    .map((f) => `[${f.id}] (출처: ${f.source} · 대상: ${f.subject ?? "-"} · ${f.year ?? "연도 없음"})${f.prev ? ` (앞 문장: ${f.prev})` : ""} ${f.text}`)
     .join("\n");
-  const o = (await callJson(system, `질문: ${question}\n\n${body}`, 6000, { tier: "light", temperature: 0.2, stage: "뜻" })) as { items?: unknown[] };
+  const o = (await callJson(system, `질문: ${question}\n\n${body}`, 6000, { tier: "light", temperature: 0.2, stage: "뜻", usage })) as { items?: unknown[] };
   const out = new Map<string, string>();
   const ids = new Set(facts.map((f) => f.id));
   for (const it of o.items ?? []) {

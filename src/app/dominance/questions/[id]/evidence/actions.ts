@@ -17,6 +17,7 @@ import {
 } from "@/lib/dominance/evidence";
 import { dominanceContext } from "@/lib/dominance/guard";
 import { writeDraftFromCard } from "@/lib/dominance/letter-draft";
+import { fillUsedMeanings } from "@/lib/dominance/meaning-fill";
 
 const errText = (e: unknown) => (e instanceof Error ? e.message : String(e));
 
@@ -134,4 +135,38 @@ export async function setFactKoAction(
 ): Promise<Result> {
   const { db } = await dominanceContext();
   return wrap(id, () => setFactKo(db, rowId, line, ko, verify));
+}
+
+/** 53차 G · D54 · 「뜻 초안 다시 받기」 · 쓰인 문장의 빈 뜻만 채운다(미확인) */
+export async function refillMeaningsAction(id: string): Promise<{ error: string | null; text: string | null }> {
+  const { db } = await dominanceContext();
+  try {
+    const r = await fillUsedMeanings(db, id, { auto: false });
+    refresh(id);
+    if (!r.ran) return { error: null, text: "뜻이 빈 문장이 없습니다" };
+    return { error: null, text: `뜻 초안 ${r.filled}개를 채웠습니다 · ${r.model} · ${Math.round(r.ms / 1000)}초` };
+  } catch (e) {
+    return { error: errText(e), text: null };
+  }
+}
+
+/** 53차 H · D54 · 「위 문장 n개를 모두 읽고 확인했습니다」 · 화면의 글자 그대로 뜻을 저장하고 확인 시각을 지금으로 둔다(빈 뜻은 건너뜀) */
+export async function confirmAllMeaningsAction(
+  id: string,
+  items: { rowId: string; line: number; ko: string }[],
+): Promise<{ error: string | null; done: number }> {
+  const { db } = await dominanceContext();
+  let done = 0;
+  try {
+    for (const it of items) {
+      if (!it.ko.trim()) continue;
+      await setFactKo(db, it.rowId, it.line, it.ko, true);
+      done++;
+    }
+    refresh(id);
+    return { error: null, done };
+  } catch (e) {
+    refresh(id);
+    return { error: `${done}개 저장 뒤 멈춤 · ${errText(e)}`, done };
+  }
 }

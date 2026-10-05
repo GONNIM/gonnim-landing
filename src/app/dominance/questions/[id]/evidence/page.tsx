@@ -10,6 +10,7 @@ import { dominanceContext } from "@/lib/dominance/guard";
 import { loadQuestion } from "@/lib/dominance/questions";
 import { loadQuestionCard, usedFacts } from "@/lib/dominance/card";
 import { EvidenceBoard } from "./EvidenceBoard";
+import { fillUsedMeanings } from "@/lib/dominance/meaning-fill";
 
 export const dynamic = "force-dynamic";
 // [증거 모으기] 한 단계가 Europe PMC 여러 번과 LLM 1회를 부른다.
@@ -20,6 +21,8 @@ export default async function EvidencePage({ params }: { params: Promise<{ id: s
   const { db } = await dominanceContext();
   const q = await loadQuestion(db, id);
   if (!q) notFound();
+  // 53차 G · D54 · 글이 있고 쓰인 문장의 뜻이 비었으면 처음 열 때 한 번 채운다(미확인 · 실패해도 화면은 연다)
+  await fillUsedMeanings(db, id, { auto: true }).catch(() => null);
   const table = await loadEvidence(db, id);
   const { data: letter } = await db
     .from("ds_letters")

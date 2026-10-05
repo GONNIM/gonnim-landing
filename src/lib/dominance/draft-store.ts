@@ -30,6 +30,8 @@ export type DraftMeta = {
   generation: number;
   /** 48차 A · D51 · 제목 · 한 문장 요약 추천(Claude) 마지막 결과 */
   title_suggestions?: import("./title-suggest").TitleSuggestions;
+  /** 53차 G · D54 · 증거 표를 열 때 쓰인 문장의 빈 뜻을 자동으로 한 번 채운 시각 */
+  auto_translated_at?: string;
 };
 
 async function ensureBucket(db: SupabaseClient) {
