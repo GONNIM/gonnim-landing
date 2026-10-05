@@ -18,7 +18,7 @@ import {
 import { ReviewPanel } from "./ReviewPanel";
 import { TitleSummaryEditor } from "./TitleSummaryEditor";
 import { readDraftMeta } from "@/lib/dominance/draft-store";
-import { openaiReady } from "@/lib/dominance/llm";
+import { suggestReady } from "@/lib/dominance/llm";
 
 export const dynamic = "force-dynamic";
 
@@ -120,7 +120,7 @@ export default async function ReviewDetailPage({
           letterId={id}
           initialTitle={data.title}
           initialSummary={data.summary ?? ""}
-          suggestReady={openaiReady()}
+          suggestReady={suggestReady()}
           suggestions={draftMeta?.title_suggestions ?? null}
         />
       )}

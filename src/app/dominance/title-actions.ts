@@ -21,6 +21,16 @@ export async function requestTitleSuggestions(letterId: string): Promise<{ error
  * 키 틀림(401)은 운영자가 할 일을 바로 적는다. 그 밖은 「추천 실패 · {상태 코드} {메시지 앞 80자}」.
  */
 function suggestErrorText(err: unknown): string {
+  // 54차 · 두 모델 모두 실패했을 때만 여기로 온다. 안내는 OpenAI 첫 오류로 한다
+  const first = (err as { openaiError?: unknown })?.openaiError;
+  if (first) {
+    const f = first as { status?: number; code?: string; message?: string };
+    const fm = String(f?.message ?? "");
+    if (f?.status === 401) return "OPENAI_API_KEY 가 틀립니다.";
+    if (f?.code === "credit_balance_exhausted" || ((f?.status === 402 || f?.status === 429) && /credits|billing/i.test(fm))) {
+      return "OpenAI 잔액이 없습니다. 충전한 뒤 다시 누르십시오.";
+    }
+  }
   const e = err as { status?: number; code?: string; message?: string };
   const msg = String(e?.message ?? err ?? "");
   if (e?.status === 401) return "OPENAI_API_KEY 가 틀립니다.";

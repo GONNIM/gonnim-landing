@@ -214,3 +214,53 @@ export async function callJson(
   }
   throw new Error(`LLM 응답이 JSON 이 아닙니다 (길이 ${last.length} · 앞: ${last.slice(0, 80)} · 끝: ${last.slice(-80)})`);
 }
+
+/**
+ * 54차 A · D51 · OpenAI 를 먼저 부르고, 어떤 오류로든 실패하면 같은 지시문으로 GLM main 을 부른다.
+ * 두 호출 모두 llm-calls 로그에 남는다(chat 이 남김). 둘 다 실패하면 OpenAI 첫 오류를 openaiError 로 붙여 던진다.
+ */
+export type FallbackResult = { data: unknown; provider: "openai" | "zai"; model: string; fallback: boolean; firstError: string | null };
+
+/** OpenAI 오류를 짧은 글자로(화면 · 기록용) */
+export function shortOpenAIError(err: unknown): string {
+  const e = err as { status?: number; code?: string; message?: string };
+  const msg = String(e?.message ?? err ?? "");
+  if (e?.status === 401) return "키 틀림";
+  if (e?.code === "credit_balance_exhausted" || ((e?.status === 402 || e?.status === 429) && /credits|billing/i.test(msg))) return "잔액 없음";
+  if (e?.status === 404 || /model/i.test(String(e?.code ?? "")) || /does not exist|model_not_found/i.test(msg)) return "모델 이름 오류";
+  if (e?.status && e.status >= 500) return `서버 오류 ${e.status}`;
+  if (/OPENAI_API_KEY 없음/.test(msg)) return "키 없음";
+  return `${e?.status ?? "네트워크"} ${String(e?.code ?? msg).slice(0, 40)}`.trim();
+}
+
+export async function callJsonWithFallback(
+  system: string,
+  user: string,
+  maxTokens: number,
+  opts: { stage: string; usage?: (u: Usage) => void },
+): Promise<FallbackResult> {
+  let served: string | null = null;
+  const usage = (u: Usage) => {
+    served = u.served ?? u.model;
+    opts.usage?.(u);
+  };
+  try {
+    const data = await callJson(system, user, maxTokens, { tier: "main", provider: "openai", stage: opts.stage, usage });
+    return { data, provider: "openai", model: served ?? OPENAI_MODEL, fallback: false, firstError: null };
+  } catch (openaiErr) {
+    const firstError = shortOpenAIError(openaiErr);
+    try {
+      const data = await callJson(system, user, maxTokens, { tier: "main", provider: "zai", stage: `${opts.stage}(GLM 대체)`, usage });
+      return { data, provider: "zai", model: served ?? MODEL_MAIN, fallback: true, firstError };
+    } catch (glmErr) {
+      const err = new Error(`OpenAI(${firstError}) · GLM(${glmErr instanceof Error ? glmErr.message.slice(0, 80) : String(glmErr)}) 모두 실패`);
+      (err as { openaiError?: unknown }).openaiError = openaiErr;
+      throw err;
+    }
+  }
+}
+
+/** 54차 · 추천 단추를 열 수 있는가(OpenAI 또는 GLM 키 중 하나) */
+export function suggestReady(): boolean {
+  return openaiReady() || Boolean(process.env.ZAI_API_KEY?.trim());
+}

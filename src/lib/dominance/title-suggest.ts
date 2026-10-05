@@ -6,7 +6,7 @@
 // 거절 필터(의학적 지시 등) 금지 · 카드에 없는 수치 금지. 어긴 묶음은 빼고 몇 개를 뺐는지 남긴다.
 
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { openaiReady, OPENAI_MODEL, callJson, costOf, type Usage } from "./llm";
+import { suggestReady, callJsonWithFallback, costOf, type Usage } from "./llm";
 import { loadQuestionCard } from "./card";
 import { extractNumbers } from "./card-check";
 import { categoryTerms, flagBlock } from "./filters";
@@ -24,6 +24,10 @@ export type TitleSuggestions = {
   model: string;
   items: TitleSuggestion[];
   dropped: { title: string; reason: string }[];
+  /** 54차 · 답한 공급자 · OpenAI 에서 대체했으면 그 이유 */
+  provider?: "openai" | "zai";
+  fallback_from?: "openai" | null;
+  fallback_reason?: string | null;
   /** 48차 · 걸린 시간(ms) · 토큰 · 비용(달러 · 가격표에 없으면 null) */
   ms?: number;
   tokens?: { input: number; output: number };
@@ -61,7 +65,7 @@ const SYSTEM = `너는 한국어 과학 레터의 편집자다. 다 쓴 글을 �
 출력: {"items":[{"type":"question","title":"…","summary":"…","why":"…"},{"type":"flip",…},{"type":"apply",…}]}`;
 
 export async function suggestTitles(db: SupabaseClient, letterId: string): Promise<TitleSuggestions> {
-  if (!openaiReady()) throw new Error("OPENAI_API_KEY 없음");
+  if (!suggestReady()) throw new Error("OPENAI_API_KEY 없음");
   const { data: letter } = await db
     .from("ds_letters")
     .select("title, summary, blocks, question_id, review_checks")
@@ -88,24 +92,24 @@ export async function suggestTitles(db: SupabaseClient, letterId: string): Promi
   const t0 = Date.now();
   const tokens = { input: 0, output: 0 };
   let cost: number | null = 0;
-  let served: string | null = null;
   const usage = (u: Usage) => {
-    if (u.served) served = u.served;
     tokens.input += u.input;
     tokens.output += u.output;
     const c = costOf(u);
     cost = cost === null || c === null ? null : cost + c;
   };
 
+  let who: { provider: "openai" | "zai"; model: string; fallback: boolean; firstError: string | null } | null = null;
   // 카드에 있는 숫자(원문 · 뜻)
   const cardNums = new Set((card?.facts ?? []).flatMap((f) => [...extractNumbers(f.text), ...extractNumbers(f.ko ?? "")].map((n) => n.value)));
   const byType = new Map<TitleType, TitleSuggestion>();
   const dropped: TitleSuggestions["dropped"] = [];
   // 53차 I · 유형 3개가 다 차지 않으면 한 번 더 부른다
   for (let attempt = 0; attempt < 2 && byType.size < 3; attempt++) {
-    const raw = (await callJson(SYSTEM, user, 1500, { tier: "main", provider: "openai", stage: attempt === 0 ? "제목 · 요약 추천" : "제목 · 요약 추천(모자라 한 번 더)", usage })) as {
-      items?: Partial<TitleSuggestion>[];
-    };
+    // 54차 A · OpenAI 먼저 · 실패하면 GLM main 으로 대신
+    const r = await callJsonWithFallback(SYSTEM, user, 1500, { stage: attempt === 0 ? "제목 · 요약 추천" : "제목 · 요약 추천(모자라 한 번 더)", usage });
+    if (!who) who = r;
+    const raw = r.data as { items?: Partial<TitleSuggestion>[] };
     for (const it of raw.items ?? []) {
       const title = String(it.title ?? "").trim();
       const summary = String(it.summary ?? "").trim();
@@ -133,7 +137,19 @@ export async function suggestTitles(db: SupabaseClient, letterId: string): Promi
   const items = (["question", "flip", "apply"] as const).map((t) => byType.get(t)).filter((x): x is TitleSuggestion => !!x);
   const ms = Date.now() - t0;
 
-  const result: TitleSuggestions = { at: new Date().toISOString(), model: served ?? OPENAI_MODEL, items, dropped, ms, tokens, cost };
+  const w = who as { provider: "openai" | "zai"; model: string; fallback: boolean; firstError: string | null } | null;
+  const result: TitleSuggestions = {
+    at: new Date().toISOString(),
+    model: w?.model ?? "",
+    provider: w?.provider,
+    fallback_from: w?.fallback ? "openai" : null,
+    fallback_reason: w?.fallback ? w.firstError : null,
+    items,
+    dropped,
+    ms,
+    tokens,
+    cost,
+  };
   const meta = await readDraftMeta(db, letterId);
   if (meta) await writeDraftMeta(db, letterId, { ...meta, title_suggestions: result } as DraftMeta);
   return result;

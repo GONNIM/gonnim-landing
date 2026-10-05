@@ -56,8 +56,11 @@ export function TitleSuggestBox({
       {result && (
         <div className="space-y-1.5">
           <p className="text-muted-foreground">
-            추천 {result.items.length}묶음 · 누르면 「제목」 · 「한 문장 요약」 칸에 들어갑니다 · {result.model}
+            추천 {result.items.length}묶음 · 누르면 「제목」 · 「한 문장 요약」 칸에 들어갑니다 · {result.model} 로 추천
             {result.dropped.length > 0 && ` · 규칙에 걸려 뺀 묶음 ${result.dropped.length}개`}
+            {result.fallback_from === "openai" && (
+              <span className="text-muted-foreground/70"> · OpenAI 사용 불가({result.fallback_reason}) · GLM 으로 대신 추천</span>
+            )}
           </p>
           {result.items.map((it) => (
             <button
