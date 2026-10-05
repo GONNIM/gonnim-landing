@@ -51,7 +51,7 @@ export function TitleSuggestBox({
         {!ready ? "OPENAI_API_KEY 없음" : pending ? "추천 받는 중…" : "제목·요약 추천 받기"}
       </button>
       {done && <p className="text-emerald-700 dark:text-emerald-300">{done}</p>}
-      {error && <p className="text-red-700 dark:text-red-300">추천 실패 · {error}</p>}
+      {error && <p className="text-red-700 dark:text-red-300">{error}</p>}
       {result && (
         <div className="space-y-1.5">
           <p className="text-muted-foreground">

@@ -12,8 +12,22 @@ export async function requestTitleSuggestions(letterId: string): Promise<{ error
   try {
     return { error: null, result: await suggestTitles(db, letterId) };
   } catch (err) {
-    return { error: err instanceof Error ? err.message : String(err), result: null };
+    return { error: suggestErrorText(err), result: null };
   }
+}
+
+/**
+ * 51차 B · 추천 오류를 화면 글자로. 잔액(429 credit_balance_exhausted · credits/billing 이 든 402 · 429)과
+ * 키 틀림(401)은 운영자가 할 일을 바로 적는다. 그 밖은 「추천 실패 · {상태 코드} {메시지 앞 80자}」.
+ */
+function suggestErrorText(err: unknown): string {
+  const e = err as { status?: number; code?: string; message?: string };
+  const msg = String(e?.message ?? err ?? "");
+  if (e?.status === 401) return "OPENAI_API_KEY 가 틀립니다.";
+  if (e?.code === "credit_balance_exhausted" || ((e?.status === 402 || e?.status === 429) && /credits|billing/i.test(msg))) {
+    return "OpenAI 잔액이 없습니다. 충전한 뒤 다시 누르십시오.";
+  }
+  return `추천 실패 · ${e?.status ?? ""} ${msg.slice(0, 80)}`.replace(/\s+/g, " ").trim();
 }
 
 /**
