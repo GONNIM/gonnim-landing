@@ -249,6 +249,9 @@ export async function callJsonWithFallback(
     return { data, provider: "openai", model: served ?? OPENAI_MODEL, fallback: false, firstError: null };
   } catch (openaiErr) {
     const firstError = shortOpenAIError(openaiErr);
+    // 54차 · 실패한 OpenAI 호출도 한 줄 남긴다(토큰 0 · 비용 0 · 단계에 이유)
+    const { logLlmCall } = await import("./runlog");
+    await logLlmCall({ stage: `${opts.stage}(실패 · ${firstError})`, provider: "openai", model: OPENAI_MODEL, input: 0, output: 0, reasoning: 0, ms: 0, cost: 0 });
     try {
       const data = await callJson(system, user, maxTokens, { tier: "main", provider: "zai", stage: `${opts.stage}(GLM 대체)`, usage });
       return { data, provider: "zai", model: served ?? MODEL_MAIN, fallback: true, firstError };
