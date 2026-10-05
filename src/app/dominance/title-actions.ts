@@ -1,6 +1,6 @@
 "use server";
 
-// 48차 A · D51 · 제목 · 한 문장 요약 추천(Claude)과 ④ 리뷰 화면의 제목 · 요약 저장.
+// 48차 A · D51 · 제목 · 한 문장 요약 추천(50차부터 OpenAI)과 ④ 리뷰 화면의 제목 · 요약 저장.
 
 import { revalidatePath } from "next/cache";
 import { dominanceContext } from "@/lib/dominance/guard";

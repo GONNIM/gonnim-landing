@@ -83,7 +83,7 @@ export type LlmCallLine = {
   reasoning: number;
   ms: number;
   cost: number | null;
-  /** 48차 · 공급자(zai · groq · anthropic). 옛 줄에는 없다(= zai) */
+  /** 48차 · 공급자(zai · groq · openai). 옛 줄에는 없다(= zai) */
   provider?: string;
 };
 

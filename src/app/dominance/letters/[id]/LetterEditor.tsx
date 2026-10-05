@@ -23,9 +23,9 @@ export type EditorCard = {
 
 export type EditorMeta = {
   titles: string[];
-  /** 48차 A · D51 · 마지막 제목 · 요약 추천(Claude) */
+  /** 48차 A · D51 · 마지막 제목 · 요약 추천(50차부터 OpenAI) */
   titleSuggestions?: TitleSuggestions | null;
-  /** ANTHROPIC_API_KEY 가 있는가 */
+  /** OPENAI_API_KEY 가 있는가 */
   suggestReady?: boolean;
   glossary: GlossaryItem[];
   generatedAt: string;
@@ -213,7 +213,7 @@ export function LetterEditor({
             className="w-full rounded-lg border border-[color:var(--border)]/70 bg-surface/30 px-3 py-2 text-sm text-foreground read-only:opacity-70"
           />
           {categoryMark(summary) && <p className="text-xs text-red-700 dark:text-red-300">{categoryMark(summary)}</p>}
-          {/* 48차 A · D51 · 제목 · 요약 추천(Claude). 묶음을 누르면 두 칸에 들어가고 자동 저장이 돈다 */}
+          {/* 48차 A · D51 · 제목 · 요약 추천(50차부터 OpenAI). 묶음을 누르면 두 칸에 들어가고 자동 저장이 돈다 */}
           <TitleSuggestBox
             letterId={letterId}
             ready={Boolean(meta?.suggestReady)}

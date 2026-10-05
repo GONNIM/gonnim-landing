@@ -1,4 +1,4 @@
-// 48차 A · D51 · 제목 · 한 문장 요약 추천(Anthropic Claude).
+// 48차 A · D51 · 제목 · 한 문장 요약 추천(50차부터 OpenAI API).
 //
 // 쓰기와 교차 리뷰는 D46 대로 GLM 이다. 여기는 다 쓴 글의 제목과 한 문장 요약만 묶음 3개로 제안한다.
 // 결과는 ds-drafts/<letterId>/meta.json 의 title_suggestions 에 시각과 함께 남긴다. 글은 바꾸지 않는다.
@@ -6,7 +6,7 @@
 // 거절 필터(의학적 지시 등) 금지 · 카드에 없는 수치 금지. 어긴 묶음은 빼고 몇 개를 뺐는지 남긴다.
 
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { anthropicReady, ANTHROPIC_MODEL, callJson, costOf, type Usage } from "./llm";
+import { openaiReady, OPENAI_MODEL, callJson, costOf, type Usage } from "./llm";
 import { loadQuestionCard } from "./card";
 import { extractNumbers } from "./card-check";
 import { categoryTerms, flagBlock } from "./filters";
@@ -55,7 +55,7 @@ const SYSTEM = `너는 한국어 과학 레터의 편집자다. 다 쓴 글을 �
 출력: {"items":[{"title":"…","summary":"…","why":"이 묶음을 고른 이유 한 줄"}, … 3개]}`;
 
 export async function suggestTitles(db: SupabaseClient, letterId: string): Promise<TitleSuggestions> {
-  if (!anthropicReady()) throw new Error("ANTHROPIC_API_KEY 없음");
+  if (!openaiReady()) throw new Error("OPENAI_API_KEY 없음");
   const { data: letter } = await db
     .from("ds_letters")
     .select("title, summary, blocks, question_id, review_checks")
@@ -82,13 +82,15 @@ export async function suggestTitles(db: SupabaseClient, letterId: string): Promi
   const t0 = Date.now();
   const tokens = { input: 0, output: 0 };
   let cost: number | null = 0;
+  let served: string | null = null;
   const usage = (u: Usage) => {
+    if (u.served) served = u.served;
     tokens.input += u.input;
     tokens.output += u.output;
     const c = costOf(u);
     cost = cost === null || c === null ? null : cost + c;
   };
-  const raw = (await callJson(SYSTEM, user, 1500, { tier: "main", provider: "anthropic", stage: "제목 · 요약 추천", usage })) as { items?: Partial<TitleSuggestion>[] };
+  const raw = (await callJson(SYSTEM, user, 1500, { tier: "main", provider: "openai", stage: "제목 · 요약 추천", usage })) as { items?: Partial<TitleSuggestion>[] };
   const ms = Date.now() - t0;
 
   // 카드에 있는 숫자(원문 · 뜻)
@@ -112,7 +114,7 @@ export async function suggestTitles(db: SupabaseClient, letterId: string): Promi
     else items.push({ title, summary, why });
   }
 
-  const result: TitleSuggestions = { at: new Date().toISOString(), model: ANTHROPIC_MODEL, items: items.slice(0, 3), dropped, ms, tokens, cost };
+  const result: TitleSuggestions = { at: new Date().toISOString(), model: served ?? OPENAI_MODEL, items: items.slice(0, 3), dropped, ms, tokens, cost };
   const meta = await readDraftMeta(db, letterId);
   if (meta) await writeDraftMeta(db, letterId, { ...meta, title_suggestions: result } as DraftMeta);
   return result;

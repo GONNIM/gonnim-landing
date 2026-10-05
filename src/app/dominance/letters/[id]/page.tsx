@@ -1,6 +1,6 @@
 // ③ 수정 · 재작성 · 왼쪽에 원천, 오른쪽에 내 글.
 
-import { anthropicReady } from "@/lib/dominance/llm";
+import { openaiReady } from "@/lib/dominance/llm";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { dominanceContext } from "@/lib/dominance/guard";
@@ -129,7 +129,7 @@ export default async function LetterEditPage({
             : null
         }
         initialMismatches={mismatches}
-        meta={meta ? { titles: meta.titles, glossary: meta.glossary, generatedAt: meta.generatedAt, generation: meta.generation, titleSuggestions: meta.title_suggestions ?? null, suggestReady: anthropicReady() } : null}
+        meta={meta ? { titles: meta.titles, glossary: meta.glossary, generatedAt: meta.generatedAt, generation: meta.generation, titleSuggestions: meta.title_suggestions ?? null, suggestReady: openaiReady() } : null}
       />
     </div>
   );

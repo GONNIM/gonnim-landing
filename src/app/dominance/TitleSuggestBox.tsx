@@ -15,7 +15,7 @@ export function TitleSuggestBox({
   onPick,
 }: {
   letterId: string;
-  /** ANTHROPIC_API_KEY 가 있는가 */
+  /** OPENAI_API_KEY 가 있는가 */
   ready: boolean;
   initial: TitleSuggestions | null;
   disabled?: boolean;
@@ -48,7 +48,7 @@ export function TitleSuggestBox({
         disabled={!ready || pending || disabled}
         className="rounded-md border border-[color:var(--border)] px-3 py-1.5 text-foreground/85 hover:border-[color:var(--accent)] disabled:cursor-not-allowed disabled:opacity-50"
       >
-        {!ready ? "ANTHROPIC_API_KEY 없음" : pending ? "추천 받는 중…" : "제목·요약 추천 받기"}
+        {!ready ? "OPENAI_API_KEY 없음" : pending ? "추천 받는 중…" : "제목·요약 추천 받기"}
       </button>
       {done && <p className="text-emerald-700 dark:text-emerald-300">{done}</p>}
       {error && <p className="text-red-700 dark:text-red-300">추천 실패 · {error}</p>}
