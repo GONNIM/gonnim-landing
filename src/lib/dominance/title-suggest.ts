@@ -13,7 +13,12 @@ import { categoryTerms, flagBlock } from "./filters";
 import { readDraftMeta, writeDraftMeta, type DraftMeta } from "./draft-store";
 import { BLOCK_LABEL, type LetterBlock } from "./types";
 
-export type TitleSuggestion = { title: string; summary: string; why: string };
+import type { TitleType } from "./title-types";
+export { TITLE_TYPE_LABEL, type TitleType } from "./title-types";
+export type TitleSuggestion = { title: string; summary: string; why: string; type?: TitleType };
+
+/** 53차 I · 과장 낱말(코드 검사 · 걸리면 그 묶음을 뺀다) */
+const HYPE = ["충격", "경악", "반드시", "무조건", "100%", "모두가"];
 export type TitleSuggestions = {
   at: string;
   model: string;
@@ -43,16 +48,17 @@ export function titleSummaryProblems(title: string, summary: string): string[] {
   return out;
 }
 
-const SYSTEM = `너는 한국어 과학 레터의 편집자다. 다 쓴 글을 읽고 제목과 한 문장 요약을 묶음 3개로 제안한다.
+const SYSTEM = `너는 한국어 과학 레터의 편집자다. 다 쓴 글을 읽고 제목과 부제목(한 문장 요약)을 묶음 3개로 제안한다.
+세 묶음은 유형이 서로 달라야 한다. 각 묶음에 type 을 붙인다.
+- question(질문형): 독자가 궁금해할 질문으로 쓴다. 답을 제목에서 다 주지 않는다.
+- flip(통설 뒤집기형): 독자가 믿던 것을 한 문장으로 뒤집는다.
+- apply(내 몸 적용형): 독자의 하루에 닿는 말로 쓴다.
 지킬 것:
-- 제목은 30자 안. 질문형이어도 된다. 독자가 "왜?" 하고 열어 보고 싶게 쓰되 과장하지 않는다.
-- 한 문장 요약은 60자 안(태그 [P5] 같은 꼬리표는 글자 수에 넣지 않는다). 글의 결론 하나를 사실대로 적는다. 사실을 말하면 그 사실의 카드 태그를 [P5] 처럼 붙인다.
-- 의학적 지시(복용하십시오 · 권장 용량 · 치료된다 등)를 쓰지 않는다.
-- "반직관" · "통설 파괴" · "놀라운 수치" · "내 몸과의 연결" 같은 지시문의 범주 이름을 쓰지 않는다.
-- 사실 카드에 없는 숫자를 쓰지 않는다.
-- 영어 낱말을 번역 없이 남기지 않는다.
-- 세 묶음은 서로 다른 각도로 쓴다(예: 질문 · 결론 · 장면).
-출력: {"items":[{"title":"…","summary":"…","why":"이 묶음을 고른 이유 한 줄"}, … 3개]}`;
+- 제목은 30자 안. 부제목은 60자 안.
+- 부제목은 글의 핵심 사실 하나를 담는다. 그 사실은 사실 카드 문장이나 3줄 요약에 근거가 있어야 한다. 태그([P5] 같은 꼬리표)는 쓰지 않는다.
+- 금지: 카드에 없는 수치 · 카드에 없는 단정, 과장 낱말(충격 · 경악 · 반드시 · 무조건 · 100% · 모두가), 느낌표, 의학적 지시(복용하십시오 · 권장 용량 · 치료된다 등), 지시문의 범주 이름("반직관" · "통설 파괴" · "놀라운 수치" · "내 몸과의 연결" 등), 번역하지 않은 영어 낱말.
+- why 에는 이 묶음을 고른 이유를 한 줄로 쓴다.
+출력: {"items":[{"type":"question","title":"…","summary":"…","why":"…"},{"type":"flip",…},{"type":"apply",…}]}`;
 
 export async function suggestTitles(db: SupabaseClient, letterId: string): Promise<TitleSuggestions> {
   if (!openaiReady()) throw new Error("OPENAI_API_KEY 없음");
@@ -90,31 +96,44 @@ export async function suggestTitles(db: SupabaseClient, letterId: string): Promi
     const c = costOf(u);
     cost = cost === null || c === null ? null : cost + c;
   };
-  const raw = (await callJson(SYSTEM, user, 1500, { tier: "main", provider: "openai", stage: "제목 · 요약 추천", usage })) as { items?: Partial<TitleSuggestion>[] };
-  const ms = Date.now() - t0;
 
   // 카드에 있는 숫자(원문 · 뜻)
   const cardNums = new Set((card?.facts ?? []).flatMap((f) => [...extractNumbers(f.text), ...extractNumbers(f.ko ?? "")].map((n) => n.value)));
-  const items: TitleSuggestion[] = [];
+  const byType = new Map<TitleType, TitleSuggestion>();
   const dropped: TitleSuggestions["dropped"] = [];
-  for (const it of raw.items ?? []) {
-    const title = String(it.title ?? "").trim();
-    const summary = String(it.summary ?? "").trim();
-    const why = String(it.why ?? "").trim();
-    const reasons: string[] = [];
-    if (!title || !summary) reasons.push("빈 칸");
-    if (plainLen(title) > 30) reasons.push(`제목 ${plainLen(title)}자`);
-    if (plainLen(summary) > 60) reasons.push(`요약 ${plainLen(summary)}자`);
-    reasons.push(...titleSummaryProblems(title, summary));
-    if (card) {
-      const extra = [...extractNumbers(title), ...extractNumbers(summary)].map((n) => n.value).filter((v) => !cardNums.has(v));
-      if (extra.length) reasons.push(`카드에 없는 수치 ${extra.join(", ")}`);
+  // 53차 I · 유형 3개가 다 차지 않으면 한 번 더 부른다
+  for (let attempt = 0; attempt < 2 && byType.size < 3; attempt++) {
+    const raw = (await callJson(SYSTEM, user, 1500, { tier: "main", provider: "openai", stage: attempt === 0 ? "제목 · 요약 추천" : "제목 · 요약 추천(모자라 한 번 더)", usage })) as {
+      items?: Partial<TitleSuggestion>[];
+    };
+    for (const it of raw.items ?? []) {
+      const title = String(it.title ?? "").trim();
+      const summary = String(it.summary ?? "").trim();
+      const why = String(it.why ?? "").trim();
+      const type = (["question", "flip", "apply"] as const).find((t) => t === it.type);
+      const reasons: string[] = [];
+      if (!type) reasons.push(`유형 없음(${String(it.type ?? "")})`);
+      if (!title || !summary) reasons.push("빈 칸");
+      if (plainLen(title) > 30) reasons.push(`제목 ${plainLen(title)}자`);
+      if (plainLen(summary) > 60) reasons.push(`부제목 ${plainLen(summary)}자`);
+      if (TAG.test(summary) || TAG.test(title)) reasons.push("태그를 씀");
+      TAG.lastIndex = 0;
+      if (/[!！]/.test(title + summary)) reasons.push("느낌표");
+      const hype = HYPE.filter((w) => (title + summary).includes(w));
+      if (hype.length) reasons.push(`과장 낱말 ${hype.join(" · ")}`);
+      reasons.push(...titleSummaryProblems(title, summary));
+      if (card) {
+        const extra = [...extractNumbers(title), ...extractNumbers(summary)].map((n) => n.value).filter((v) => !cardNums.has(v));
+        if (extra.length) reasons.push(`카드에 없는 수치 ${extra.join(", ")}`);
+      }
+      if (reasons.length) dropped.push({ title, reason: reasons.join(" · ") });
+      else if (type && !byType.has(type)) byType.set(type, { title, summary, why, type });
     }
-    if (reasons.length) dropped.push({ title, reason: reasons.join(" · ") });
-    else items.push({ title, summary, why });
   }
+  const items = (["question", "flip", "apply"] as const).map((t) => byType.get(t)).filter((x): x is TitleSuggestion => !!x);
+  const ms = Date.now() - t0;
 
-  const result: TitleSuggestions = { at: new Date().toISOString(), model: served ?? OPENAI_MODEL, items: items.slice(0, 3), dropped, ms, tokens, cost };
+  const result: TitleSuggestions = { at: new Date().toISOString(), model: served ?? OPENAI_MODEL, items, dropped, ms, tokens, cost };
   const meta = await readDraftMeta(db, letterId);
   if (meta) await writeDraftMeta(db, letterId, { ...meta, title_suggestions: result } as DraftMeta);
   return result;

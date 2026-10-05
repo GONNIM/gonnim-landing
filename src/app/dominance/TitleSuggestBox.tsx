@@ -6,6 +6,7 @@
 import { useState, useTransition } from "react";
 import { requestTitleSuggestions } from "./title-actions";
 import type { TitleSuggestion, TitleSuggestions } from "@/lib/dominance/title-suggest";
+import { TITLE_TYPE_LABEL } from "@/lib/dominance/title-types";
 
 export function TitleSuggestBox({
   letterId,
@@ -66,7 +67,10 @@ export function TitleSuggestBox({
               onClick={() => onPick(it)}
               className="block w-full rounded-md border border-[color:var(--border)]/70 px-2.5 py-2 text-left hover:border-[color:var(--accent)] disabled:opacity-60"
             >
-              <span className="block text-sm font-medium text-foreground">{it.title}</span>
+              <span className="block text-sm font-medium text-foreground">
+                {it.type && <span className="mr-1.5 rounded border border-[color:var(--border)] px-1 py-px text-[10px] font-normal text-muted-foreground">{TITLE_TYPE_LABEL[it.type]}</span>}
+                {it.title}
+              </span>
               <span className="mt-0.5 block text-sm text-foreground/85">{it.summary}</span>
               <span className="mt-0.5 block text-[11px] text-muted-foreground">{it.why}</span>
             </button>
