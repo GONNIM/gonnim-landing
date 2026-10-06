@@ -67,7 +67,7 @@ export default async function DominanceHome() {
 
   // 36차 C · 이번 주 Needs 신호 한 줄
   const needs = await loadLatestNeeds(db).catch(() => null);
-  // 48차 G · D53 · 다음 할 일(글 먼저 · 질문 나중 · 최대 10줄)
+  // 48차 G · D53 · 54차 D · 다음 할 일(글 모두 · 보류 · 글 없는 채택 질문 · 나머지는 접힌 칸)
   const nextActions = await loadNextActions(db).catch(() => [] as NextAction[]);
 
   return (
