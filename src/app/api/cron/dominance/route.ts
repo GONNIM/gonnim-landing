@@ -12,6 +12,7 @@
 // 남기지 않으면 아침에 확인할 것이 없다.
 
 import { PRE_PUBLISHING_NOTE, publishingStarted } from "@/lib/dominance/publishing";
+import { autoScheduleReviewed } from "@/lib/dominance/approve";
 import type { NextRequest } from "next/server";
 
 import { gatherAlerts, sendAlertEmail, type Alert } from "@/lib/dominance/alerts";
@@ -63,6 +64,18 @@ export async function GET(req: NextRequest) {
     failedSteps.push("수집");
     extraAlerts.push(fail("수집", err));
     steps.collect = { error: String(err) };
+  }
+
+  // 1-2. D55 · 자동 날짜 붙이기(발행 앞 단계 · 56차 B). 리뷰 통과 · 뜻 확인이 끝난 글을 다음 빈 월·수·금에 승인한다.
+  //      경보 메일은 보내지 않는다. 결과는 요약에만 적는다. 실패해도 발행 단계는 그대로 돈다.
+  let autoLines: string[] = [];
+  try {
+    const auto = await autoScheduleReviewed(db);
+    autoLines = auto.lines;
+    steps.autoSchedule = auto;
+  } catch (err) {
+    steps.autoSchedule = { error: String(err) };
+    autoLines = [`자동 날짜 붙이기 오류 · ${String(err).slice(0, 80)}`];
   }
 
   // 2. 발행 · 오늘 날짜가 붙은 승인된 글만
@@ -144,6 +157,7 @@ export async function GET(req: NextRequest) {
     (failedSteps.length > 0 ? ` · 실패 ${failedSteps.join(", ")}` : "") +
     (sourcesDead ? " · 원천 전부 0건" : "") +
     (heldForNoAudience ? ` · 구독자 0명 · 발행 보류 · 글 ${heldForNoAudience}건` : "") +
+    autoLines.map((l) => ` · ${l}`).join("") +
     (publishingStarted() ? "" : ` · ${PRE_PUBLISHING_NOTE}`);
 
   const heartbeat = await pingHeartbeat(healthy, summary);

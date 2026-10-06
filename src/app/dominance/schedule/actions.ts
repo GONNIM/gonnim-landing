@@ -1,24 +1,10 @@
 "use server";
 
 import { meaningStatus, type MeaningStatus } from "@/lib/dominance/card";
-import { PRE_PUBLISHING_REASON, publishingStarted } from "@/lib/dominance/publishing";
 import { revalidatePath } from "next/cache";
 import { dominanceContext } from "@/lib/dominance/guard";
-import { kstToday } from "@/lib/dominance/kst";
 import { readVoteCandidates, writeVoteCandidates, type VoteCandidate } from "@/lib/dominance/draft-store";
-import { loadLetterSources } from "@/lib/dominance/letters";
-import { linkCheckUrls, runReviewChecks } from "@/lib/dominance/review";
-import type { LetterBlock, LetterStatus } from "@/lib/dominance/types";
-
-type Row = {
-  id: string;
-  title: string;
-  blocks: LetterBlock[];
-  status: LetterStatus;
-  reviewed_at: string | null;
-};
-
-const SELECT = "id, title, blocks, status, reviewed_at";
+import { approveLetterCore, recheckLetterLinks } from "@/lib/dominance/approve";
 
 function revalidateAll() {
   revalidatePath("/dominance/schedule");
@@ -32,36 +18,7 @@ export async function recheckLinks(
   letterId: string,
 ): Promise<{ ok: boolean; detail: string; checkedAt: string }> {
   const { db } = await dominanceContext();
-
-  const { data } = await db
-    .from("ds_letters")
-    .select("id, summary, blocks")
-    .eq("id", letterId)
-    .maybeSingle<{ id: string; summary: string | null; blocks: LetterBlock[] }>();
-
-  if (!data) {
-    return { ok: false, detail: "글을 찾지 못했습니다", checkedAt: "" };
-  }
-
-  const sources = await loadLetterSources(db, letterId);
-  const checks = await runReviewChecks({
-    blocks: data.blocks,
-    sourceUrls: linkCheckUrls(sources),
-    sourceTags: sources.map((s) => s.tag),
-    summary: data.summary,
-  });
-  const links = checks.find((c) => c.code === "links");
-
-  return {
-    ok: links?.passed ?? false,
-    // 통과해도 확인 불가(403 · 429)가 남으면 그 목록을 보여 준다. 사람이 직접 눌러 본다 (D35).
-    detail: links?.passed
-      ? links.detail
-        ? `${sources.length}개 중 ${links.detail}`
-        : `${sources.length}개 정상`
-      : (links?.detail ?? "확인하지 못했습니다"),
-    checkedAt: new Date().toISOString(),
-  };
+  return recheckLetterLinks(db, letterId);
 }
 
 /** 45차 C · 승인 창의 셋째 칸(쓰인 문장 뜻 확인 수) */
@@ -70,85 +27,15 @@ export async function checkMeanings(letterId: string): Promise<MeaningStatus> {
   return meaningStatus(db, letterId);
 }
 
-/** [승인하고 날짜 확정] · 여기를 지나면 크론이 그날 07시에 내보낸다. */
+/** [승인하고 날짜 확정] · 여기를 지나면 크론이 그날 07시에 내보낸다. 검사와 기록은 approve.ts(56차 B · 크론과 같은 몸통). */
 export async function approveLetter(
   letterId: string,
   date: string,
 ): Promise<{ error: string | null; warning: string | null }> {
   const { admin, db } = await dominanceContext();
-
-  // D40 · 발행 시작 선언 전에는 서버에서도 거부한다.
-  if (!publishingStarted()) return { error: PRE_PUBLISHING_REASON, warning: null };
-
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
-    return { error: "날짜 형식이 올바르지 않습니다", warning: null };
-  }
-
-  const today = kstToday();
-  // 크론은 오늘 날짜만 본다. 지난 날짜를 붙이면 영원히 발행되지 않는다.
-  if (date < today) {
-    return { error: "지난 날짜에는 붙일 수 없습니다", warning: null };
-  }
-
-  const { data: letter } = await db
-    .from("ds_letters")
-    .select(SELECT)
-    .eq("id", letterId)
-    .maybeSingle<Row>();
-
-  if (!letter) return { error: "글을 찾지 못했습니다", warning: null };
-  if (letter.status === "published") {
-    return { error: "이미 발행된 글은 날짜를 바꿀 수 없습니다", warning: null };
-  }
-  if (!letter.reviewed_at) {
-    return { error: "리뷰를 통과하지 않은 글입니다", warning: null };
-  }
-
-  const links = await recheckLinks(letterId);
-  if (!links.ok) {
-    return { error: `원천 링크 문제: ${links.detail}`, warning: null };
-  }
-
-  // 45차 C · D50 · 쓰인 문장의 뜻을 모두 확인해야 승인한다(옛 글 · 카드 없는 글은 해당 없음).
-  const meaning = await meaningStatus(db, letterId);
-  if (meaning.applicable && meaning.verified < meaning.used) {
-    return { error: `쓰인 문장의 뜻 ${meaning.used - meaning.verified}개가 확인되지 않았습니다`, warning: null };
-  }
-
-  const now = new Date().toISOString();
-  const { error } = await db
-    .from("ds_letters")
-    .update({
-      status: "approved",
-      scheduled_for: date,
-      approved_at: now,
-      approved_by: admin.email,
-      updated_at: now,
-    })
-    .eq("id", letterId)
-    .in("status", ["reviewed", "approved"]);
-
-  if (error) return { error: error.message, warning: null };
-
-  // 같은 날짜에 이미 다른 글이 있으면 막지 않고 알린다. 둘 다 발행된다.
-  const { data: sameDay } = await db
-    .from("ds_letters")
-    .select("id")
-    .eq("scheduled_for", date)
-    .in("status", ["approved", "published"])
-    .neq("id", letterId);
-
-  revalidateAll();
-
-  const warnings: string[] = [];
-  if (sameDay && sameDay.length > 0) {
-    warnings.push(`이 날짜에 글이 ${sameDay.length + 1}편입니다. 모두 발행됩니다.`);
-  }
-  if (date === today) {
-    warnings.push("오늘 07시가 지났으면 내일 발행됩니다.");
-  }
-
-  return { error: null, warning: warnings.join(" ") || null };
+  const r = await approveLetterCore(db, letterId, date, { by: admin.email, event: "approve", note: `${admin.email}: 승인 창` });
+  if (!r.error) revalidateAll();
+  return { error: r.error, warning: r.warning };
 }
 
 /** [승인 취소] · 발행 전이면 언제든 되돌린다. 리뷰 통과 상태로 돌아간다. */

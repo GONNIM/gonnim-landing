@@ -277,6 +277,13 @@ export function ScheduleCalendar({
         </p>
       )}
 
+      {/* 56차 B · D55 · 자동 날짜 붙이기 안내(발행 시작 뒤에만) */}
+      {started && (
+        <p className="rounded-md border border-sky-500/40 bg-sky-500/10 p-2.5 text-xs text-sky-800 dark:text-sky-200">
+          자동 날짜 붙이기가 켜져 있습니다(D55). 리뷰 통과와 뜻 확인이 끝난 글은 다음 빈 월·수·금에 자동으로 붙습니다. 되돌리려면 「승인 취소」.
+        </p>
+      )}
+
       <Pool pool={pool} today={today} onPick={openApproval} />
 
       {target && (
