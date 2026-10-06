@@ -12,5 +12,27 @@
       "path": "/api/cron/dominance-needs",
       "schedule": "30 22 * * *"
     }
-  ]
+  ],
+  "functions": {
+    "src/app/dominance/**/*.tsx": {
+      "regions": [
+        "icn1"
+      ]
+    },
+    "src/app/api/cron/dominance/route.ts": {
+      "regions": [
+        "icn1"
+      ]
+    },
+    "src/app/api/cron/dominance-needs/route.ts": {
+      "regions": [
+        "icn1"
+      ]
+    },
+    "src/app/api/cron/dominance-timing/route.ts": {
+      "regions": [
+        "icn1"
+      ]
+    }
+  }
 }
