@@ -19,6 +19,8 @@ export type NextAction = {
   buttonLabel: string | null;
   /** 글 줄 아래 작은 글자(쓰는 중 · 리뷰 대기 글의 뜻 확인 m/n) */
   sub?: { line: string; href: string } | null;
+  /** 54차 D · 접지 않고 글 줄 바로 아래에 보일 질문(보류 · 채택 후 글 없음) */
+  pinned?: boolean;
 };
 
 export async function loadNextActions(db: SupabaseClient): Promise<NextAction[]> {
@@ -35,7 +37,8 @@ export async function loadNextActions(db: SupabaseClient): Promise<NextAction[]>
     if (l.question_id) withLetter.add(l.question_id);
     const m = await meaningStatus(db, l.id);
     const short = m.applicable && m.verified < m.used;
-    const evidence = m.questionId ? `/dominance/questions/${m.questionId}/evidence` : null;
+    // 54차 D · 증거 표 노란 상자로 바로(앵커)
+    const evidence = m.questionId ? `/dominance/questions/${m.questionId}/evidence#used-facts` : null;
     const base = { kind: "letter" as const, id: l.id, title: l.title };
     const sub = short && evidence ? { line: `뜻 확인 ${m.verified}/${m.used}`, href: evidence } : null;
     if (l.status === "draft") {
@@ -55,11 +58,11 @@ export async function loadNextActions(db: SupabaseClient): Promise<NextAction[]>
   for (const q of questions) {
     const base = { kind: "question" as const, id: q.id, title: q.question };
     if (q.status === "held") {
-      out.push({ ...base, line: `보류 · ${holdReason(q)} · ${holdNext(q).join(" / ")}`, href: "/dominance/questions", buttonLabel: "열기" });
+      out.push({ ...base, line: `보류 · ${holdReason(q)} · ${holdNext(q).join(" / ")}`, href: "/dominance/questions", buttonLabel: "열기", pinned: true });
     } else if (q.status === "validated" && q.v3EvidenceOk === true) {
       out.push({ ...base, line: "채택할 수 있습니다", href: "/dominance/questions", buttonLabel: "열기" });
     } else if (q.status === "adopted" && !withLetter.has(q.id)) {
-      out.push({ ...base, line: "[글 작성하기]를 누르십시오", href: `/dominance/questions/${q.id}/evidence`, buttonLabel: "열기" });
+      out.push({ ...base, line: "[글 작성하기]를 누르십시오", href: `/dominance/questions/${q.id}/evidence`, buttonLabel: "열기", pinned: true });
     }
   }
   return out;

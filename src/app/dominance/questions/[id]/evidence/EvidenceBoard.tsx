@@ -170,7 +170,7 @@ export function EvidenceBoard({
           <p className="text-xs text-muted-foreground">
             뜻 확인은 이 문장들만 하시면 됩니다. 나머지 카드 문장은 확인하지 않아도 됩니다(런북 13번).
           </p>
-          <ol id="used-facts" className="space-y-2">
+          <ol id="used-facts" className="scroll-mt-40 space-y-2">
             {usedList.map(({ f, slot, tag, title }) => (
               <div key={`${f.rowId}-${f.line}`}>
                 <p className="text-[11px] text-muted-foreground">
