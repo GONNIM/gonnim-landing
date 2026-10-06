@@ -1,7 +1,7 @@
 "use client";
 
 import { AREAS } from "@/lib/dominance/questions";
-import type { IssueFields } from "./actions";
+import type { IssueFields } from "@/lib/dominance/question-actions";
 
 export function FieldsEditor({
   value: f,

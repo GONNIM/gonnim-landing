@@ -15,7 +15,6 @@ async function withTagSources(db: Db, letterId: string, blocks: LetterBlock[]): 
   return withTagSourcesFor(await questionOf(db, letterId), blocks);
 }
 
-export type { SaveResult };
 
 /** 자동 저장과 Cmd+S 가 같이 쓰는 경로. 몸통은 letter-save.ts(56차 D · 시간 재기 라우트와 같은 함수). */
 export async function saveLetter(

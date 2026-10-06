@@ -30,8 +30,8 @@ import {
   suggestFillAction,
   suggestQueriesAction,
   validateAction,
-  type IssueFields,
 } from "./actions";
+import type { IssueFields } from "@/lib/dominance/question-actions";
 import { runCollect } from "./runCollect";
 import { IssueMaker } from "./IssueMaker";
 import type { IssueSignal } from "./actions";

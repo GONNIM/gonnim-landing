@@ -24,8 +24,6 @@ import {
 } from "@/lib/dominance/questions";
 import { validateQuestion, type ValidationResult } from "@/lib/dominance/validate";
 
-export type { IssueFields } from "@/lib/dominance/question-actions";
-
 const PATH = "/dominance/questions";
 
 const errText = (e: unknown) => (e instanceof Error ? e.message : String(e));

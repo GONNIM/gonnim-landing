@@ -8,7 +8,8 @@ import { useState } from "react";
 import { ActionButton, type RunResult } from "../_ui/ActionButton";
 import { useActionStatus } from "../_ui/ActionStatus";
 import type { FillMode } from "@/lib/dominance/question-llm";
-import { fillAction, saveIssueAction, type IssueFields, type IssueSignal } from "./actions";
+import { fillAction, saveIssueAction, type IssueSignal } from "./actions";
+import type { IssueFields } from "@/lib/dominance/question-actions";
 import { FieldsEditor } from "./ui";
 
 const MODES: { key: FillMode; label: string; placeholder: string }[] = [
