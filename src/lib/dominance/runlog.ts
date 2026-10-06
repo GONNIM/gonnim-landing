@@ -69,8 +69,10 @@ export async function saveRun(
 // 표를 새로 만들지 않으려고(DDL 은 운영자 몫) 비공개 버킷 ds-drafts 의 날짜별 파일에 쌓는다.
 //   ds-drafts/logs/json-retry/<KST 날짜>.json  →  [{ at, model, stage, head }]       (JSON 다시 부른 기록)
 //   ds-drafts/logs/llm-calls/<KST 날짜>.json   →  [{ at, stage, model, input, … }]   (LLM 호출마다 · 36차)
-// 파일은 읽고-더하고-쓰기다. 같은 프로세스 안에서 동시에 쓰면(교차 리뷰 두 모델 등) 한 줄을 잃으므로
-// 파일마다 줄을 세워 하나씩 쓴다. 서로 다른 서버 인스턴스가 같은 순간에 쓰면 한 줄을 잃을 수 있다.
+// 57차 C · 줄마다 파일 하나로 쓴다: ds-drafts/<dir>/<KST 날짜>/<시각>-<무작위>.json (한 줄 객체).
+//   전에는 날짜 파일 하나를 읽고-더하고-쓰기 했다. 10/6 에 같은 프로세스 안에서도 한 줄을 잃었다(저장소가 방금 쓴 파일 대신
+//   옛 파일을 돌려준 것으로 본다). 새 방식은 덮어쓰기가 없어 동시에 써도 줄을 잃지 않는다.
+//   읽을 때는 옛 날짜 파일(<날짜>.json · 56차까지)과 새 폴더의 파일을 합쳐 시각 순으로 돌려준다.
 // 기록은 예외를 던지지 않는다. 기록 때문에 본 호출을 잃지 않는다.
 
 export type JsonRetryLine = { at: string; model: string; stage: string; head: string };
@@ -85,6 +87,8 @@ export type LlmCallLine = {
   cost: number | null;
   /** 48차 · 공급자(zai · groq · openai). 옛 줄에는 없다(= zai) */
   provider?: string;
+  /** 57차 · 잃은 줄을 다른 기록(meta.json 등)으로 보충했으면 그 설명 */
+  backfill?: string;
 };
 
 export const JSON_RETRY_DIR = "logs/json-retry";
@@ -94,38 +98,55 @@ export function kstDay(d = new Date()): string {
   return new Date(d.getTime() + 9 * 3600e3).toISOString().slice(0, 10);
 }
 
-const queues = new Map<string, Promise<unknown>>();
-
-async function appendDayLog<T>(dir: string, line: T): Promise<string | null> {
-  const path = `${dir}/${kstDay()}.json`;
-  const run = async (): Promise<string | null> => {
-    try {
-      const { getDominanceClient } = await import("./db");
-      const db = getDominanceClient();
-      const { data } = await db.storage.from("ds-drafts").download(path);
-      const lines: T[] = data ? (JSON.parse(await data.text()) as T[]) : [];
-      lines.push(line);
-      const { error } = await db.storage
-        .from("ds-drafts")
-        .upload(path, new Blob([JSON.stringify(lines, null, 1)], { type: "application/json" }), { upsert: true });
-      return error ? error.message : null;
-    } catch (err) {
-      return err instanceof Error ? err.message : String(err);
-    }
-  };
-  const next = (queues.get(path) ?? Promise.resolve()).then(run, run);
-  queues.set(path, next);
-  return next;
+export async function appendDayLog<T extends { at: string }>(dir: string, line: T): Promise<string | null> {
+  const stamp = line.at.replace(/[:.]/g, "-");
+  const path = `${dir}/${kstDay(new Date(line.at))}/${stamp}-${Math.random().toString(36).slice(2, 10)}.json`;
+  try {
+    const { getDominanceClient } = await import("./db");
+    const db = getDominanceClient();
+    const { error } = await db.storage
+      .from("ds-drafts")
+      .upload(path, new Blob([JSON.stringify(line)], { type: "application/json" }), { upsert: false });
+    return error ? error.message : null;
+  } catch (err) {
+    return err instanceof Error ? err.message : String(err);
+  }
 }
 
-async function readDayLog<T>(db: SupabaseClient, dir: string, day: string): Promise<T[]> {
-  const { data } = await db.storage.from("ds-drafts").download(`${dir}/${day}.json`);
-  if (!data) return [];
-  try {
-    return JSON.parse(await data.text()) as T[];
-  } catch {
-    return [];
+export async function readDayLog<T extends { at: string }>(db: SupabaseClient, dir: string, day: string): Promise<T[]> {
+  const out: T[] = [];
+  // 옛 날짜 파일(56차까지)
+  const { data: legacy } = await db.storage.from("ds-drafts").download(`${dir}/${day}.json`);
+  if (legacy) {
+    try {
+      out.push(...(JSON.parse(await legacy.text()) as T[]));
+    } catch {
+      // 깨진 옛 파일은 건너뛴다
+    }
   }
+  // 57차 · 줄마다 파일
+  const names: string[] = [];
+  for (let offset = 0; ; offset += 1000) {
+    const { data } = await db.storage.from("ds-drafts").list(`${dir}/${day}`, { limit: 1000, offset, sortBy: { column: "name", order: "asc" } });
+    const page = (data ?? []).filter((f) => f.name.endsWith(".json")).map((f) => f.name);
+    names.push(...page);
+    if (!data || data.length < 1000) break;
+  }
+  for (let i = 0; i < names.length; i += 16) {
+    const lines = await Promise.all(
+      names.slice(i, i + 16).map(async (n) => {
+        const { data } = await db.storage.from("ds-drafts").download(`${dir}/${day}/${n}`);
+        if (!data) return null;
+        try {
+          return JSON.parse(await data.text()) as T;
+        } catch {
+          return null;
+        }
+      }),
+    );
+    out.push(...lines.filter((x): x is Awaited<T> => x !== null) as T[]);
+  }
+  return out.sort((x, y) => x.at.localeCompare(y.at));
 }
 
 export function logJsonRetry(line: Omit<JsonRetryLine, "at">): Promise<string | null> {
