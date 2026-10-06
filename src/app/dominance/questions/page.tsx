@@ -2,8 +2,10 @@
 //
 // 순서는 사람이 정한다(D39). 정렬은 계열 · 영역 · V5 · 만든 날뿐이고, 검증 점수로 줄 세우지 않는다.
 
+import { timer } from "@/lib/dominance/timing";
+import { TimingTag } from "@/app/dominance/_ui/TimingTag";
+import { loadQuestionsPage } from "@/lib/dominance/page-data";
 import { dominanceContext } from "@/lib/dominance/guard";
-import { loadQuestions } from "@/lib/dominance/questions";
 import { isMissingSchema, SchemaNotice } from "@/lib/dominance/schema-guard";
 import { QuestionBoard } from "./QuestionBoard";
 import type { IssueSignal } from "./actions";
@@ -22,8 +24,9 @@ export default async function QuestionsPage({ searchParams }: { searchParams: Pr
   } catch {
     signal = null;
   }
-  const { db } = await dominanceContext();
-  const { questions, extColumns, error } = await loadQuestions(db);
+  const t = timer("① 이슈");
+  const { db } = await t.step("인증", dominanceContext());
+  const { questions, extColumns, error } = await loadQuestionsPage(db, t);
 
   if (error) {
     return (
@@ -40,6 +43,7 @@ export default async function QuestionsPage({ searchParams }: { searchParams: Pr
 
   return (
     <div className="space-y-6">
+      <TimingTag t={t} />
       <Heading />
       {!extColumns && (
         <p className="rounded-lg border border-dashed border-amber-500/40 p-3 text-xs text-muted-foreground">

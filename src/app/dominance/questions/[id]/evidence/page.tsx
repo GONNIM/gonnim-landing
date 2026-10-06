@@ -2,15 +2,13 @@
 //
 // 문장은 원문과 글자 그대로 대조한 것만 들어간다. 채택한 질문이고 3칸 이상 차면 [글 작성하기] 가 열린다(20차).
 
+import { timer } from "@/lib/dominance/timing";
+import { TimingTag } from "@/app/dominance/_ui/TimingTag";
+import { loadEvidencePage } from "@/lib/dominance/page-data";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { loadEvidence, SLOTS } from "@/lib/dominance/evidence";
-import { prevSentence } from "@/lib/dominance/prev-sentence";
 import { dominanceContext } from "@/lib/dominance/guard";
-import { loadQuestion } from "@/lib/dominance/questions";
-import { loadQuestionCard, usedFacts } from "@/lib/dominance/card";
 import { EvidenceBoard } from "./EvidenceBoard";
-import { fillUsedMeanings } from "@/lib/dominance/meaning-fill";
 
 export const dynamic = "force-dynamic";
 // [증거 모으기] 한 단계가 Europe PMC 여러 번과 LLM 1회를 부른다.
@@ -18,45 +16,16 @@ export const maxDuration = 300;
 
 export default async function EvidencePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const { db } = await dominanceContext();
-  const q = await loadQuestion(db, id);
-  if (!q) notFound();
-  // 53차 G · D54 · 글이 있고 쓰인 문장의 뜻이 비었으면 처음 열 때 한 번 채운다(미확인 · 실패해도 화면은 연다)
-  await fillUsedMeanings(db, id, { auto: true }).catch(() => null);
-  const table = await loadEvidence(db, id);
-  const { data: letter } = await db
-    .from("ds_letters")
-    .select("id, status")
-    .eq("question_id", id)
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle<{ id: string; status: string }>();
-  // 25차 C · 글에 쓰인 문장만 뜻을 확인하면 된다. 그 문장들을 맨 위로 올린다.
-  let usedIds: string[] = [];
-  if (letter) {
-    const { data: lb } = await db.from("ds_letters").select("blocks").eq("id", letter.id).single<{ blocks: { text: string }[] }>();
-    const card = await loadQuestionCard(db, id);
-    if (card && lb) usedIds = usedFacts(card, lb.blocks).map((f) => f.id);
-  }
-
-  // 33차 F · 원문마다 초록의 바로 앞 문장(지시어 확인용 · LLM 없음)
-  const groups = SLOTS.flatMap((s) => table.slots[s]);
-  const paperIds = [...new Set(groups.map((g) => g.source.paperId).filter((x): x is string => !!x))];
-  const { data: papers } = paperIds.length
-    ? await db.from("ds_papers").select("id, abstract").in("id", paperIds)
-    : { data: [] };
-  const abstractOf = new Map(((papers ?? []) as { id: string; abstract: string | null }[]).map((p) => [p.id, p.abstract]));
-  const prevById: Record<string, string> = {};
-  for (const g of groups) {
-    if (!g.source.paperId) continue;
-    for (const f of g.facts) {
-      const p = prevSentence(abstractOf.get(g.source.paperId), f.text);
-      if (p) prevById[`${f.rowId}:${f.line}`] = p;
-    }
-  }
+  // 56차 D · 자료 읽기는 page-data.ts(시간 재기 라우트와 같은 함수)
+  const t = timer("② 증거 표");
+  const { db } = await t.step("인증", dominanceContext());
+  const { q, table: tbl, letter, usedIds, prevById } = await loadEvidencePage(db, id, t);
+  if (!q || !tbl) notFound();
+  const table = tbl;
 
   return (
     <div className="space-y-6">
+      <TimingTag t={t} />
       <div>
         <div className="flex items-center justify-between gap-3">
           <span className="flex gap-3">

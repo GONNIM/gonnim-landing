@@ -1,31 +1,20 @@
 // ③ 수정 · 재작성 · 왼쪽에 원천, 오른쪽에 내 글.
 
+import { timer } from "@/lib/dominance/timing";
+import { TimingTag } from "@/app/dominance/_ui/TimingTag";
+import { loadEditorPage } from "@/lib/dominance/page-data";
 import { suggestReady } from "@/lib/dominance/llm";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { dominanceContext } from "@/lib/dominance/guard";
-import { loadLetterSources } from "@/lib/dominance/letters";
-import { loadQuestionCard, numberMismatchesFor, unverifiedInLetter } from "@/lib/dominance/card";
-import { readDraftMeta } from "@/lib/dominance/draft-store";
 import {
   LETTER_STATUS_LABEL,
   LETTER_STATUS_STYLE,
-  type LetterBlock,
-  type LetterStatus,
 } from "@/lib/dominance/types";
 import { LetterEditor } from "./LetterEditor";
 
 export const dynamic = "force-dynamic";
 
-type Row = {
-  id: string;
-  title: string;
-  summary: string | null;
-  blocks: LetterBlock[];
-  status: LetterStatus;
-  revision_count: number;
-  question_id: string | null;
-};
 
 export default async function LetterEditPage({
   params,
@@ -33,26 +22,16 @@ export default async function LetterEditPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const { db } = await dominanceContext();
-
-  const { data } = await db
-    .from("ds_letters")
-    .select("id, title, summary, blocks, status, revision_count, question_id")
-    .eq("id", id)
-    .maybeSingle<Row>();
-
-  if (!data) notFound();
-
-  const sources = await loadLetterSources(db, id);
-  // 질문에서 나온 글(20차)은 왼쪽에 사실 카드를 둔다. 옛 글은 원천 초록을 둔다.
-  const card = data.question_id ? await loadQuestionCard(db, data.question_id) : null;
-  const meta = data.question_id ? await readDraftMeta(db, id) : null;
-  const mismatches = await numberMismatchesFor(db, data.question_id, data.blocks, meta?.glossary ?? []);
-  // 24차 B-5 · 확인되지 않은 뜻으로 만든 초안이면 맨 위에 표시. 운영자가 뜻을 확인하면 사라진다.
-  const unverified = card ? unverifiedInLetter(card, data.blocks) : 0;
+  // 56차 D · 자료 읽기는 page-data.ts(시간 재기 라우트와 같은 함수)
+  const t = timer("③ 편집");
+  const { db } = await t.step("인증", dominanceContext());
+  const loaded = await loadEditorPage(db, id, t);
+  if (!loaded) notFound();
+  const { data, sources, card, meta, mismatches, unverified } = loaded;
 
   return (
     <div className="space-y-6">
+      <TimingTag t={t} />
       <section className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <div className="flex items-center gap-2">

@@ -16,6 +16,7 @@ import {
   type Slot,
 } from "@/lib/dominance/evidence";
 import { dominanceContext } from "@/lib/dominance/guard";
+import { timer } from "@/lib/dominance/timing";
 import { writeDraftFromCard } from "@/lib/dominance/letter-draft";
 import { fillUsedMeanings } from "@/lib/dominance/meaning-fill";
 
@@ -133,8 +134,12 @@ export async function setFactKoAction(
   ko: string,
   verify: boolean,
 ): Promise<Result> {
-  const { db } = await dominanceContext();
-  return wrap(id, () => setFactKo(db, rowId, line, ko, verify));
+  // 56차 D · 뜻 확인 동작 시간(로그)
+  const t = timer(verify ? "뜻 확인" : "뜻 저장");
+  const { db } = await t.step("인증", dominanceContext());
+  const r = await t.step("뜻 저장 · 화면 새로 고침 표시", wrap(id, () => setFactKo(db, rowId, line, ko, verify)));
+  t.log();
+  return r;
 }
 
 /** 53차 G · D54 · 「뜻 초안 다시 받기」 · 쓰인 문장의 빈 뜻만 채운다(미확인) */

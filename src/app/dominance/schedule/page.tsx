@@ -1,5 +1,8 @@
 // ⑤ 발행일 · 모든 날짜를 보여준다. 월·수·금은 추천일이고 제한이 아니다.
 
+import { timer } from "@/lib/dominance/timing";
+import { TimingTag } from "@/app/dominance/_ui/TimingTag";
+import { loadSchedulePage } from "@/lib/dominance/page-data";
 import { publishingStarted } from "@/lib/dominance/publishing";
 import Link from "next/link";
 import { dominanceContext } from "@/lib/dominance/guard";
@@ -19,8 +22,6 @@ type Row = {
   revision_count: number;
 };
 
-const SELECT =
-  "id, title, status, scheduled_for, reviewed_at, revision_count";
 
 /** "2026-09" 을 받아 달의 첫날과 마지막날, 1일의 요일을 낸다. */
 function monthBounds(month: string) {
@@ -54,22 +55,10 @@ export default async function SchedulePage({
   const month = normalizeMonth(m);
   const bounds = monthBounds(month);
 
-  const { db } = await dominanceContext();
-
-  const [scheduled, pool] = await Promise.all([
-    db
-      .from("ds_letters")
-      .select(SELECT)
-      .gte("scheduled_for", bounds.first)
-      .lte("scheduled_for", bounds.last)
-      .in("status", ["approved", "published"])
-      .order("scheduled_for", { ascending: true }),
-    db
-      .from("ds_letters")
-      .select(SELECT)
-      .eq("status", "reviewed")
-      .order("reviewed_at", { ascending: true }),
-  ]);
+  // 56차 D · 자료 읽기는 page-data.ts(시간 재기 라우트와 같은 함수)
+  const t = timer("⑤ 발행일");
+  const { db } = await t.step("인증", dominanceContext());
+  const { scheduled, pool } = await loadSchedulePage(db, bounds, t);
 
   if (isMissingSchema(scheduled.error) || isMissingSchema(pool.error)) {
     return (
@@ -82,6 +71,7 @@ export default async function SchedulePage({
 
   return (
     <div className="space-y-6">
+      <TimingTag t={t} />
       <Heading />
       {!publishingStarted() && (
         <p className="rounded-lg border border-dashed border-amber-500/40 p-3 text-sm text-muted-foreground">

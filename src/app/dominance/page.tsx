@@ -1,9 +1,11 @@
 // 지배상식 현황 · 5단계 흐름의 각 단계에 몇 건이 걸려 있는지 한 장으로 본다.
 
+import { timer } from "@/lib/dominance/timing";
+import { TimingTag } from "@/app/dominance/_ui/TimingTag";
+import { loadOverview } from "@/lib/dominance/page-data";
 import Link from "next/link";
 import { dominanceContext } from "@/lib/dominance/guard";
-import { loadLatestNeeds } from "@/lib/dominance/needs";
-import { loadNextActions, type NextAction } from "@/lib/dominance/next-actions";
+import { type NextAction } from "@/lib/dominance/next-actions";
 import { kstToday, formatKstDate, formatKstDateTime, hoursSince } from "@/lib/dominance/kst";
 import { isMissingSchema, SchemaNotice } from "@/lib/dominance/schema-guard";
 import {
@@ -15,11 +17,14 @@ import {
 export const dynamic = "force-dynamic";
 
 export default async function DominanceHome() {
-  const { db } = await dominanceContext();
+  // 56차 D · 자료 읽기는 page-data.ts(시간 재기 라우트와 같은 함수)
+  const t = timer("현황");
+  const { db } = await t.step("인증", dominanceContext());
   const today = kstToday();
+  const ov = await loadOverview(db, t);
 
   // 스키마가 있는지만 본다. 후보 수는 더 쓰지 않는다(D24).
-  const { error: candErr } = await db.from("ds_candidates").select("id").limit(1);
+  const candErr = ov.candErr;
 
   if (isMissingSchema(candErr)) {
     return (
@@ -30,24 +35,16 @@ export default async function DominanceHome() {
     );
   }
 
-  const { data: letters } = await db
-    .from("ds_letters")
-    .select("id, title, status, scheduled_for, updated_at")
-    .order("updated_at", { ascending: false });
+  const letters = ov.letters;
 
   // 크론이 멈춘 것을 여기서 먼저 알린다. 전용 화면이 있어도 열지 않으면 소용없다.
   // 표가 아직 없을 수 있으므로 오류는 무시한다 — 현황이 열리지 않게 만들지 않는다.
-  const { data: lastRun } = await db
-    .from("ds_cron_runs")
-    .select("started_at, summary")
-    .order("started_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
+  const lastRun = ov.lastRun;
 
   const staleHours = lastRun ? Math.floor(hoursSince(lastRun.started_at)) : null;
 
   // ① 이슈는 질문 단위다(D24). 옛 후보(ds_candidates)는 기록 화면에서만 본다.
-  const { data: questionRows } = await db.from("ds_questions").select("status");
+  const questionRows = ov.questionRows;
   const qCount = (s: string) => (questionRows ?? []).filter((q) => q.status === s).length;
 
   const letterRows = (letters ?? []) as {
@@ -66,12 +63,13 @@ export default async function DominanceHome() {
   const dueToday = approved.filter((l) => l.scheduled_for === today);
 
   // 36차 C · 이번 주 Needs 신호 한 줄
-  const needs = await loadLatestNeeds(db).catch(() => null);
+  const needs = ov.needs;
   // 48차 G · D53 · 54차 D · 다음 할 일(글 모두 · 보류 · 글 없는 채택 질문 · 나머지는 접힌 칸)
-  const nextActions = await loadNextActions(db).catch(() => [] as NextAction[]);
+  const nextActions = ov.nextActions;
 
   return (
     <div className="space-y-8">
+      <TimingTag t={t} />
       <Heading />
 
       <p className="text-xs text-muted-foreground">

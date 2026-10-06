@@ -1,37 +1,22 @@
 // ④ 리뷰 화면 · 왼쪽에 글, 오른쪽에 점검 결과. 여기서는 글을 고치지 않는다.
 
-import { meaningStatus } from "@/lib/dominance/card";
-import { loadCardSentences } from "@/lib/dominance/card";
+import { timer } from "@/lib/dominance/timing";
+import { TimingTag } from "@/app/dominance/_ui/TimingTag";
+import { loadReviewPage } from "@/lib/dominance/page-data";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { dominanceContext } from "@/lib/dominance/guard";
-import { loadLetterSources } from "@/lib/dominance/letters";
-import { linkCheckUrls, runReviewChecks } from "@/lib/dominance/review";
 import { charCount, readingMinutes } from "@/lib/dominance/render";
 import {
   LETTER_STATUS_LABEL,
   LETTER_STATUS_STYLE,
-  type LetterBlock,
-  type LetterStatus,
-  type ReviewChecks,
 } from "@/lib/dominance/types";
 import { ReviewPanel } from "./ReviewPanel";
 import { TitleSummaryEditor } from "./TitleSummaryEditor";
-import { readDraftMeta } from "@/lib/dominance/draft-store";
 import { suggestReady } from "@/lib/dominance/llm";
 
 export const dynamic = "force-dynamic";
 
-type Row = {
-  id: string;
-  title: string;
-  summary: string | null;
-  blocks: LetterBlock[];
-  status: LetterStatus;
-  review_checks: ReviewChecks | null;
-  revision_count: number;
-  question_id: string | null;
-};
 
 export default async function ReviewDetailPage({
   params,
@@ -39,37 +24,18 @@ export default async function ReviewDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const { db } = await dominanceContext();
-
-  const { data } = await db
-    .from("ds_letters")
-    .select(
-      "id, title, summary, blocks, status, review_checks, revision_count, question_id",
-    )
-    .eq("id", id)
-    .maybeSingle<Row>();
-
-  if (!data) notFound();
-
-  const sources = await loadLetterSources(db, id);
-
-  // 화면을 열 때마다 다시 점검한다. 자동 점검은 돈이 들지 않는다.
-  const checks = await runReviewChecks({
-    blocks: data.blocks,
-    sourceUrls: linkCheckUrls(sources),
-    sourceTags: sources.map((s) => s.tag),
-    summary: data.summary,
-    cardSentences: await loadCardSentences(db, data.question_id),
-  });
-
-  // 45차 C · D50 · 쓰인 문장 뜻 확인 수(알림만)
-  const meaning = await meaningStatus(db, id);
+  // 56차 D · 자료 읽기는 page-data.ts(시간 재기 라우트와 같은 함수)
+  const t = timer("④ 리뷰");
+  const { db } = await t.step("인증", dominanceContext());
+  const loaded = await loadReviewPage(db, id, t);
+  if (!loaded) notFound();
+  const { data, sources, checks, meaning, draftMeta } = loaded;
   // 48차 A · D51 · 리뷰 대기 · 리뷰 통과 글은 제목 · 요약만 여기서 고칠 수 있다
   const titleEditable = data.status === "review" || data.status === "reviewed";
-  const draftMeta = titleEditable ? await readDraftMeta(db, id) : null;
 
   return (
     <div className="space-y-6">
+      <TimingTag t={t} />
       <section className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <div className="flex items-center gap-2">

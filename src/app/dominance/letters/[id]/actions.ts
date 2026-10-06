@@ -3,67 +3,30 @@
 import { revalidatePath } from "next/cache";
 import { dominanceContext } from "@/lib/dominance/guard";
 import { countFlags, flagBlocks } from "@/lib/dominance/filters";
-import { saveLetterBody } from "@/lib/dominance/letters";
 import type { GlossaryItem } from "@/lib/dominance/draft-card";
-import { normalizePunct, tagsIn } from "@/lib/dominance/tags";
-import { numberMismatchesFor } from "@/lib/dominance/card";
-import type { NumberMismatch } from "@/lib/dominance/card-check";
 import { readDraftMeta, writeDraftMeta } from "@/lib/dominance/draft-store";
+import { questionOf, saveLetterCore, withTagSources as withTagSourcesFor, type SaveResult } from "@/lib/dominance/letter-save";
+import { timer } from "@/lib/dominance/timing";
 import type { LetterBlock } from "@/lib/dominance/types";
 
 type Db = Awaited<ReturnType<typeof dominanceContext>>["db"];
 
-/**
- * 질문에서 나온 글(20차)은 블록의 출처를 본문의 인라인 태그로 다시 센다. 사람이 문장을 고치면 태그도 따라 바뀐다.
- * 옛 후보 경로의 글은 태그가 없으므로 그대로 둔다.
- */
 async function withTagSources(db: Db, letterId: string, blocks: LetterBlock[]): Promise<LetterBlock[]> {
-  const { data } = await db.from("ds_letters").select("question_id").eq("id", letterId).maybeSingle<{ question_id: string | null }>();
-  if (!data?.question_id) return blocks;
-  return blocks.map((b) => {
-    // 24차 B-2 · 전각 마침표 · 물음표를 반각으로
-    const text = normalizePunct(b.text);
-    const tags = tagsIn(text);
-    return { ...b, text, sourceIds: tags.length ? tags : undefined };
-  });
+  return withTagSourcesFor(await questionOf(db, letterId), blocks);
 }
 
-async function questionOf(db: Db, letterId: string): Promise<string | null> {
-  const { data } = await db.from("ds_letters").select("question_id").eq("id", letterId).maybeSingle<{ question_id: string | null }>();
-  return data?.question_id ?? null;
-}
+export type { SaveResult };
 
-export type SaveResult = {
-  blocks: LetterBlock[];
-  /** 카드 수치 대조에서 어긋난 문장(24차 A-6) · 저장은 막지 않는다 */
-  mismatches: NumberMismatch[];
-  flagCount: number;
-  savedAt: string;
-  error: string | null;
-};
-
-/** 자동 저장과 Cmd+S 가 같이 쓰는 경로. 저장할 때마다 필터를 다시 건다. */
+/** 자동 저장과 Cmd+S 가 같이 쓰는 경로. 몸통은 letter-save.ts(56차 D · 시간 재기 라우트와 같은 함수). */
 export async function saveLetter(
   letterId: string,
   patch: { title: string; summary: string; blocks: LetterBlock[] },
 ): Promise<SaveResult> {
-  const { db } = await dominanceContext();
-
-  const blocks = flagBlocks(await withTagSources(db, letterId, patch.blocks));
-  const { error } = await saveLetterBody(db, letterId, {
-    title: patch.title,
-    summary: patch.summary,
-    blocks,
-  });
-
-  return {
-    blocks,
-    // 29차 B-2 · 용어표 괄호 풀이의 숫자는 대조에서 뺀다
-    mismatches: await numberMismatchesFor(db, await questionOf(db, letterId), blocks, (await readDraftMeta(db, letterId))?.glossary ?? []),
-    flagCount: countFlags(blocks),
-    savedAt: new Date().toISOString(),
-    error: error?.message ?? null,
-  };
+  const t = timer("저장");
+  const { db } = await t.step("인증", dominanceContext());
+  const r = await saveLetterCore(db, letterId, patch, t);
+  t.log();
+  return r;
 }
 
 /** [작성 완료] · status 를 review 로 올린다. "발행해도 되는 글"이 아니라 "다 썼다"는 뜻이다. */
