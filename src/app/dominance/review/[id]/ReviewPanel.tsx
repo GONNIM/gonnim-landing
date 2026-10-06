@@ -2,7 +2,10 @@
 
 // 리뷰 화면의 조작부. 글은 읽기만 하고, 판단은 사람이 한다.
 
-import { useState, useTransition } from "react";
+import { useState } from "react";
+import { ActionButton, type RunResult } from "../../_ui/ActionButton";
+import { useActionStatus } from "../../_ui/ActionStatus";
+import { STAGES } from "../../_ui/Progress";
 import { useRouter } from "next/navigation";
 import { CROSS_REVIEW_KIND_LABEL } from "@/lib/dominance/cross-review";
 import { isBlockingCheck } from "@/lib/dominance/review";
@@ -56,7 +59,7 @@ export function ReviewPanel({
   meaning?: { used: number; verified: number } | null;
 }) {
   const router = useRouter();
-  const [pending, startTransition] = useTransition();
+  const { busy: pending } = useActionStatus();
 
   const [notes, setNotes] = useState<CrossReviewNote[] | null>(
     savedCrossReview,
@@ -72,65 +75,67 @@ export function ReviewPanel({
   const canPass =
     status === "review" && blocking.length === 0 && allTicked && !pending;
 
-  function run(
+  // 56차 C · 처리 함수는 결과 글자를 돌려준다. ActionButton 이 알림 띠로 낸다. 아래쪽 결과 글자는 그대로 둔다.
+  async function run(
     action: () => Promise<{ error: string | null }>,
     onDone: () => void,
-  ) {
+    okText: string,
+  ): Promise<RunResult> {
     setError(null);
     setMessage(null);
-    startTransition(async () => {
-      const result = await action();
-      if (result.error) {
-        setError(result.error);
-        return;
-      }
-      onDone();
-    });
+    const result = await action();
+    if (result.error) {
+      setError(result.error);
+      return { ok: false, text: result.error };
+    }
+    onDone();
+    return { ok: true, text: okText };
   }
 
-  function onCrossReview() {
+  async function onCrossReview(): Promise<RunResult> {
     setError(null);
     setMessage(null);
-    startTransition(async () => {
-      const result = await requestCrossReview(letterId);
-      if (result.error) {
-        setError(result.error);
-        return;
-      }
-      setNotes(result.notes);
-      setRuns(result.runs);
-      setMessage(
-        result.notes.length === 0
-          ? "교차 리뷰가 지적할 것을 찾지 못했습니다."
-          : `교차 리뷰 의견 ${result.notes.length}건을 받았습니다.`,
-      );
-    });
+    const result = await requestCrossReview(letterId);
+    if (result.error) {
+      setError(result.error);
+      return { ok: false, text: result.error };
+    }
+    setNotes(result.notes);
+    setRuns(result.runs);
+    const text =
+      result.notes.length === 0
+        ? "교차 리뷰가 지적할 것을 찾지 못했습니다."
+        : `교차 리뷰 의견 ${result.notes.length}건을 받았습니다.`;
+    setMessage(text);
+    return { ok: true, text };
   }
 
-  function onTestSend() {
+  async function onTestSend(): Promise<RunResult> {
     setError(null);
     setMessage(null);
-    startTransition(async () => {
-      const result = await sendTestEmail(letterId);
-      if (result.error) {
-        setError(result.error);
-        return;
-      }
-      setMessage(`${result.to} 로 테스트 메일을 보냈습니다.`);
-    });
+    const result = await sendTestEmail(letterId);
+    if (result.error) {
+      setError(result.error);
+      return { ok: false, text: result.error };
+    }
+    const text = `${result.to} 로 테스트 메일을 보냈습니다.`;
+    setMessage(text);
+    return { ok: true, text };
   }
 
   function onPass() {
-    run(
+    return run(
       () => passReview(letterId),
       () => router.push("/dominance/schedule"),
+      "리뷰를 통과했습니다. ⑤ 발행일로 옮겨 갑니다.",
     );
   }
 
   function onRevert() {
-    run(
+    return run(
       () => revertToDraft(letterId, reason),
       () => router.push(`/dominance/letters/${letterId}`),
+      "수정으로 되돌렸습니다. 편집 화면으로 옮겨 갑니다.",
     );
   }
 
@@ -248,14 +253,15 @@ export function ReviewPanel({
         <section className="rounded-lg border border-[color:var(--border)]/70 bg-surface/30 p-4">
           <div className="flex items-center justify-between gap-2">
             <h2 className="text-sm font-medium">교차 리뷰</h2>
-            <button
-              type="button"
-              onClick={onCrossReview}
+            <ActionButton
+              run={onCrossReview}
               disabled={pending}
+              stages={STAGES.cross}
+              pendingText="요청 중…"
               className="rounded-md border border-[color:var(--border)] px-2.5 py-1 text-xs text-foreground/85 hover:border-[color:var(--accent)] disabled:opacity-50"
             >
               {notes === null ? "요청하기" : "다시 요청"}
-            </button>
+            </ActionButton>
           </div>
           <p className="mt-1 text-xs text-muted-foreground">
             두 모델(main · light)에게 다른 지시문으로 동시에 묻고 의견을 합칩니다(D47). 의견만 받고 글은
@@ -339,25 +345,24 @@ export function ReviewPanel({
               </li>
             ))}
           </ul>
-          <button
-            type="button"
-            onClick={onTestSend}
+          <ActionButton
+            run={onTestSend}
             disabled={pending}
+            pendingText="보내는 중…"
             className="mt-3 w-full rounded-md border border-[color:var(--border)] px-3 py-1.5 text-xs text-foreground/85 hover:border-[color:var(--accent)] disabled:opacity-50"
           >
             내게 테스트 발송
-          </button>
+          </ActionButton>
         </section>
 
         <section className="space-y-2 rounded-lg border border-[color:var(--border)]/70 bg-surface/30 p-4">
-          <button
-            type="button"
-            onClick={onPass}
+          <ActionButton
+            run={onPass}
             disabled={!canPass}
             className="w-full rounded-md bg-violet-500/90 px-3 py-2 text-sm font-medium text-white hover:bg-violet-500 disabled:cursor-not-allowed disabled:bg-[color:var(--muted)]/30 disabled:text-muted-foreground"
           >
             리뷰 통과
-          </button>
+          </ActionButton>
           <p className="text-[11px] text-muted-foreground">
             {status !== "review"
               ? "리뷰 대기 상태의 글만 통과시킬 수 있습니다."
@@ -376,14 +381,13 @@ export function ReviewPanel({
               placeholder="되돌리는 이유를 한 줄로"
               className="w-full rounded-md border border-[color:var(--border)] bg-background/60 px-2.5 py-1.5 text-xs outline-none focus:border-[color:var(--accent)]"
             />
-            <button
-              type="button"
-              onClick={onRevert}
+            <ActionButton
+              run={onRevert}
               disabled={pending}
               className="mt-2 w-full rounded-md border border-amber-500/50 px-3 py-1.5 text-xs text-amber-700 dark:text-amber-200 hover:bg-amber-500/10 disabled:opacity-50"
             >
               수정으로 되돌리기
-            </button>
+            </ActionButton>
             {status === "approved" && (
               <p className="mt-1 text-[11px] text-muted-foreground">
                 발행 예정 글입니다. 되돌리면 발행일과 승인 기록도 지워집니다.

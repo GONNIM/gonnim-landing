@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition, createContext, useContext, useRef } from "react";
+import { useState, createContext, useContext, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { PHASE_LABEL, type EvidenceRun } from "@/lib/dominance/collect-types";
 import {
@@ -19,6 +19,9 @@ import {
 } from "@/lib/dominance/evidence";
 import type { QuestionStatus } from "@/lib/dominance/questions";
 import { Btn } from "../../ui";
+import { ActionButton, type RunResult, type StepFn } from "../../../_ui/ActionButton";
+import { useActionStatus } from "../../../_ui/ActionStatus";
+import { STAGES } from "../../../_ui/Progress";
 import { runCollect } from "../../runCollect";
 import {
   writeDraftAction,
@@ -58,44 +61,54 @@ export function EvidenceBoard({
   letter: { id: string; status: string } | null;
 }) {
   const router = useRouter();
-  const [pending, start] = useTransition();
+  const { busy: pending, begin } = useActionStatus();
   const [progress, setProgress] = useState<string | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
   const canCollect = ["validated", "adopted", "drafted"].includes(status);
 
-  const act: Act = (fn, ok, onOk) =>
-    start(async () => {
+  // 56차 C · act 는 결과 글자를 돌려준다. 단추(ActionButton)는 그 글자를 알림 띠로 낸다. 칸 고침(onBlur · 칸 이동)은 fire 로 바로 띠를 낸다.
+  const act: Act = async (fn, ok, onOk) => {
+    const end = begin();
+    try {
       const r = await fn();
-      setMsg(r.error ? `실패 · ${r.error}` : ok ?? null);
+      const text = r.error ? `실패 · ${r.error}` : (ok ?? null);
+      setMsg(text);
       if (!r.error) onOk?.();
       router.refresh();
-    });
+      return text ? { ok: !r.error, text } : null;
+    } finally {
+      end();
+    }
+  };
 
   const canWrite = ["adopted", "drafted"].includes(status) && table.filledSlots >= 3;
   const [writing, setWriting] = useState(false);
   const allFacts = SLOTS.flatMap((s) => table.slots[s].flatMap((g) => g.facts));
   const unverified = allFacts.filter((f) => !f.koVerifiedAt).length;
-  async function write() {
+  async function write(): Promise<RunResult> {
     // D44 · 초안은 확인된 뜻만 받는다. 확인 안 된 뜻이 있어도 운영자가 고르면 진행한다.
-    if (unverified > 0 && !window.confirm(`확인되지 않은 뜻 ${unverified}개가 있습니다. 확인하지 않은 뜻으로 글을 씁니다. 진행할까요?`)) return;
-    if (letter && !window.confirm("새 판을 만듭니다. 지금 글은 파일로 보관되고 본문이 바뀝니다.")) return;
+    if (unverified > 0 && !window.confirm(`확인되지 않은 뜻 ${unverified}개가 있습니다. 확인하지 않은 뜻으로 글을 씁니다. 진행할까요?`)) return null;
+    if (letter && !window.confirm("새 판을 만듭니다. 지금 글은 파일로 보관되고 본문이 바뀝니다.")) return null;
     setWriting(true);
     setMsg("사실 카드로 초안을 쓰는 중입니다(1분 안팎)…");
     const r = await writeDraftAction(questionId);
     setWriting(false);
     if (!r.ok) {
       setMsg(`글 작성 실패 · ${r.error}`);
-      return;
+      return { ok: false, text: `글 작성 실패 · ${r.error}` };
     }
     router.push(`/dominance/letters/${r.letterId}`);
+    return { ok: true, text: "초안을 썼습니다. 편집 화면으로 옮겨 갑니다" };
   }
 
-  async function collect() {
+  async function collect(step: StepFn): Promise<RunResult> {
     setMsg(null);
-    const r = await runCollect(questionId, setProgress);
+    const r = await runCollect(questionId, setProgress, step);
     setProgress(null);
-    setMsg(r.error ? `증거 모으기 실패 · ${r.error}` : "증거 모으기를 마쳤습니다");
+    const text = r.error ? `증거 모으기 실패 · ${r.error}` : "증거 모으기를 마쳤습니다";
+    setMsg(text);
     router.refresh();
+    return { ok: !r.error, text };
   }
 
   const pct = Math.min(100, Math.round((table.factCount / CARD_TARGET) * 100));
@@ -113,18 +126,18 @@ export function EvidenceBoard({
   const usedVerified = usedList.filter((x) => x.f.koVerifiedAt).length;
 
   // 53차 G · 「뜻 초안 다시 받기」 · 빈 뜻만
-  function refill() {
-    start(async () => {
-      setMsg("뜻 초안을 받는 중…");
-      const r = await refillMeaningsAction(questionId);
-      setMsg(r.error ? `실패 · ${r.error}` : r.text);
-      router.refresh();
-    });
+  async function refill(): Promise<RunResult> {
+    setMsg("뜻 초안을 받는 중…");
+    const r = await refillMeaningsAction(questionId);
+    const text = r.error ? `실패 · ${r.error}` : (r.text ?? "");
+    setMsg(text);
+    router.refresh();
+    return { ok: !r.error, text };
   }
   // 53차 H · 「위 문장 n개를 모두 읽고 확인했습니다」 · 화면의 뜻 칸 글자를 그대로 확인 처리
-  function confirmAll() {
+  async function confirmAll(): Promise<RunResult> {
     const box = document.getElementById("used-facts");
-    if (!box) return;
+    if (!box) return null;
     const items = [...box.querySelectorAll<HTMLElement>("[data-fact-row]")].map((r) => ({
       rowId: r.dataset.rowId ?? "",
       line: Number(r.dataset.line),
@@ -132,12 +145,12 @@ export function EvidenceBoard({
     }));
     const n = items.filter((x) => x.ko.trim()).length;
     const m = items.length - n;
-    if (!window.confirm(`${n}개 문장의 뜻을 지금 글자 그대로 확인 처리합니다. 뜻이 빈 문장 ${m}개는 건너뜁니다.`)) return;
-    start(async () => {
-      const r = await confirmAllMeaningsAction(questionId, items);
-      setMsg(r.error ? `실패 · ${r.error}` : `${r.done}개 문장의 뜻을 확인했습니다`);
-      router.refresh();
-    });
+    if (!window.confirm(`${n}개 문장의 뜻을 지금 글자 그대로 확인 처리합니다. 뜻이 빈 문장 ${m}개는 건너뜁니다.`)) return null;
+    const r = await confirmAllMeaningsAction(questionId, items);
+    const text = r.error ? `실패 · ${r.error}` : `${r.done}개 문장의 뜻을 확인했습니다`;
+    setMsg(text);
+    router.refresh();
+    return { ok: !r.error, text };
   }
 
   return (
@@ -149,14 +162,9 @@ export function EvidenceBoard({
             <h2 className="text-base font-medium">
               글에 쓰인 문장 {usedList.length}개 중 확인 {usedVerified}개
             </h2>
-            <button
-              type="button"
-              disabled={pending}
-              onClick={refill}
-              className="rounded-md border border-[color:var(--border)] px-2.5 py-1 text-xs text-foreground/85 hover:border-[color:var(--accent)] disabled:opacity-40"
-            >
+            <ActionButton run={refill} disabled={pending} pendingText="뜻 초안을 받는 중…">
               뜻 초안 다시 받기
-            </button>
+            </ActionButton>
             {usedVerified < usedList.length && (
               <button
                 type="button"
@@ -182,14 +190,13 @@ export function EvidenceBoard({
           </ol>
           {/* 53차 H · D54 · 화면에 보이는 뜻 글자 그대로 한 번에 확인(빈 뜻은 건너뜀) */}
           <div className="flex flex-wrap items-center gap-2 border-t border-amber-500/30 pt-3">
-            <button
-              type="button"
+            <ActionButton
+              run={confirmAll}
               disabled={pending || usedList.length === 0}
-              onClick={confirmAll}
               className="rounded-md border border-emerald-500/60 px-3 py-1.5 text-xs text-emerald-800 hover:bg-emerald-500/10 disabled:opacity-40 dark:text-emerald-200"
             >
               위 문장 {usedList.length}개를 모두 읽고 확인했습니다
-            </button>
+            </ActionButton>
           </div>
         </section>
       )}
@@ -220,9 +227,10 @@ export function EvidenceBoard({
                 초안 열기
               </a>
             )}
-            <button
-              type="button"
-              onClick={write}
+            <ActionButton
+              run={write}
+              stages={STAGES.write}
+              pendingText="쓰는 중…"
               disabled={!canWrite || writing || pending || (letter !== null && letter.status !== "draft")}
               title={
                 canWrite
@@ -233,15 +241,15 @@ export function EvidenceBoard({
               }
               className="rounded-md bg-[color:var(--accent)] px-3 py-1.5 text-xs font-medium text-background disabled:opacity-40"
             >
-              {writing ? "쓰는 중…" : letter ? "글 작성하기 (새 판)" : "글 작성하기"}
+              {letter ? "글 작성하기 (새 판)" : "글 작성하기"}
               {unverified > 0 ? ` · 확인되지 않은 뜻 ${unverified}개` : ""}
-            </button>
+            </ActionButton>
           </span>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <Btn onClick={collect} disabled={!canCollect || pending || progress !== null} accent>
-            {progress ?? "증거 모으기"}
-          </Btn>
+          <ActionButton run={collect} disabled={!canCollect || pending || progress !== null} accent pendingText="증거 모으는 중…">
+            증거 모으기
+          </ActionButton>
           {!canCollect && <span className="text-xs text-muted-foreground">검증을 통과했거나 채택한 질문만 모읍니다.</span>}
           {msg && <span className="text-xs text-foreground/80">{msg}</span>}
         </div>
@@ -322,7 +330,17 @@ function RunSummary({ run }: { run: EvidenceRun }) {
   );
 }
 
-type Act = (fn: () => Promise<{ error: string | null }>, ok?: string, onOk?: () => void) => void;
+type Act = (fn: () => Promise<{ error: string | null }>, ok?: string, onOk?: () => void) => Promise<RunResult>;
+
+/** 56차 C · 단추가 아닌 곳(칸에서 나갈 때 · 칸 이동)에서 부르고 결과를 바로 알림 띠로 낸다 */
+function useFire(act: Act) {
+  const { toast } = useActionStatus();
+  return (...args: Parameters<Act>) => {
+    void act(...args).then((r) => {
+      if (r && r.text) toast(r);
+    });
+  };
+}
 
 /**
  * 48차 D · 노란 상자(글에 쓰인 문장) 안의 다음 미확인 문장으로 화면을 내리고 그 뜻 칸에 포커스를 둔다.
@@ -395,13 +413,14 @@ function SourceCard({
 }) {
   const s = g.source;
   const [tag, setTag] = useState(s.tag ?? "");
+  const fire = useFire(act);
   return (
     <div className="rounded-xl border border-[color:var(--border)]/70 bg-surface/30 p-4">
       <div className="flex flex-wrap items-baseline gap-2">
         <input
           value={tag}
           onChange={(e) => setTag(e.target.value.toUpperCase())}
-          onBlur={() => tag !== (s.tag ?? "") && act(() => setTagAction(questionId, s.key, tag), `태그를 ${tag} 로 바꿨습니다`)}
+          onBlur={() => tag !== (s.tag ?? "") && fire(() => setTagAction(questionId, s.key, tag), `태그를 ${tag} 로 바꿨습니다`)}
           className={`${input} w-14 font-mono`}
           aria-label="태그"
         />
@@ -425,17 +444,14 @@ function SourceCard({
         ))}
       </ol>
       <div className="mt-2 text-right">
-        <button
-          type="button"
+        <ActionButton
           disabled={busy}
-          onClick={() => {
-            if (window.confirm(`${s.tag ?? ""} 원천을 ${SLOT_LABEL[slot]} 칸에서 뺍니다. 이 칸의 문장 ${g.facts.length}개도 함께 빠집니다.`))
-              act(() => removeSourceAction(questionId, slot, s.key), "원천을 뺐습니다");
-          }}
-          className="text-xs text-muted-foreground hover:text-red-700 dark:hover:text-red-300"
+          confirm={`${s.tag ?? ""} 원천을 ${SLOT_LABEL[slot]} 칸에서 뺍니다. 이 칸의 문장 ${g.facts.length}개도 함께 빠집니다.`}
+          run={() => act(() => removeSourceAction(questionId, slot, s.key), "원천을 뺐습니다")}
+          className="text-xs text-muted-foreground hover:text-red-700 disabled:opacity-40 dark:hover:text-red-300"
         >
           이 칸에서 원천 빼기
-        </button>
+        </ActionButton>
       </div>
     </div>
   );
@@ -452,6 +468,7 @@ function FactRow({ f, slot, questionId, busy, act, wide = false }: { f: Fact; sl
   const changed = ko.trim() !== (f.ko ?? "");
   const prev = useContext(PrevContext)[`${f.rowId}:${f.line}`];
   const rowRef = useRef<HTMLLIElement>(null);
+  const fire = useFire(act);
   return (
     <li
       ref={rowRef}
@@ -492,10 +509,9 @@ function FactRow({ f, slot, questionId, busy, act, wide = false }: { f: Fact; sl
           <span className={f.koVerifiedAt && !changed ? "text-emerald-700 dark:text-emerald-300" : "text-amber-700 dark:text-amber-300"}>
             {f.koVerifiedAt && !changed ? `확인됨 ${f.koVerifiedAt.slice(0, 10)}` : changed ? "고침 · 아직 확인 안 됨" : "확인 안 됨"}
           </span>
-          <button
-            type="button"
+          <ActionButton
             disabled={busy || !ko.trim() || (!!f.koVerifiedAt && !changed)}
-            onClick={() =>
+            run={() =>
               act(
                 () => setFactKoAction(questionId, f.rowId, f.line, ko, true),
                 "뜻을 확인했습니다",
@@ -508,16 +524,15 @@ function FactRow({ f, slot, questionId, busy, act, wide = false }: { f: Fact; sl
             className="rounded border border-[color:var(--border)] px-2 py-0.5 hover:border-emerald-400 disabled:opacity-40"
           >
             확인
-          </button>
+          </ActionButton>
           {changed && (
-            <button
-              type="button"
+            <ActionButton
               disabled={busy || !ko.trim()}
-              onClick={() => act(() => setFactKoAction(questionId, f.rowId, f.line, ko, false), "뜻을 고쳤습니다(미확인)")}
+              run={() => act(() => setFactKoAction(questionId, f.rowId, f.line, ko, false), "뜻을 고쳤습니다(미확인)")}
               className="rounded border border-[color:var(--border)] px-2 py-0.5 disabled:opacity-40"
             >
               고친 뜻만 저장
-            </button>
+            </ActionButton>
           )}
         </div>
       </div>
@@ -530,7 +545,7 @@ function FactRow({ f, slot, questionId, busy, act, wide = false }: { f: Fact; sl
             onChange={(e) => setSubject(e.target.value)}
             onBlur={() =>
               subject !== (f.subject ?? "") &&
-              act(() => updateFactMetaAction(questionId, f.rowId, f.line, { subject: subject.trim() || null }), "대상을 고쳤습니다")
+              fire(() => updateFactMetaAction(questionId, f.rowId, f.line, { subject: subject.trim() || null }), "대상을 고쳤습니다")
             }
             className={`${input} w-44`}
           />
@@ -546,7 +561,7 @@ function FactRow({ f, slot, questionId, busy, act, wide = false }: { f: Fact; sl
         <select
           value={slot}
           disabled={busy}
-          onChange={(e) => act(() => moveFactAction(questionId, f.rowId, f.line, e.target.value as Slot), "칸을 옮겼습니다")}
+          onChange={(e) => fire(() => moveFactAction(questionId, f.rowId, f.line, e.target.value as Slot), "칸을 옮겼습니다")}
           className={input}
           aria-label="칸 이동"
         >
@@ -556,14 +571,14 @@ function FactRow({ f, slot, questionId, busy, act, wide = false }: { f: Fact; sl
             </option>
           ))}
         </select>
-        <button
-          type="button"
+        <ActionButton
           disabled={busy}
-          onClick={() => window.confirm("이 문장을 뺍니다.") && act(() => deleteFactAction(questionId, f.rowId, f.line), "문장을 뺐습니다")}
-          className="hover:text-red-700 dark:hover:text-red-300"
+          confirm="이 문장을 뺍니다."
+          run={() => act(() => deleteFactAction(questionId, f.rowId, f.line), "문장을 뺐습니다")}
+          className="hover:text-red-700 disabled:opacity-40 dark:hover:text-red-300"
         >
           삭제
-        </button>
+        </ActionButton>
       </div>
     </li>
   );
@@ -576,7 +591,7 @@ function AddFact({ slot, sources, questionId }: { slot: Slot; sources: SourceGro
   const [text, setText] = useState("");
   const [subject, setSubject] = useState("");
   const [msg, setMsg] = useState<string | null>(null);
-  const [pending, start] = useTransition();
+  const { busy: pending } = useActionStatus();
 
   if (!open)
     return (
@@ -603,23 +618,26 @@ function AddFact({ slot, sources, questionId }: { slot: Slot; sources: SourceGro
       />
       <input value={subject} onChange={(e) => setSubject(e.target.value)} placeholder="대상(예: 영국 성인 72,174명)" className={`${input} w-full`} />
       <div className="flex items-center gap-2">
-        <Btn
+        <ActionButton
           accent
           disabled={pending || !key || !text.trim()}
-          onClick={() =>
-            start(async () => {
-              const r = await addFactAction(questionId, slot, key, { text, subject: subject.trim() || null, year: null, hasNumber: null });
-              if (r.ok) {
-                setMsg(`대조 통과(${r.part === "body" ? "본문" : "초록"}) · 저장했습니다`);
-                setText("");
-                setSubject("");
-                router.refresh();
-              } else setMsg(`저장하지 않았습니다 · ${r.reason}`);
-            })
-          }
+          pendingText="대조 중…"
+          run={async () => {
+            const r = await addFactAction(questionId, slot, key, { text, subject: subject.trim() || null, year: null, hasNumber: null });
+            if (r.ok) {
+              const done = `대조 통과(${r.part === "body" ? "본문" : "초록"}) · 저장했습니다`;
+              setMsg(done);
+              setText("");
+              setSubject("");
+              router.refresh();
+              return { ok: true, text: done };
+            }
+            setMsg(`저장하지 않았습니다 · ${r.reason}`);
+            return { ok: false, text: `저장하지 않았습니다 · ${r.reason}` };
+          }}
         >
-          {pending ? "대조 중…" : "대조하고 저장"}
-        </Btn>
+          대조하고 저장
+        </ActionButton>
         <Btn onClick={() => setOpen(false)}>닫기</Btn>
       </div>
       {msg && <p className="text-xs text-foreground/80">{msg}</p>}
@@ -648,17 +666,18 @@ function AddSource({ slot, questionId, act, busy }: { slot: Slot; questionId: st
     return (
       <div className="flex flex-wrap items-center gap-2 rounded-lg border border-dashed border-[color:var(--border)] p-3">
         <input value={ref} onChange={(e) => setRef(e.target.value)} placeholder="MED:35247352 · PMC12778096" className={`${input} w-64 font-mono`} />
-        <Btn
+        <ActionButton
           accent
           disabled={busy || !ref.trim()}
-          onClick={() => {
-            act(() => addPaperAction(questionId, slot, ref), "논문 원천을 넣었습니다. 이제 문장을 추가하십시오");
+          run={async () => {
+            const r = await act(() => addPaperAction(questionId, slot, ref), "논문 원천을 넣었습니다. 이제 문장을 추가하십시오");
             setRef("");
             setMode("none");
+            return r;
           }}
         >
           넣기
-        </Btn>
+        </ActionButton>
         <Btn onClick={() => setMode("none")}>닫기</Btn>
         <span className="text-xs text-muted-foreground">라이선스가 CC0 · CC BY · 퍼블릭 도메인이 아니면 넣지 않습니다.</span>
       </div>
@@ -685,19 +704,20 @@ function AddSource({ slot, questionId, act, busy }: { slot: Slot; questionId: st
       <textarea value={x.memo} onChange={(e) => setX({ ...x, memo: e.target.value })} placeholder="메모(우리 말로 · 링크만인 원천의 사실은 여기에)" rows={2} className={`${input} sm:col-span-2`} />
       <input value={x.tag} onChange={(e) => setX({ ...x, tag: e.target.value.toUpperCase() })} placeholder="태그(비우면 자동)" className={`${input} font-mono`} />
       <div className="flex gap-2">
-        <Btn
+        <ActionButton
           accent
           disabled={busy || !x.url.trim() || !x.title.trim()}
-          onClick={() => {
-            act(
+          run={async () => {
+            const r = await act(
               () => addExternalAction(questionId, slot, { ...x, memo: x.memo || null, tag: x.tag || null }),
               "외부 원천을 넣었습니다",
             );
             setMode("none");
+            return r;
           }}
         >
           넣기
-        </Btn>
+        </ActionButton>
         <Btn onClick={() => setMode("none")}>닫기</Btn>
       </div>
       {x.license === "link_only" && <p className="sm:col-span-2">링크만(link_only) 원천은 문장 칸이 잠깁니다. 사실은 메모에 우리 말로 적습니다.</p>}

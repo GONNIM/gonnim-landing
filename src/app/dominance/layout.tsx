@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { requireDominanceAdmin } from "@/lib/dominance/guard";
+import { ActionStatusProvider, NavPending } from "./_ui/ActionStatus";
 
 export const dynamic = "force-dynamic";
 
@@ -30,6 +31,8 @@ export default async function DominanceLayout({
 
   return (
     <main className="min-h-screen bg-background text-foreground">
+      {/* 56차 C · 처리 중 상태 · 알림 띠 · 이동 확인 · 진행 막대 */}
+      <ActionStatusProvider>
       <header className="sticky top-0 z-40 border-b border-[color:var(--border)]/70 bg-background/80 backdrop-blur">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
           <div className="flex items-center gap-6">
@@ -46,6 +49,7 @@ export default async function DominanceLayout({
               {NAV.map((n) => (
                 <Link key={n.href} href={n.href} className="hover:text-foreground">
                   {n.label}
+                  <NavPending id={n.href} />
                 </Link>
               ))}
             </nav>
@@ -64,6 +68,7 @@ export default async function DominanceLayout({
         </div>
       </header>
       <div className="mx-auto max-w-6xl px-6 py-8">{children}</div>
+      </ActionStatusProvider>
     </main>
   );
 }

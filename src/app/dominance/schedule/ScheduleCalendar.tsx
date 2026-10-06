@@ -3,7 +3,9 @@
 // 달력과 승인 창. 날짜를 고르는 방법은 세 가지다 —
 // 빈 날짜의 ＋ 를 누르거나, 글을 끌어다 놓거나, 날짜를 직접 적는다.
 
-import { useEffect, useState, useTransition } from "react";
+import { ActionButton, type RunResult } from "../_ui/ActionButton";
+import { useActionStatus } from "../_ui/ActionStatus";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { formatKstDate, formatKstDateTime } from "@/lib/dominance/kst";
 import type { LetterStatus } from "@/lib/dominance/types";
@@ -61,7 +63,7 @@ export function ScheduleCalendar({
   const [picking, setPicking] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [pending, startTransition] = useTransition();
+  const { busy: pending } = useActionStatus();
 
   const byDate = new Map<string, Row[]>();
   for (const row of scheduled) {
@@ -97,14 +99,18 @@ export function ScheduleCalendar({
     openApproval(letter, date);
   }
 
-  function onUnapprove(letterId: string) {
+  // 56차 C · 결과 글자를 알림 띠로 낸다(ActionButton)
+  async function onUnapprove(letterId: string): Promise<RunResult> {
     setError(null);
     setNotice(null);
-    startTransition(async () => {
-      const result = await unapproveLetter(letterId);
-      if (result.error) setError(result.error);
-      else setNotice("승인을 취소했습니다. 리뷰 통과 상태로 돌아갔습니다.");
-    });
+    const result = await unapproveLetter(letterId);
+    if (result.error) {
+      setError(result.error);
+      return { ok: false, text: result.error };
+    }
+    const text = "승인을 취소했습니다. 리뷰 통과 상태로 돌아갔습니다.";
+    setNotice(text);
+    return { ok: true, text };
   }
 
   const leading = bounds.firstWeekday;
@@ -207,14 +213,14 @@ export function ScheduleCalendar({
                             {row.status === "published" ? "●" : "◐"} {row.title}
                           </Link>
                           {row.status === "approved" && (
-                            <button
-                              type="button"
-                              onClick={() => onUnapprove(row.id)}
+                            <ActionButton
+                              run={() => onUnapprove(row.id)}
                               disabled={pending}
+                              pendingText="취소 중…"
                               className="mt-0.5 text-[9px] text-sky-700/70 dark:text-sky-300/70 hover:text-sky-700 dark:hover:text-sky-200 disabled:opacity-50"
                             >
                               승인 취소
-                            </button>
+                            </ActionButton>
                           )}
                         </div>
                       ))}
@@ -417,7 +423,7 @@ function ApprovalDialog({
   } | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [pending, startTransition] = useTransition();
+  const { busy: pending } = useActionStatus();
   // 45차 C · D50 · 셋째 칸: 쓰인 문장 뜻 확인(옛 글은 해당 없음)
   const [meaning, setMeaning] = useState<MeaningStatus | null>(null);
   const [meaningTicked, setMeaningTicked] = useState(false);
@@ -446,23 +452,28 @@ function ApprovalDialog({
 
   const ready = links?.ok === true && ticked.every(Boolean) && meaningOk && !pending;
 
-  function onTestSend() {
+  async function onTestSend(): Promise<RunResult> {
     setError(null);
     setMessage(null);
-    startTransition(async () => {
-      const result = await sendTestEmail(letter.id);
-      if (result.error) setError(result.error);
-      else setMessage(`${result.to} 로 테스트 메일을 보냈습니다.`);
-    });
+    const result = await sendTestEmail(letter.id);
+    if (result.error) {
+      setError(result.error);
+      return { ok: false, text: result.error };
+    }
+    const text = `${result.to} 로 테스트 메일을 보냈습니다.`;
+    setMessage(text);
+    return { ok: true, text };
   }
 
-  function onApprove() {
+  async function onApprove(): Promise<RunResult> {
     setError(null);
-    startTransition(async () => {
-      const result = await approveLetter(letter.id, date);
-      if (result.error) setError(result.error);
-      else onDone(result.warning);
-    });
+    const result = await approveLetter(letter.id, date);
+    if (result.error) {
+      setError(result.error);
+      return { ok: false, text: result.error };
+    }
+    onDone(result.warning);
+    return { ok: true, text: result.warning ? `날짜를 확정했습니다. ${result.warning}` : "날짜를 확정했습니다." };
   }
 
   return (
@@ -549,14 +560,14 @@ function ApprovalDialog({
         {error && <p className="text-xs text-red-700 dark:text-red-300">{error}</p>}
 
         <div className="flex flex-wrap gap-2">
-          <button
-            type="button"
-            onClick={onTestSend}
+          <ActionButton
+            run={onTestSend}
             disabled={pending}
+            pendingText="보내는 중…"
             className="rounded-md border border-[color:var(--border)] px-3 py-1.5 text-xs text-foreground/85 hover:border-[color:var(--accent)] disabled:opacity-50"
           >
             내게 테스트 발송
-          </button>
+          </ActionButton>
           <button
             type="button"
             onClick={onClose}
@@ -564,15 +575,17 @@ function ApprovalDialog({
           >
             닫기
           </button>
-          <button
-            type="button"
-            onClick={onApprove}
-            disabled={!ready || !started}
-            title={started ? undefined : "발행 시작 선언 전"}
-            className="ml-auto rounded-md bg-sky-500/90 px-3 py-1.5 text-xs font-medium text-white hover:bg-sky-500 disabled:cursor-not-allowed disabled:bg-[color:var(--muted)]/30 disabled:text-muted-foreground"
-          >
-            {started ? "승인하고 날짜 확정" : "발행 시작 선언 전"}
-          </button>
+          <span className="ml-auto inline-flex">
+            <ActionButton
+              run={onApprove}
+              disabled={!ready || !started}
+              title={started ? undefined : "발행 시작 선언 전"}
+              pendingText="승인 중…"
+              className="rounded-md bg-sky-500/90 px-3 py-1.5 text-xs font-medium text-white hover:bg-sky-500 disabled:cursor-not-allowed disabled:bg-[color:var(--muted)]/30 disabled:text-muted-foreground"
+            >
+              {started ? "승인하고 날짜 확정" : "발행 시작 선언 전"}
+            </ActionButton>
+          </span>
         </div>
       </div>
     </div>
@@ -584,7 +597,7 @@ function VotePicker({ letterId }: { letterId: string }) {
   const [options, setOptions] = useState<{ id: string; question: string }[] | null>(null);
   const [picked, setPicked] = useState<string[]>([]);
   const [note, setNote] = useState<string | null>(null);
-  const [pending, startTransition] = useTransition();
+  const { busy: pending } = useActionStatus();
 
   useEffect(() => {
     let live = true;
@@ -603,11 +616,11 @@ function VotePicker({ letterId }: { letterId: string }) {
     setPicked((prev) => (on ? (prev.length >= 3 ? prev : [...prev, id]) : prev.filter((x) => x !== id)));
   }
 
-  function onSave() {
-    startTransition(async () => {
-      const r = await saveVoteChoices(letterId, picked);
-      setNote(r.error ?? `투표 후보 ${picked.length}개를 저장했습니다.`);
-    });
+  async function onSave(): Promise<RunResult> {
+    const r = await saveVoteChoices(letterId, picked);
+    const text = r.error ?? `투표 후보 ${picked.length}개를 저장했습니다.`;
+    setNote(text);
+    return { ok: !r.error, text };
   }
 
   return (
@@ -636,14 +649,13 @@ function VotePicker({ letterId }: { letterId: string }) {
         </ul>
       )}
       <div className="flex items-center gap-2">
-        <button
-          type="button"
-          onClick={onSave}
+        <ActionButton
+          run={onSave}
           disabled={pending || options === null}
           className="rounded-md border border-[color:var(--border)] px-3 py-1 text-xs text-foreground/85 hover:border-[color:var(--accent)] disabled:opacity-50"
         >
           후보 저장
-        </button>
+        </ActionButton>
         {note && <span className="text-xs text-muted-foreground">{note}</span>}
       </div>
     </div>

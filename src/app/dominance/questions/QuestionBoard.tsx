@@ -1,8 +1,11 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { ActionButton, type RunResult, type StepFn } from "../_ui/ActionButton";
+import { useActionStatus } from "../_ui/ActionStatus";
+import { STAGES } from "../_ui/Progress";
 import type { EvidenceRun } from "@/lib/dominance/collect-types";
 import {
   AREAS,
@@ -47,11 +50,13 @@ const SORT_LABEL: Record<SortKey, string> = {
 /** 한 번에 검증하는 질문 수. Europe PMC 가 동시 요청에 503 을 주므로 2개씩 부른다. */
 const VALIDATE_CONCURRENCY = 2;
 
+const TOP_BTN = "rounded-md border border-[color:var(--border)] px-3 py-2 text-sm text-foreground/85 hover:border-[color:var(--accent)] disabled:opacity-40";
+
 const OPEN = new Set(["cc0", "cc by", "cc-by", "public domain", "pd"]);
 
 export function QuestionBoard({ questions, signal = null }: { questions: Question[]; signal?: IssueSignal | null }) {
   const router = useRouter();
-  const [pending, startTransition] = useTransition();
+  const { busy: actionBusy, toast } = useActionStatus();
   const [statusFilter, setStatusFilter] = useState<QuestionStatus | "all" | "open">("open");
   const [seedFilter, setSeedFilter] = useState<SeedKind | "all">("all");
   const [areaFilter, setAreaFilter] = useState<string>("all");
@@ -86,107 +91,119 @@ export function QuestionBoard({ questions, signal = null }: { questions: Questio
 
   const note = (id: string, text: string) => setNotes((n) => ({ ...n, [id]: text }));
 
-  function propose() {
+  // 56차 C · 처리 함수는 결과 글자를 돌려준다. ActionButton 이 그 글자를 알림 띠로 낸다. 카드 아래 글자(note)는 그대로 둔다.
+  async function propose(): Promise<RunResult> {
     setBanner(null);
-    startTransition(async () => {
-      const r = await proposeAction(branch);
-      if (!r.ok) setBanner(`제안 실패 · ${r.error}`);
-      else
-        setBanner(
-          `${SEED_LABEL[branch]} 제안 ${r.inserted}개를 넣었습니다 (${(r.ms / 1000).toFixed(1)}초 · 제외 목록 ${r.excluded}개).` +
-            (r.skipped.length ? ` 같은 문장이 있어 뺀 것 ${r.skipped.length}개: ${r.skipped.join(" / ")}` : ""),
-        );
-      setStatusFilter("open");
-      router.refresh();
-    });
+    const r = await proposeAction(branch);
+    const text = !r.ok
+      ? `제안 실패 · ${r.error}`
+      : `${SEED_LABEL[branch]} 제안 ${r.inserted}개를 넣었습니다 (${(r.ms / 1000).toFixed(1)}초 · 제외 목록 ${r.excluded}개).` +
+        (r.skipped.length ? ` 같은 문장이 있어 뺀 것 ${r.skipped.length}개: ${r.skipped.join(" / ")}` : "");
+    setBanner(text);
+    setStatusFilter("open");
+    router.refresh();
+    return { ok: r.ok, text };
   }
 
-  async function validateOne(id: string) {
+  async function validateOne(id: string): Promise<{ ok: boolean; passed: boolean; text: string }> {
     setRunning((s) => new Set(s).add(id));
     note(id, "검증 중…");
     const r = await validateAction(id);
-    if (!r.ok) note(id, `검증 실패 · ${r.error}`);
+    let out: { ok: boolean; passed: boolean; text: string };
+    if (!r.ok) out = { ok: false, passed: false, text: `검증 실패 · ${r.error}` };
     else {
       const v = r.result;
-      note(
-        id,
-        `${v.ok ? "통과" : `보류 · ${v.failure}`}${v.rewritten ? " · 검색어를 다시 썼습니다" : ""} · ` +
+      out = {
+        ok: true,
+        passed: v.ok,
+        text:
+          `${v.ok ? "통과" : `보류 · ${v.failure}`}${v.rewritten ? " · 검색어를 다시 썼습니다" : ""} · ` +
           `${(v.ms.total / 1000).toFixed(1)}초 (Europe PMC ${v.epmcCalls}회 ${(v.ms.epmc / 1000).toFixed(1)}초 · LLM ${v.llmCalls}회 ${(v.ms.llm / 1000).toFixed(1)}초 · 위키·MedlinePlus ${(v.ms.signals / 1000).toFixed(1)}초)`,
-      );
+      };
     }
+    note(id, out.text);
     setRunning((s) => {
       const n = new Set(s);
       n.delete(id);
       return n;
     });
+    return out;
   }
 
-  async function validateMany(ids: string[]) {
+  async function validateMany(ids: string[]): Promise<RunResult> {
     const queue = [...ids];
+    const results: { ok: boolean; passed: boolean; text: string }[] = [];
     const worker = async () => {
       while (queue.length) {
         const id = queue.shift()!;
-        await validateOne(id);
+        results.push(await validateOne(id));
       }
     };
     await Promise.all(Array.from({ length: Math.min(VALIDATE_CONCURRENCY, ids.length) }, worker));
     setSelected(new Set());
     router.refresh();
+    if (results.length === 1) return { ok: results[0].ok, text: results[0].text };
+    const failed = results.filter((x) => !x.ok).length;
+    const passed = results.filter((x) => x.passed).length;
+    return { ok: failed === 0, text: `${results.length}개 검증 · 통과 ${passed} · 보류 ${results.length - passed - failed}${failed ? ` · 실패 ${failed}` : ""}` };
   }
 
-  function setStatus(id: string, to: "adopted" | "rejected" | "held") {
-    startTransition(async () => {
-      const r = await setStatusAction(id, to);
-      note(id, r.error ? `실패 · ${r.error}` : `${STATUS_LABEL[to]}(으)로 바꿨습니다`);
-      router.refresh();
-      // D26 ① · 채택하면 [증거 모으기]가 곧바로 돈다. 실패해도 채택은 그대로다.
-      if (!r.error && to === "adopted") void collectAfterAdopt(id);
-    });
+  async function setStatus(id: string, to: "adopted" | "rejected" | "held", step?: StepFn): Promise<RunResult> {
+    const r = await setStatusAction(id, to);
+    const text = r.error ? `실패 · ${r.error}` : `${STATUS_LABEL[to]}(으)로 바꿨습니다`;
+    note(id, text);
+    router.refresh();
+    if (r.error) return { ok: false, text };
+    // D26 ① · 채택하면 [증거 모으기]가 곧바로 돈다. 실패해도 채택은 그대로다. 단추는 다 모을 때까지 단계를 보인다.
+    if (to === "adopted") {
+      toast({ ok: true, text });
+      return collectAfterAdopt(id, step);
+    }
+    return { ok: true, text };
   }
 
-  async function collectAfterAdopt(id: string) {
+  async function collectAfterAdopt(id: string, step?: StepFn): Promise<RunResult> {
     setRunning((s) => new Set(s).add(id));
-    const r = await runCollect(id, (t) => note(id, `채택했습니다 · 증거 모으기 ${t}`));
-    note(
-      id,
-      r.error
-        ? `채택했습니다 · 증거 모으기 실패(${r.error}). 증거 표에서 다시 누를 수 있습니다`
-        : `채택했습니다 · 증거 모으기 끝 · 카드 ${r.run?.total ?? 0}문장`,
-    );
+    const r = await runCollect(id, (t) => note(id, `채택했습니다 · 증거 모으기 ${t}`), step);
+    const text = r.error
+      ? `채택했습니다 · 증거 모으기 실패(${r.error}). 증거 표에서 다시 누를 수 있습니다`
+      : `채택했습니다 · 증거 모으기 끝 · 카드 ${r.run?.total ?? 0}문장`;
+    note(id, text);
     setRunning((s) => {
       const n = new Set(s);
       n.delete(id);
       return n;
     });
     router.refresh();
+    return { ok: !r.error, text };
   }
 
-  function suggest(id: string) {
-    startTransition(async () => {
-      note(id, "빈 칸을 채우는 중…");
-      const r = await suggestFillAction(id);
-      note(id, r.ok ? `제안을 받았습니다(${(r.ms / 1000).toFixed(1)}초). [고치기]에서 확인하고 저장하십시오` : `실패 · ${r.error}`);
-      router.refresh();
-    });
+  async function suggest(id: string): Promise<RunResult> {
+    note(id, "빈 칸을 채우는 중…");
+    const r = await suggestFillAction(id);
+    const text = r.ok ? `제안을 받았습니다(${(r.ms / 1000).toFixed(1)}초). [고치기]에서 확인하고 저장하십시오` : `실패 · ${r.error}`;
+    note(id, text);
+    router.refresh();
+    return { ok: r.ok, text };
   }
 
   // 48차 B · 보류 카드의 [검색어 제안 받기] · suggested 칸에만 저장
-  function suggestQueries(id: string) {
-    startTransition(async () => {
-      note(id, "검색어 제안을 받는 중…");
-      const r = await suggestQueriesAction(id);
-      note(id, r.ok ? "검색어 제안을 받았습니다. [고치기]에서 확인하고 저장한 뒤 검증하십시오" : `실패 · ${r.error}`);
-      router.refresh();
-    });
+  async function suggestQueries(id: string): Promise<RunResult> {
+    note(id, "검색어 제안을 받는 중…");
+    const r = await suggestQueriesAction(id);
+    const text = r.ok ? "검색어 제안을 받았습니다. [고치기]에서 확인하고 저장한 뒤 검증하십시오" : `실패 · ${r.error}`;
+    note(id, text);
+    router.refresh();
+    return { ok: r.ok, text };
   }
 
-  function saveEdit(id: string, f: IssueFields) {
-    startTransition(async () => {
-      const r = await editQuestionAction(id, f);
-      note(id, r.error ? `고치기 실패 · ${r.error}` : "고쳤습니다");
-      if (!r.error) setEditing(null);
-      router.refresh();
-    });
+  async function saveEdit(id: string, f: IssueFields): Promise<RunResult> {
+    const r = await editQuestionAction(id, f);
+    const text = r.error ? `고치기 실패 · ${r.error}` : "고쳤습니다";
+    note(id, text);
+    if (!r.error) setEditing(null);
+    router.refresh();
+    return { ok: !r.error, text };
   }
 
   /** 같은 문장의 이슈로 옮겨 간다. 필터에 가려지지 않게 모두 푼다. */
@@ -198,7 +215,7 @@ export function QuestionBoard({ questions, signal = null }: { questions: Questio
     setTimeout(() => document.getElementById(`q-${id}`)?.scrollIntoView({ behavior: "smooth", block: "center" }), 50);
   }
 
-  const busy = pending || running.size > 0;
+  const busy = actionBusy || running.size > 0;
   const selectable = (q: Question) => ["proposed", "validated", "held"].includes(q.status);
 
   return (
@@ -222,22 +239,18 @@ export function QuestionBoard({ questions, signal = null }: { questions: Questio
           <option value="hypothesis">S2 과거 가설</option>
           <option value="review_title">S3 리뷰 제목</option>
         </select>
-        <button
-          type="button"
-          onClick={propose}
-          disabled={busy}
-          className="rounded-md border border-[color:var(--border)] px-3 py-2 text-sm text-foreground/85 hover:border-[color:var(--accent)] disabled:opacity-40"
-        >
-          {pending ? "처리 중…" : "새 이슈 10개 제안"}
-        </button>
-        <button
-          type="button"
-          onClick={() => validateMany([...selected])}
+        <ActionButton run={propose} disabled={busy} stages={STAGES.propose} className={TOP_BTN}>
+          새 이슈 10개 제안
+        </ActionButton>
+        <ActionButton
+          run={() => validateMany([...selected])}
           disabled={busy || selected.size === 0}
-          className="rounded-md border border-[color:var(--border)] px-3 py-2 text-sm text-foreground/85 hover:border-[color:var(--accent)] disabled:opacity-40"
+          stages={STAGES.validate}
+          className={TOP_BTN}
+          pendingText={`${selected.size}개 검증 중…`}
         >
           고른 {selected.size}개 검증
-        </button>
+        </ActionButton>
       </div>
 
       {makerOpen && (
@@ -356,11 +369,11 @@ export function QuestionBoard({ questions, signal = null }: { questions: Questio
 
                   {selectable(q) && editing !== q.id && (
                     <div className="mt-3 flex flex-wrap gap-2">
-                      <Btn onClick={() => validateMany([q.id])} disabled={busy || running.has(q.id)}>
-                        {running.has(q.id) ? "검증 중…" : "검증"}
-                      </Btn>
-                      <Btn
-                        onClick={() => setStatus(q.id, "adopted")}
+                      <ActionButton run={() => validateMany([q.id])} disabled={busy || running.has(q.id)} stages={STAGES.validate} pendingText="검증 중…">
+                        검증
+                      </ActionButton>
+                      <ActionButton
+                        run={(step) => setStatus(q.id, "adopted", step)}
                         disabled={busy || !canAdopt(q)}
                         accent
                         title={
@@ -372,27 +385,27 @@ export function QuestionBoard({ questions, signal = null }: { questions: Questio
                         }
                       >
                         채택
-                      </Btn>
-                      <Btn onClick={() => setStatus(q.id, "rejected")} disabled={busy}>
+                      </ActionButton>
+                      <ActionButton run={() => setStatus(q.id, "rejected")} disabled={busy}>
                         기각
-                      </Btn>
+                      </ActionButton>
                       {q.status !== "held" && (
-                        <Btn onClick={() => setStatus(q.id, "held")} disabled={busy}>
+                        <ActionButton run={() => setStatus(q.id, "held")} disabled={busy}>
                           보류
-                        </Btn>
+                        </ActionButton>
                       )}
                       <Btn onClick={() => setEditing(q.id)} disabled={busy}>
                         고치기
                       </Btn>
                       {q.status === "held" && (
-                        <Btn onClick={() => suggestQueries(q.id)} disabled={busy}>
+                        <ActionButton run={() => suggestQueries(q.id)} disabled={busy}>
                           검색어 제안 받기
-                        </Btn>
+                        </ActionButton>
                       )}
                       {hasEmpty(q) && !q.suggested && (
-                        <Btn onClick={() => suggest(q.id)} disabled={busy}>
+                        <ActionButton run={() => suggest(q.id)} disabled={busy}>
                           빈 칸 채우기
-                        </Btn>
+                        </ActionButton>
                       )}
                     </div>
                   )}
@@ -510,7 +523,7 @@ function EditForm({
   busy,
 }: {
   q: Question;
-  onSave: (f: IssueFields) => void;
+  onSave: (f: IssueFields) => Promise<RunResult>;
   onCancel: () => void;
   busy: boolean;
 }) {
@@ -535,9 +548,9 @@ function EditForm({
     <div className="space-y-2">
       <FieldsEditor value={f} onChange={setF} marks={marks} />
       <div className="flex gap-2">
-        <Btn onClick={() => onSave(f)} disabled={busy} accent>
+        <ActionButton run={() => onSave(f)} disabled={busy} accent>
           저장
-        </Btn>
+        </ActionButton>
         <Btn onClick={onCancel} disabled={busy}>
           취소
         </Btn>

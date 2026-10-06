@@ -3,7 +3,9 @@
 // 48차 A · D51 · 「제목·요약 추천 받기」 단추와 결과 묶음 3개. ③ 편집 화면과 ④ 리뷰 화면이 같이 쓴다.
 // 묶음을 누르면 onPick 으로 제목 · 한 문장 요약을 넘긴다(저장은 부르는 쪽이 한다).
 
-import { useState, useTransition } from "react";
+import { useState } from "react";
+import { ActionButton, type RunResult } from "./_ui/ActionButton";
+import { STAGES } from "./_ui/Progress";
 import { requestTitleSuggestions } from "./title-actions";
 import type { TitleSuggestion, TitleSuggestions } from "@/lib/dominance/title-suggest";
 import { TITLE_TYPE_LABEL } from "@/lib/dominance/title-types";
@@ -25,32 +27,33 @@ export function TitleSuggestBox({
   const [result, setResult] = useState<TitleSuggestions | null>(initial);
   const [done, setDone] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [pending, startTransition] = useTransition();
-
-  function ask() {
+  // 56차 C · 결과 글자를 알림 띠로 낸다(ActionButton)
+  async function ask(): Promise<RunResult> {
     setError(null);
     setDone(null);
     const t0 = Date.now();
-    startTransition(async () => {
-      const r = await requestTitleSuggestions(letterId);
-      if (r.error) setError(r.error);
-      else {
-        setResult(r.result);
-        setDone(`묶음 ${r.result?.items.length ?? 0}개를 받았습니다 (${Math.round((Date.now() - t0) / 1000)}초)`);
-      }
-    });
+    const r = await requestTitleSuggestions(letterId);
+    if (r.error) {
+      setError(r.error);
+      return { ok: false, text: r.error };
+    }
+    setResult(r.result);
+    const text = `묶음 ${r.result?.items.length ?? 0}개를 받았습니다 (${Math.round((Date.now() - t0) / 1000)}초)`;
+    setDone(text);
+    return { ok: true, text };
   }
 
   return (
     <div className="space-y-2 text-xs">
-      <button
-        type="button"
-        onClick={ask}
-        disabled={!ready || pending || disabled}
+      <ActionButton
+        run={ask}
+        disabled={!ready || disabled}
+        pendingText="추천 받는 중…"
+        stages={STAGES.suggest}
         className="rounded-md border border-[color:var(--border)] px-3 py-1.5 text-foreground/85 hover:border-[color:var(--accent)] disabled:cursor-not-allowed disabled:opacity-50"
       >
-        {!ready ? "OPENAI_API_KEY 없음" : pending ? "추천 받는 중…" : "제목·요약 추천 받기"}
-      </button>
+        {!ready ? "OPENAI_API_KEY 없음" : "제목·요약 추천 받기"}
+      </ActionButton>
       {done && <p className="text-emerald-700 dark:text-emerald-300">{done}</p>}
       {error && <p className="text-red-700 dark:text-red-300">{error}</p>}
       {result && (

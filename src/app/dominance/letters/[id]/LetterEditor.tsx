@@ -1,5 +1,6 @@
 "use client";
 
+import { ActionButton, type RunResult } from "../../_ui/ActionButton";
 import { TitleSuggestBox } from "../../TitleSuggestBox";
 import type { TitleSuggestions } from "@/lib/dominance/title-suggest";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
@@ -130,15 +131,17 @@ export function LetterEditor({
     setDirty(true);
   }
 
-  async function submit() {
+  // 56차 C · 결과 글자를 알림 띠로 낸다(ActionButton)
+  async function submit(): Promise<RunResult> {
     setBusy(true);
     const { error } = await finishWriting(letterId, latest.current);
     setBusy(false);
     if (error) {
       setMessage(error);
-      return;
+      return { ok: false, text: error };
     }
     router.push(`/dominance/review/${letterId}`);
+    return { ok: true, text: "리뷰로 올렸습니다. 리뷰 화면으로 옮겨 갑니다" };
   }
 
   return (
@@ -322,9 +325,8 @@ export function LetterEditor({
                 <span className="ml-2 text-amber-700 dark:text-amber-300">빈 블록 {emptyCount}개</span>
               )}
             </div>
-            <button
-              type="button"
-              onClick={submit}
+            <ActionButton
+              run={submit}
               disabled={busy || flagCount > 0 || emptyCount > 0}
               className="rounded-md bg-[color:var(--accent)] px-4 py-2 text-sm font-medium text-background disabled:opacity-40"
               title={
@@ -336,7 +338,7 @@ export function LetterEditor({
               }
             >
               작성 완료
-            </button>
+            </ActionButton>
           </div>
         )}
       </div>
@@ -452,16 +454,17 @@ function GlossaryEditor({ letterId, initial, readOnly }: { letterId: string; ini
           </div>
         ))}
         {!readOnly && (
-          <button
-            type="button"
-            onClick={async () => {
+          <ActionButton
+            run={async () => {
               const r = await saveGlossary(letterId, items);
-              setMsg(r.error ? `저장 실패 · ${r.error}` : "용어표를 저장했습니다. 본문은 직접 고치십시오.");
+              const text = r.error ? `저장 실패 · ${r.error}` : "용어표를 저장했습니다. 본문은 직접 고치십시오.";
+              setMsg(text);
+              return { ok: !r.error, text };
             }}
             className="rounded-md border border-[color:var(--border)] px-2.5 py-1 text-xs text-foreground/85 hover:border-[color:var(--accent)]"
           >
             용어표 저장
-          </button>
+          </ActionButton>
         )}
         {msg && <p className="text-foreground/80">{msg}</p>}
       </div>

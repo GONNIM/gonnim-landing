@@ -3,7 +3,8 @@
 // 48차 A · D51 · ④ 리뷰 화면에서 제목 · 한 문장 요약만 고친다. 상태(리뷰 대기 · 리뷰 통과)는 그대로다.
 // 저장할 때 서버가 거절 필터와 범주 이름 검사를 두 칸에 돌린다. 걸리면 저장하지 않고 이유를 보인다.
 
-import { useState, useTransition } from "react";
+import { useState } from "react";
+import { ActionButton, type RunResult } from "../../_ui/ActionButton";
 import { useRouter } from "next/navigation";
 import { saveTitleSummary } from "../../title-actions";
 import { TitleSuggestBox } from "../../TitleSuggestBox";
@@ -28,23 +29,23 @@ export function TitleSummaryEditor({
   const [message, setMessage] = useState<string | null>(null);
   const [problems, setProblems] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
-  const [pending, startTransition] = useTransition();
   const changed = title.trim() !== initialTitle.trim() || summary.trim() !== initialSummary.trim();
 
-  function save() {
+  // 56차 C · 결과 글자를 알림 띠로 낸다(ActionButton)
+  async function save(): Promise<RunResult> {
     setMessage(null);
     setError(null);
     setProblems([]);
-    startTransition(async () => {
-      const r = await saveTitleSummary(letterId, title, summary);
-      if (r.error) {
-        setError(r.error);
-        setProblems(r.problems);
-      } else {
-        setMessage("제목 · 요약을 저장했습니다. 상태는 그대로입니다.");
-        router.refresh();
-      }
-    });
+    const r = await saveTitleSummary(letterId, title, summary);
+    if (r.error) {
+      setError(r.error);
+      setProblems(r.problems);
+      return { ok: false, text: r.error };
+    }
+    const text = "제목 · 요약을 저장했습니다. 상태는 그대로입니다.";
+    setMessage(text);
+    router.refresh();
+    return { ok: true, text };
   }
 
   return (
@@ -77,14 +78,14 @@ export function TitleSummaryEditor({
         }}
       />
       <div className="flex items-center gap-2">
-        <button
-          type="button"
-          onClick={save}
-          disabled={!changed || pending}
+        <ActionButton
+          run={save}
+          disabled={!changed}
+          pendingText="저장 중…"
           className="rounded-md border border-[color:var(--accent)] px-3 py-1.5 text-foreground hover:bg-[color:var(--accent)]/10 disabled:opacity-40"
         >
-          {pending ? "저장 중…" : "제목·요약 저장"}
-        </button>
+          제목·요약 저장
+        </ActionButton>
         <span className="text-muted-foreground">두 칸만 바꿉니다. 리뷰 상태는 그대로입니다.</span>
       </div>
       {message && <p className="text-emerald-700 dark:text-emerald-300">{message}</p>}

@@ -4,10 +4,12 @@
 // [채우기] 는 LLM 1회로 칸을 채운다. 모든 칸은 저장 전에 고칠 수 있다. 저장한 이슈는 '제안' 상태로
 // 들어가고, 채택하려면 검증을 거쳐야 한다(넘지 않는 선 7).
 
-import { useState, useTransition } from "react";
+import { useState } from "react";
+import { ActionButton, type RunResult } from "../_ui/ActionButton";
+import { useActionStatus } from "../_ui/ActionStatus";
 import type { FillMode } from "@/lib/dominance/question-llm";
 import { fillAction, saveIssueAction, type IssueFields, type IssueSignal } from "./actions";
-import { Btn, FieldsEditor } from "./ui";
+import { FieldsEditor } from "./ui";
 
 const MODES: { key: FillMode; label: string; placeholder: string }[] = [
   { key: "sentence", label: "① 문장", placeholder: "예: 커피를 마시면 정말 탈수가 오는가?" },
@@ -34,16 +36,17 @@ export function IssueMaker({
   const [linkTitle, setLinkTitle] = useState<string | null>(null);
   const [fields, setFields] = useState<IssueFields>(EMPTY);
   const [msg, setMsg] = useState<string | null>(null);
-  const [pending, start] = useTransition();
+  const { busy: pending } = useActionStatus();
 
-  function fill() {
+  // 56차 C · 결과 글자를 돌려주면 ActionButton 이 알림 띠로 낸다
+  async function fill(): Promise<RunResult> {
     setMsg(null);
-    start(async () => {
+    {
       const r = await fillAction({ mode, text, manualTitle: needTitle ? manualTitle : undefined });
       if (!r.ok) {
         setMsg(r.error);
         if (r.needTitle) setNeedTitle(true);
-        return;
+        return { ok: false, text: r.error };
       }
       setLinkTitle(r.linkTitle);
       setFields({
@@ -54,24 +57,27 @@ export function IssueMaker({
         area: r.filled.area ?? "",
         queries: [r.filled.queries[0] ?? "", r.filled.queries[1] ?? ""],
       });
-      setMsg(`채웠습니다 · ${(r.ms / 1000).toFixed(1)}초${r.linkTitle ? ` · 읽은 제목: ${r.linkTitle}` : ""}. 칸을 확인하고 고치십시오.`);
-    });
+      const done = `채웠습니다 · ${(r.ms / 1000).toFixed(1)}초${r.linkTitle ? ` · 읽은 제목: ${r.linkTitle}` : ""}. 칸을 확인하고 고치십시오.`;
+      setMsg(done);
+      return { ok: true, text: done };
+    }
   }
 
-  function save() {
+  async function save(): Promise<RunResult> {
     setMsg(null);
-    start(async () => {
+    {
       const f = mode === "sentence" && !fields.question.trim() ? { ...fields, question: text } : fields;
       const r = await saveIssueAction({ mode, text, linkTitle: linkTitle ?? (manualTitle.trim() || null), fields: f, signal });
       if (r.ok) {
         setText("");
         setFields(EMPTY);
         onSaved(r.id);
-        return;
+        return { ok: true, text: "이슈를 저장했습니다" };
       }
       setMsg(r.error);
       if (r.duplicateId) onDuplicate(r.duplicateId);
-    });
+      return { ok: false, text: r.error };
+    }
   }
 
   return (
@@ -111,9 +117,9 @@ export function IssueMaker({
           placeholder={MODES.find((m) => m.key === mode)!.placeholder}
           className="w-full rounded-md border border-[color:var(--border)] bg-background px-3 py-2 text-sm"
         />
-        <Btn onClick={fill} disabled={pending || !text.trim()} accent>
-          {pending ? "…" : "채우기"}
-        </Btn>
+        <ActionButton run={fill} disabled={pending || !text.trim()} accent pendingText="채우는 중…">
+          채우기
+        </ActionButton>
       </div>
 
       {mode === "link" && needTitle && (
@@ -130,9 +136,9 @@ export function IssueMaker({
       <FieldsEditor value={fields} onChange={setFields} />
 
       <div className="flex items-center gap-2">
-        <Btn onClick={save} disabled={pending || !(fields.question.trim() || (mode === "sentence" && text.trim()))} accent>
+        <ActionButton run={save} disabled={pending || !(fields.question.trim() || (mode === "sentence" && text.trim()))} accent>
           저장
-        </Btn>
+        </ActionButton>
         <span className="text-xs text-muted-foreground">저장하면 &lsquo;제안&rsquo; 상태로 들어갑니다. 채택 전에 검증을 거칩니다.</span>
       </div>
     </section>

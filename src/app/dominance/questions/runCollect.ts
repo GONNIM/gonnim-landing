@@ -7,10 +7,13 @@ import { collectPhaseAction } from "./[id]/evidence/actions";
 export async function runCollect(
   id: string,
   onStep: (text: string) => void,
+  /** 56차 C · 단추의 단계 표시(번호 · 전체 · 이름) */
+  step?: (i: number, n: number, name: string) => void,
 ): Promise<{ run: EvidenceRun | null; error: string | null }> {
   let run: EvidenceRun | null = null;
   for (const [i, p] of PHASES.entries()) {
     onStep(`${i + 1}/${PHASES.length} ${PHASE_LABEL[p]} …`);
+    step?.(i + 1, PHASES.length, `증거 모으기 · ${PHASE_LABEL[p]}`);
     const r = await collectPhaseAction(id, p);
     if (!r.ok) return { run, error: r.error };
     run = r.run;
