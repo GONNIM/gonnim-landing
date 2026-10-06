@@ -6,7 +6,8 @@
 // 켜는 날은 운영자가 발행 시작을 선언하는 날이다(런북 11번).
 
 export function publishingStarted(): boolean {
-  return process.env.DS_PUBLISHING_STARTED === "1";
+  // 56차 · Vercel 값 끝에 줄바꿈이 붙어 "1\n" 으로 저장된 일이 있었다(44차와 같은 종류) · 앞뒤 공백을 지운다
+  return process.env.DS_PUBLISHING_STARTED?.trim() === "1";
 }
 
 export const PRE_PUBLISHING_NOTE = "발행 전 기간";

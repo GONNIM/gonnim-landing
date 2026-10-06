@@ -47,7 +47,8 @@ function main() {
   }
   if (cmd === "on") {
     if (present()) sh(`vercel env rm ${NAME} production -y 2>&1`);
-    sh(`vercel env add ${NAME} production 2>&1`, "1\n");
+    // 56차 · 줄바꿈을 붙이면 값이 "1\n" 으로 저장된다 · 줄바꿈 없이 넣는다
+    sh(`vercel env add ${NAME} production 2>&1`, "1");
     if (!present()) throw new Error("값을 넣지 못했습니다");
     console.log(`${NAME}=1 을 Production 에 넣었습니다`);
   } else {
