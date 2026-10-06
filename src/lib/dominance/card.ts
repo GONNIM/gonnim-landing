@@ -79,10 +79,17 @@ export function vSearchUrl(q: Question): string {
   return `https://europepmc.org/search?query=${encodeURIComponent(q.searchQueries[0] ?? q.question)}`;
 }
 
-export async function loadQuestionCard(db: SupabaseClient, questionId: string): Promise<QuestionCard | null> {
-  const q = await loadQuestion(db, questionId);
+/** 56차 D · 질문과 증거 표를 함께 읽는다. 이미 읽은 증거 표가 있으면 pre.table 로 넘겨 다시 읽지 않는다. */
+export async function loadQuestionCard(
+  db: SupabaseClient,
+  questionId: string,
+  pre?: { table?: Awaited<ReturnType<typeof loadEvidence>>; q?: Question | null },
+): Promise<QuestionCard | null> {
+  const [q, t] = await Promise.all([
+    pre?.q !== undefined ? Promise.resolve(pre.q) : loadQuestion(db, questionId),
+    pre?.table ? Promise.resolve(pre.table) : loadEvidence(db, questionId),
+  ]);
   if (!q) return null;
-  const t = await loadEvidence(db, questionId);
 
   const facts: CardFact[] = [];
   const sources = new Map<string, CardSource>();
@@ -178,9 +185,11 @@ export async function numberMismatchesFor(
   questionId: string | null,
   blocks: { text: string }[],
   glossary: import("./card-check").GlossaryLike[] = [],
+  /** 56차 D · 이미 읽은 카드(같은 요청에서 다시 읽지 않게) */
+  preCard?: QuestionCard | null,
 ): Promise<import("./card-check").NumberMismatch[]> {
   if (!questionId) return [];
-  const card = await loadQuestionCard(db, questionId);
+  const card = preCard !== undefined ? preCard : await loadQuestionCard(db, questionId);
   if (!card) return [];
   const { cardNumberMismatches, oddsAsPercent } = await import("./card-check");
   return [
@@ -240,6 +249,14 @@ export function unverifiedInLetter(card: QuestionCard, blocks: { text: string }[
  * 질문에서 나오지 않은 옛 글이나 카드가 없는 글은 applicable=false(해당 없음 · 막지 않음).
  */
 export type MeaningStatus = { applicable: boolean; used: number; verified: number; questionId: string | null };
+
+/** 56차 D · 이미 읽은 카드와 본문으로 계산(조회 없음) · meaningStatus 와 같은 계산 */
+export function meaningStatusFrom(card: QuestionCard | null, blocks: { text: string }[], questionId: string | null): MeaningStatus {
+  if (!questionId || !card) return { applicable: false, used: 0, verified: 0, questionId };
+  const used = usedFacts(card, blocks);
+  if (used.length === 0) return { applicable: false, used: 0, verified: 0, questionId };
+  return { applicable: true, used: used.length, verified: used.filter((f) => f.koVerifiedAt).length, questionId };
+}
 
 export async function meaningStatus(db: SupabaseClient, letterId: string): Promise<MeaningStatus> {
   const { data: letter } = await db

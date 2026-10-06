@@ -4,7 +4,7 @@
 // 뜻 확인 수는 card.meaningStatus(D50 · 증거 표 노란 상자와 같은 계산), 발행 시작은 DS_PUBLISHING_STARTED === "1".
 
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { meaningStatus } from "./card";
+import { loadQuestionCard, meaningStatusFrom, type QuestionCard } from "./card";
 import { formatKstDate } from "./kst";
 import { holdNext, holdReason, loadQuestions } from "./questions";
 import { publishingStarted } from "./publishing";
@@ -25,17 +25,27 @@ export type NextAction = {
 
 export async function loadNextActions(db: SupabaseClient): Promise<NextAction[]> {
   const started = publishingStarted();
-  const { data: letters } = await db
-    .from("ds_letters")
-    .select("id, title, status, scheduled_for, question_id, updated_at")
-    .neq("status", "published")
-    .order("updated_at", { ascending: false });
+  // 56차 D · 글(본문 포함)과 질문 목록을 한 번에 읽고, 글마다의 카드는 질문별로 동시에 읽는다(전에는 글마다 차례로 두 번씩 읽었다)
+  const [{ data: letters }, { questions }] = await Promise.all([
+    db
+      .from("ds_letters")
+      .select("id, title, status, scheduled_for, question_id, updated_at, blocks")
+      .neq("status", "published")
+      .order("updated_at", { ascending: false }),
+    loadQuestions(db),
+  ]);
+  type L = { id: string; title: string; status: LetterStatus; scheduled_for: string | null; question_id: string | null; blocks: { text: string }[] };
+  const rows = (letters ?? []) as L[];
+  const qids = [...new Set(rows.map((l) => l.question_id).filter((x): x is string => !!x))];
+  const cards = new Map<string, QuestionCard | null>(
+    await Promise.all(qids.map(async (qid) => [qid, await loadQuestionCard(db, qid, { q: questions.find((q) => q.id === qid) ?? undefined })] as const)),
+  );
 
   const out: NextAction[] = [];
   const withLetter = new Set<string>();
-  for (const l of (letters ?? []) as { id: string; title: string; status: LetterStatus; scheduled_for: string | null; question_id: string | null }[]) {
+  for (const l of rows) {
     if (l.question_id) withLetter.add(l.question_id);
-    const m = await meaningStatus(db, l.id);
+    const m = meaningStatusFrom(l.question_id ? (cards.get(l.question_id) ?? null) : null, l.blocks ?? [], l.question_id);
     const short = m.applicable && m.verified < m.used;
     // 54차 D · 증거 표 노란 상자로 바로(앵커)
     const evidence = m.questionId ? `/dominance/questions/${m.questionId}/evidence#used-facts` : null;
@@ -54,7 +64,6 @@ export async function loadNextActions(db: SupabaseClient): Promise<NextAction[]>
     }
   }
 
-  const { questions } = await loadQuestions(db);
   for (const q of questions) {
     const base = { kind: "question" as const, id: q.id, title: q.question };
     if (q.status === "held") {

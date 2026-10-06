@@ -102,6 +102,20 @@ export function linkCheckUrls(sources: { url: string; extKind?: string | null }[
   return sources.filter((s) => s.extKind !== "own").map((s) => s.url);
 }
 
+/**
+ * 56차 D · ④ 리뷰 화면용 · 링크 결과를 10분 저장한다(서버 인스턴스가 살아 있는 동안).
+ * ⑤ 승인 창 · 승인 동작은 이것을 쓰지 않고 늘 새로 확인한다(approve.ts).
+ */
+const LINK_TTL_MS = 10 * 60 * 1000;
+const linkMemo = new Map<string, { status: LinkStatus; at: number }>();
+export async function checkLinkCached(url: string): Promise<LinkStatus> {
+  const hit = linkMemo.get(url);
+  if (hit && Date.now() - hit.at < LINK_TTL_MS) return hit.status;
+  const status = await checkLink(url);
+  linkMemo.set(url, { status, at: Date.now() });
+  return status;
+}
+
 /** 경보 메일용. 확인 불가는 죽은 것으로 보지 않는다. */
 export async function isLinkAlive(url: string): Promise<boolean> {
   return (await checkLink(url)) !== "dead";
@@ -116,6 +130,8 @@ export async function runReviewChecks(input: {
   summary?: string | null;
   /** 사실 카드의 원천 언어 문장(20차 B-5). 주면 40자 복제를 찾는다. 옛 글은 비운다. */
   cardSentences?: string[];
+  /** 56차 D · 링크 확인 함수(기본은 늘 새로 확인 · ④ 리뷰 화면은 10분 저장본) */
+  linkCheck?: (url: string) => Promise<LinkStatus>;
 }): Promise<ReviewCheck[]> {
   const blocks = flagBlocks(input.blocks);
   const checks: ReviewCheck[] = [];
@@ -168,7 +184,7 @@ export async function runReviewChecks(input: {
 
   // 4. 원천 링크 생존 — 죽은 링크만 막는다. 확인 불가는 경고로 남긴다 (D35).
   const urls = [...new Set(input.sourceUrls)];
-  const statuses = await Promise.all(urls.map(checkLink));
+  const statuses = await Promise.all(urls.map(input.linkCheck ?? checkLink));
   const dead = urls.filter((_, i) => statuses[i] === "dead");
   const unverifiable = urls.filter((_, i) => statuses[i] === "unverifiable");
   const notes = [

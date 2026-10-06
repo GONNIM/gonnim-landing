@@ -178,14 +178,22 @@ function joinNote(memo: string | null, facts: FactMeta[]): string | null {
 
 const lines = (s: string | null) => (s ?? "").split("\n").map((l) => l.trim()).filter(Boolean);
 
+// 56차 D · 칸이 있다고 한 번 확인하면 그 서버 인스턴스에서는 다시 묻지 않는다(칸은 없어지지 않는다 · 없을 때는 매번 다시 묻는다)
+let evidenceColumnsSeen = false;
+let koColumnsSeen = false;
+
 export async function hasEvidenceColumns(db: SupabaseClient): Promise<boolean> {
+  if (evidenceColumnsSeen) return true;
   const { error } = await db.from("ds_question_evidence").select(EXT).limit(1);
+  if (!error) evidenceColumnsSeen = true;
   return !error;
 }
 
 /** 확인된 뜻 칸(db/2026-10-01-dominance-fact-ko.sql)이 있는가 */
 export async function hasKoColumns(db: SupabaseClient): Promise<boolean> {
+  if (koColumnsSeen) return true;
   const { error } = await db.from("ds_question_evidence").select(KO).limit(1);
+  if (!error) koColumnsSeen = true;
   return !error;
 }
 

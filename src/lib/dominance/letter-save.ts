@@ -4,7 +4,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { countFlags, flagBlocks } from "./filters";
 import { saveLetterBody } from "./letters";
 import { normalizePunct, tagsIn } from "./tags";
-import { numberMismatchesFor } from "./card";
+import { loadQuestionCard, numberMismatchesFor } from "./card";
 import type { NumberMismatch } from "./card-check";
 import { readDraftMeta } from "./draft-store";
 import type { LetterBlock } from "./types";
@@ -47,11 +47,13 @@ export async function saveLetterCore(
 ): Promise<SaveResult> {
   const questionId = await t.step("질문 id", questionOf(db, letterId));
   const blocks = flagBlocks(withTagSources(questionId, patch.blocks));
-  const { error } = await t.step("본문 저장", saveLetterBody(db, letterId, { title: patch.title, summary: patch.summary, blocks }));
-  // 56차 D 전 · 옛 코드는 질문 id 를 한 번 더 읽었다(그대로 재기 위해 남김)
-  const questionId2 = await t.step("질문 id(다시)", questionOf(db, letterId));
-  const meta = await t.step("메타 파일", readDraftMeta(db, letterId));
+  // 56차 D · 저장 · 메타 · 카드를 동시에(전에는 질문 id 를 두 번 읽고 차례로 기다렸다)
+  const [{ error }, meta, card] = await Promise.all([
+    t.step("본문 저장", saveLetterBody(db, letterId, { title: patch.title, summary: patch.summary, blocks })),
+    t.step("메타 파일", readDraftMeta(db, letterId)),
+    questionId ? t.step("사실 카드", loadQuestionCard(db, questionId)) : Promise.resolve(null),
+  ]);
   // 29차 B-2 · 용어표 괄호 풀이의 숫자는 대조에서 뺀다
-  const mismatches = await t.step("카드 수치 대조", numberMismatchesFor(db, questionId2, blocks, meta?.glossary ?? []));
+  const mismatches = await t.step("카드 수치 대조", numberMismatchesFor(db, questionId, blocks, meta?.glossary ?? [], card));
   return { blocks, mismatches, flagCount: countFlags(blocks), savedAt: new Date().toISOString(), error: error?.message ?? null };
 }
