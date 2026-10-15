@@ -434,6 +434,9 @@ export function holdReason(q: Question): string | null {
 }
 
 /** 48차 B · D52 · 보류 카드의 「다음 할 일」 */
+/** 59차 A-4 · 메모에 「이어 감」이 있는 보류 질문은 다른 질문으로 이어 간 것이다. 다음 할 일 · 보류 안내에서 뺀다. */
+export const continuedElsewhere = (q: Pick<Question, "memo">): boolean => (q.memo ?? "").includes("이어 감");
+
 export function holdNext(q: Question): string[] {
   if (q.status !== "held") return [];
   const out: string[] = [];

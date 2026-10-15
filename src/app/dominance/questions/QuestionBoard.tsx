@@ -16,6 +16,7 @@ import {
   canAdopt,
   holdNext,
   holdReason,
+  continuedElsewhere,
   curveLine,
   validationLine,
   type Question,
@@ -437,7 +438,7 @@ function Card({ q }: { q: Question }) {
       </div>
 
       {/* 48차 B · D52 · 보류 이유는 저장된 V 값에서 다시 계산해 항상 보인다 */}
-      {q.status === "held" && (
+      {q.status === "held" && !continuedElsewhere(q) && (
         <div className="mt-2 rounded-md border border-amber-500/40 bg-amber-50 px-2.5 py-1.5 text-xs text-amber-800 dark:bg-amber-950/20 dark:text-amber-200">
           <p>보류 이유 · {holdReason(q)}</p>
           <p className="mt-0.5">다음 할 일 · {holdNext(q).join(" / ")}</p>

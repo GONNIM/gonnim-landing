@@ -6,7 +6,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { loadQuestionCard, meaningStatusFrom, type QuestionCard } from "./card";
 import { formatKstDate } from "./kst";
-import { holdNext, holdReason, loadQuestions } from "./questions";
+import { continuedElsewhere, holdNext, holdReason, loadQuestions } from "./questions";
 import { publishingStarted } from "./publishing";
 import type { LetterStatus } from "./types";
 
@@ -66,7 +66,7 @@ export async function loadNextActions(db: SupabaseClient): Promise<NextAction[]>
 
   for (const q of questions) {
     const base = { kind: "question" as const, id: q.id, title: q.question };
-    if (q.status === "held") {
+    if (q.status === "held" && !continuedElsewhere(q)) {
       out.push({ ...base, line: `보류 · ${holdReason(q)} · ${holdNext(q).join(" / ")}`, href: "/dominance/questions", buttonLabel: "열기", pinned: true });
     } else if (q.status === "validated" && q.v3EvidenceOk === true) {
       out.push({ ...base, line: "채택할 수 있습니다", href: "/dominance/questions", buttonLabel: "열기" });
