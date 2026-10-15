@@ -7,6 +7,7 @@ import { ActionButton, type RunResult } from "../_ui/ActionButton";
 import { useActionStatus } from "../_ui/ActionStatus";
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { formatKstDate, formatKstDateTime } from "@/lib/dominance/kst";
 import type { LetterStatus } from "@/lib/dominance/types";
 import { sendTestEmail } from "../review/[id]/actions";
@@ -64,6 +65,16 @@ export function ScheduleCalendar({
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const { busy: pending } = useActionStatus();
+  const router = useRouter();
+  // 59차 B · 승인 성공 뒤 달력에 「◐ 제목」이 보일 때까지 창을 닫지 않는다
+  const [confirming, setConfirming] = useState<{ letterId: string; date: string; warning: string | null } | null>(null);
+  const onCalendar = confirming !== null && scheduled.some((r) => r.id === confirming.letterId && r.scheduled_for === confirming.date);
+  // 새 달력 자료가 들어온 그리기에서 바로 닫는다(effect 없이 비교)
+  if (confirming && onCalendar) {
+    setTarget(null);
+    setConfirming(null);
+    setNotice(confirming.warning ? `날짜를 확정했습니다. ${confirming.warning}` : "날짜를 확정했습니다.");
+  }
 
   const byDate = new Map<string, Row[]>();
   for (const row of scheduled) {
@@ -297,14 +308,13 @@ export function ScheduleCalendar({
           started={started}
           letter={target.letter}
           date={target.date}
-          onClose={() => setTarget(null)}
-          onDone={(warning) => {
+          onClose={() => {
             setTarget(null);
-            setNotice(
-              warning
-                ? `날짜를 확정했습니다. ${warning}`
-                : "날짜를 확정했습니다.",
-            );
+            setConfirming(null);
+          }}
+          onDone={(warning) => {
+            setConfirming({ letterId: target.letter.id, date: target.date, warning });
+            router.refresh();
           }}
         />
       )}
@@ -465,15 +475,33 @@ function ApprovalDialog({
     return { ok: true, text };
   }
 
+  // 59차 B · 거부와 실패(통신 · 서버 오류)는 창을 닫지 않고 창 안에 빨간 글로 남긴다.
+  // 성공하면 창은 열어 둔 채 달력이 갱신되기를 기다린다(닫기는 부모가 「◐ 제목」을 본 뒤에 한다).
+  const [waiting, setWaiting] = useState(false);
+  const [slow, setSlow] = useState(false);
+  useEffect(() => {
+    if (!waiting) return;
+    const t = setTimeout(() => setSlow(true), 15000);
+    return () => clearTimeout(t);
+  }, [waiting]);
+
   async function onApprove(): Promise<RunResult> {
     setError(null);
-    const result = await approveLetter(letter.id, date);
+    let result: Awaited<ReturnType<typeof approveLetter>>;
+    try {
+      result = await approveLetter(letter.id, date);
+    } catch (err) {
+      const text = `승인하지 못했습니다 · ${err instanceof Error ? err.message : String(err)}`;
+      setError(text);
+      return { ok: false, text };
+    }
     if (result.error) {
-      setError(result.error);
+      setError(`승인하지 못했습니다 · ${result.error}`);
       return { ok: false, text: result.error };
     }
+    setWaiting(true);
     onDone(result.warning);
-    return { ok: true, text: result.warning ? `날짜를 확정했습니다. ${result.warning}` : "날짜를 확정했습니다." };
+    return null;
   }
 
   return (
@@ -558,6 +586,13 @@ function ApprovalDialog({
 
         {message && <p className="text-xs text-emerald-700 dark:text-emerald-300">{message}</p>}
         {error && <p className="text-xs text-red-700 dark:text-red-300">{error}</p>}
+        {waiting && (
+          <p className={`text-xs ${slow ? "text-red-700 dark:text-red-300" : "text-emerald-700 dark:text-emerald-300"}`}>
+            {slow
+              ? "승인은 저장되었지만 달력에 아직 보이지 않습니다. 화면을 새로 고쳐 확인하십시오."
+              : "승인했습니다. 달력에 붙는 것을 확인하는 중…"}
+          </p>
+        )}
 
         <div className="flex flex-wrap gap-2">
           <ActionButton
@@ -578,7 +613,7 @@ function ApprovalDialog({
           <span className="ml-auto inline-flex">
             <ActionButton
               run={onApprove}
-              disabled={!ready || !started}
+              disabled={!ready || !started || waiting}
               title={started ? undefined : "발행 시작 선언 전"}
               pendingText="승인 중…"
               className="rounded-md bg-sky-500/90 px-3 py-1.5 text-xs font-medium text-white hover:bg-sky-500 disabled:cursor-not-allowed disabled:bg-[color:var(--muted)]/30 disabled:text-muted-foreground"
