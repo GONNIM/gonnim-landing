@@ -15,6 +15,8 @@ const NAV = [
   { href: "/dominance/letters", label: "③ 글" },
   { href: "/dominance/review", label: "④ 리뷰" },
   { href: "/dominance/schedule", label: "⑤ 발행일" },
+  // 59차 C · 발행된 글의 기록 · 변환 기능의 입구
+  { href: "/dominance/history", label: "기록" },
   { href: "/dominance/subscribers", label: "구독자" },
   { href: "/dominance/reactions", label: "반응" },
   { href: "/dominance/runs", label: "크론 기록" },
