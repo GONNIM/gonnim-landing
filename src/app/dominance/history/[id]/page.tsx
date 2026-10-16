@@ -1,20 +1,25 @@
 // 59차 C · 「기록」 상세 · 제목 · 한 문장 요약 · 7블록 본문(읽기 전용 · 태그 포함) · 원천 목록 · 감사 기록 시간표.
-// 자료는 letterPackage 한 곳에서 읽는다. 오른쪽 위 「변환」 절은 다음 차수의 블로그 글 · 쇼츠 대본 변환 자리다.
+// 자료는 letterPackage 한 곳에서 읽는다. 60차 B · 머리 아래 「변환」 절에서 블로그 글 · 쇼츠 대본을 만든다.
 
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { dominanceContext } from "@/lib/dominance/guard";
 import { formatKstDate, formatKstDateTime } from "@/lib/dominance/kst";
 import { letterPackage } from "@/lib/dominance/letter-package";
+import { listConversions } from "@/lib/dominance/convert";
+import { ConvertPanel } from "./ConvertPanel";
 import { LETTER_STATUS_LABEL } from "@/lib/dominance/types";
 
 export const dynamic = "force-dynamic";
+// 쇼츠 대본은 GLM 을 한두 번 부른다
+export const maxDuration = 300;
 
 export default async function HistoryDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const { db } = await dominanceContext();
   const pkg = await letterPackage(db, id);
   if (!pkg) notFound();
+  const conversions = await listConversions(db, id);
 
   const dates: [string, string][] = [
     ["발행일", formatKstDate(pkg.dates.scheduledFor)],
@@ -30,32 +35,26 @@ export default async function HistoryDetailPage({ params }: { params: Promise<{ 
         ◀ 기록
       </Link>
 
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-        <section className="min-w-0 flex-1 space-y-2">
-          <p className="text-xs text-muted-foreground">{LETTER_STATUS_LABEL[pkg.status]}</p>
-          <h1 className="text-2xl font-semibold tracking-tight">{pkg.title}</h1>
-          {pkg.summary && <p className="text-sm text-foreground/85">{pkg.summary}</p>}
-          <dl className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
-            {dates.map(([k, v]) => (
-              <div key={k}>
-                <dt className="inline">{k} </dt>
-                <dd className="inline text-foreground/85">{v}</dd>
-              </div>
-            ))}
-            {pkg.webUrl && (
-              <a href={pkg.webUrl} target="_blank" rel="noreferrer" className="underline">
-                웹 글 ↗
-              </a>
-            )}
-          </dl>
-        </section>
+      <section className="space-y-2">
+        <p className="text-xs text-muted-foreground">{LETTER_STATUS_LABEL[pkg.status]}</p>
+        <h1 className="text-2xl font-semibold tracking-tight">{pkg.title}</h1>
+        {pkg.summary && <p className="text-sm text-foreground/85">{pkg.summary}</p>}
+        <dl className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
+          {dates.map(([k, v]) => (
+            <div key={k}>
+              <dt className="inline">{k} </dt>
+              <dd className="inline text-foreground/85">{v}</dd>
+            </div>
+          ))}
+          {pkg.webUrl && (
+            <a href={pkg.webUrl} target="_blank" rel="noreferrer" className="underline">
+              웹 글 ↗
+            </a>
+          )}
+        </dl>
+      </section>
 
-        {/* 다음 차수의 변환 단추 자리 · 지금은 단추가 없다 */}
-        <section className="w-full shrink-0 rounded-xl border border-dashed border-[color:var(--border)] p-4 lg:w-72">
-          <h2 className="text-sm font-medium">변환</h2>
-          <p className="mt-2 text-xs text-muted-foreground">다음 차수에 블로그 글 · 쇼츠 대본 변환 단추가 여기 붙습니다.</p>
-        </section>
-      </div>
+      <ConvertPanel letterId={pkg.id} initial={conversions} />
 
       <section className="space-y-3">
         <h2 className="text-lg font-medium">본문</h2>

@@ -18,7 +18,7 @@ export { TITLE_TYPE_LABEL, type TitleType } from "./title-types";
 export type TitleSuggestion = { title: string; summary: string; why: string; type?: TitleType };
 
 /** 53차 I · 과장 낱말(코드 검사 · 걸리면 그 묶음을 뺀다) */
-const HYPE = ["충격", "경악", "반드시", "무조건", "100%", "모두가"];
+export const HYPE = ["충격", "경악", "반드시", "무조건", "100%", "모두가"];
 export type TitleSuggestions = {
   at: string;
   model: string;
