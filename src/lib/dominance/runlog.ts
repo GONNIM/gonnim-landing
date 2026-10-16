@@ -89,6 +89,10 @@ export type LlmCallLine = {
   provider?: string;
   /** 57차 · 잃은 줄을 다른 기록(meta.json 등)으로 보충했으면 그 설명 */
   backfill?: string;
+  /** 63차 · Anthropic · 응답 content 블록 종류별 개수(text · thinking 등) */
+  blocks?: Record<string, number>;
+  /** 63차 · Anthropic · 멈춘 이유(end_turn · max_tokens 등) */
+  stop_reason?: string | null;
 };
 
 export const JSON_RETRY_DIR = "logs/json-retry";

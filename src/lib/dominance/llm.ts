@@ -207,6 +207,9 @@ async function chatOpenAI(input: { system: string; user: string; maxTokens: numb
  * 61차 A · Anthropic 호출 하나. JSON 모드가 없으므로 지시문 끝에 「JSON 하나만 낸다」를 붙이고 응답 글을 그대로 돌려준다.
  * 호출 기록은 llm-calls 로그에 provider "anthropic" 으로 남긴다.
  */
+/** 63차 · Anthropic 호출의 출력 상한(제목 추천 · 쇼츠 공통) */
+const ANTHROPIC_MAX_TOKENS = 8000;
+
 async function chatAnthropic(input: { system: string; user: string; maxTokens: number; usage?: (u: Usage) => void; stage?: string }): Promise<string> {
   const apiKey = anthropicKey();
   if (!apiKey) {
@@ -217,9 +220,10 @@ async function chatAnthropic(input: { system: string; user: string; maxTokens: n
   const client = new Anthropic({ apiKey });
   const model = ANTHROPIC_MODEL;
   const t0 = Date.now();
+  // 63차 · 제목 추천 · 쇼츠 공통 8000(62차 쇼츠에서 2000 을 다 쓰고 글 블록이 없었다). 부르는 쪽의 maxTokens 는 다른 공급자에만 쓴다
   const response = await client.messages.create({
     model,
-    max_tokens: input.maxTokens,
+    max_tokens: ANTHROPIC_MAX_TOKENS,
     system: `${input.system}\n\nJSON 하나만 낸다. 앞뒤에 다른 글이나 코드 블록 표시를 붙이지 않는다.`,
     messages: [{ role: "user", content: input.user }],
   });
@@ -227,9 +231,13 @@ async function chatAnthropic(input: { system: string; user: string; maxTokens: n
   input.usage?.(used);
   meter?.(used);
   const { logLlmCall } = await import("./runlog");
-  await logLlmCall({ stage: input.stage ?? "unknown", provider: "anthropic", model, input: used.input, output: used.output, reasoning: 0, ms: used.ms, cost: costOf(used) });
+  // 63차 · 블록 종류별 개수와 멈춘 이유도 남긴다
+  const blocks: Record<string, number> = {};
+  for (const b of response.content) blocks[b.type] = (blocks[b.type] ?? 0) + 1;
+  const stopReason = response.stop_reason ?? null;
+  await logLlmCall({ stage: input.stage ?? "unknown", provider: "anthropic", model, input: used.input, output: used.output, reasoning: 0, ms: used.ms, cost: costOf(used), blocks, stop_reason: stopReason });
   const content = response.content.map((b) => (b.type === "text" ? b.text : "")).join("");
-  if (!content.trim()) throw new Error("Anthropic 응답이 비었습니다");
+  if (!content.trim()) throw new Error(`Anthropic 응답에 글이 없음 · 멈춘 이유 ${stopReason ?? "없음"} · 출력 ${used.output}토큰`);
   return content;
 }
 
@@ -296,12 +304,14 @@ export function shortProviderError(err: unknown): string {
   const msg = String(e?.message ?? err ?? "");
   const type = String(e?.error?.error?.type ?? e?.code ?? "");
   if (/_API_KEY 없음/.test(msg)) return "키 없음";
+  if (/응답에 글이 없음/.test(msg)) return msg;
   if (e?.status === 401 || type === "authentication_error") return "키 틀림";
   if (/credit balance|credits|billing|insufficient_quota|credit_balance/i.test(msg + type) || e?.status === 402) return "키 맞음 · 잔액 없음";
   if (e?.status === 404 || type === "not_found_error" || /does not exist|model_not_found/i.test(msg)) return "모델 이름 오류";
   if (e?.status === 429) return "요청 한도";
   if (e?.status && e.status >= 500) return `서버 오류 ${e.status}`;
-  return `${e?.status ?? "네트워크"} ${String(type || msg).slice(0, 40)}`.trim();
+  // 63차 · 상태 코드가 없는 오류의 머리말 「네트워크」 → 「응답 없음」
+  return `${e?.status ?? "응답 없음"} ${String(type || msg).slice(0, 40)}`.trim();
 }
 /** 54차 이름 · 그대로 둔다 */
 export const shortOpenAIError = shortProviderError;
