@@ -32,6 +32,18 @@ const APPROVE_CHECKS = [
   "메일 모양을 테스트 발송으로 확인했습니다.",
 ] as const;
 
+// 60차 A · 승인 창의 상태(열림 · 고른 글 · 날짜 · 체크 3칸 · 고른 후보)는 부모가 들고 있다.
+// 창이 새로 그려져도 이 값으로 다시 그린다. 달력 전체가 다시 만들어질 때를 위해 모듈 변수에도 옮겨 둔다.
+type ApprovalDraft = {
+  letter: Row;
+  date: string;
+  ticked: boolean[];
+  meaningTicked: boolean;
+  /** null 이면 아직 손대지 않음 · 서버에 저장된 후보를 그대로 보인다 */
+  picked: string[] | null;
+};
+let draftCache: ApprovalDraft | null = null;
+
 export function ScheduleCalendar({
   month,
   today,
@@ -58,9 +70,11 @@ export function ScheduleCalendar({
   scheduled: Row[];
   pool: Row[];
 }) {
-  const [target, setTarget] = useState<{ letter: Row; date: string } | null>(
-    null,
-  );
+  const [target, setTarget] = useState<ApprovalDraft | null>(() => draftCache);
+  useEffect(() => {
+    draftCache = target;
+  }, [target]);
+  const patchTarget = (patch: Partial<ApprovalDraft>) => setTarget((prev) => (prev ? { ...prev, ...patch } : prev));
   const [picking, setPicking] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -95,7 +109,7 @@ export function ScheduleCalendar({
       setError("지난 날짜에는 붙일 수 없습니다.");
       return;
     }
-    setTarget({ letter, date });
+    setTarget({ letter, date, ticked: APPROVE_CHECKS.map(() => false), meaningTicked: false, picked: null });
   }
 
   function onDrop(date: string, letterId: string) {
@@ -308,6 +322,10 @@ export function ScheduleCalendar({
           started={started}
           letter={target.letter}
           date={target.date}
+          ticked={target.ticked}
+          meaningTicked={target.meaningTicked}
+          picked={target.picked}
+          onChange={patchTarget}
           onClose={() => {
             setTarget(null);
             setConfirming(null);
@@ -414,18 +432,23 @@ function ApprovalDialog({
   started,
   letter,
   date,
+  ticked,
+  meaningTicked,
+  picked,
+  onChange,
   onClose,
   onDone,
 }: {
   started: boolean;
   letter: Row;
   date: string;
+  ticked: boolean[];
+  meaningTicked: boolean;
+  picked: string[] | null;
+  onChange: (patch: Partial<ApprovalDraft>) => void;
   onClose: () => void;
   onDone: (warning: string | null) => void;
 }) {
-  const [ticked, setTicked] = useState<boolean[]>(
-    APPROVE_CHECKS.map(() => false),
-  );
   const [links, setLinks] = useState<{
     ok: boolean;
     detail: string;
@@ -436,7 +459,6 @@ function ApprovalDialog({
   const { busy: pending } = useActionStatus();
   // 45차 C · D50 · 셋째 칸: 쓰인 문장 뜻 확인(옛 글은 해당 없음)
   const [meaning, setMeaning] = useState<MeaningStatus | null>(null);
-  const [meaningTicked, setMeaningTicked] = useState(false);
   useEffect(() => {
     let live = true;
     checkMeanings(letter.id).then((m) => {
@@ -526,9 +548,7 @@ function ApprovalDialog({
                   type="checkbox"
                   checked={ticked[i]}
                   onChange={(e) =>
-                    setTicked((prev) =>
-                      prev.map((v, j) => (j === i ? e.target.checked : v)),
-                    )
+                    onChange({ ticked: ticked.map((v, j) => (j === i ? e.target.checked : v)) })
                   }
                   className="mt-0.5 size-3.5 shrink-0 accent-[color:var(--accent)]"
                 />
@@ -551,7 +571,7 @@ function ApprovalDialog({
                     type="checkbox"
                     checked={meaningTicked}
                     disabled={!meaningComplete}
-                    onChange={(e) => setMeaningTicked(e.target.checked)}
+                    onChange={(e) => onChange({ meaningTicked: e.target.checked })}
                     className="mt-0.5 size-3.5 shrink-0 accent-[color:var(--accent)]"
                   />
                   이 글에 쓰인 문장의 뜻을 모두 확인했습니다 ({meaning.verified}/{meaning.used})
@@ -569,7 +589,7 @@ function ApprovalDialog({
           </li>
         </ul>
 
-        <VotePicker letterId={letter.id} />
+        <VotePicker letterId={letter.id} picked={picked} onPick={(ids) => onChange({ picked: ids })} />
 
         <p className="text-xs">
           <span className="text-muted-foreground">원천 링크 재점검: </span>
@@ -628,9 +648,11 @@ function ApprovalDialog({
 }
 
 /** 다음 질문 투표 후보 3개(26차 C-3). 고르지 않으면 메일에 투표 줄이 없다. */
-function VotePicker({ letterId }: { letterId: string }) {
+// 60차 A · 고른 후보는 부모(달력)가 들고 있다. 처음 열 때만 서버에 저장된 후보로 채운다.
+function VotePicker({ letterId, picked: held, onPick }: { letterId: string; picked: string[] | null; onPick: (ids: string[]) => void }) {
   const [options, setOptions] = useState<{ id: string; question: string }[] | null>(null);
-  const [picked, setPicked] = useState<string[]>([]);
+  const [saved, setSaved] = useState<string[]>([]);
+  const picked = held ?? saved;
   const [note, setNote] = useState<string | null>(null);
   const { busy: pending } = useActionStatus();
 
@@ -639,7 +661,7 @@ function VotePicker({ letterId }: { letterId: string }) {
     loadVoteChoices(letterId).then((r) => {
       if (!live) return;
       setOptions(r.options);
-      setPicked(r.picked);
+      setSaved(r.picked);
     });
     return () => {
       live = false;
@@ -648,7 +670,7 @@ function VotePicker({ letterId }: { letterId: string }) {
 
   function toggle(id: string, on: boolean) {
     setNote(null);
-    setPicked((prev) => (on ? (prev.length >= 3 ? prev : [...prev, id]) : prev.filter((x) => x !== id)));
+    onPick(on ? (picked.length >= 3 ? picked : [...picked, id]) : picked.filter((x) => x !== id));
   }
 
   async function onSave(): Promise<RunResult> {
