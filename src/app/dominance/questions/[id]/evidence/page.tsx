@@ -1,6 +1,7 @@
 // ② 증거 표 · 질문 하나의 재료 네 칸과 사실 문장 (D26 · D33 · D37 · D43).
 //
 // 문장은 원문과 글자 그대로 대조한 것만 들어간다. 채택한 질문이고 3칸 이상 차면 [글 작성하기] 가 열린다(20차).
+// 69차 · 검증 통과 · V3 있음이면 [채택하고 글 작성하기]. 잠기면 이유를 단추 옆에 글자로 보인다.
 
 import { timer } from "@/lib/dominance/timing";
 import { TimingTag } from "@/app/dominance/_ui/TimingTag";
@@ -67,6 +68,7 @@ export default async function EvidencePage({ params }: { params: Promise<{ id: s
       <EvidenceBoard
         questionId={q.id}
         status={q.status}
+        v3={q.v3EvidenceOk}
         table={table}
         run={q.evidenceRun as never}
         letter={letter ?? null}

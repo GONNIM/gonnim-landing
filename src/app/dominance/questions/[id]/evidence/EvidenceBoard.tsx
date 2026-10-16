@@ -2,7 +2,7 @@
 
 import { useState, createContext, useContext, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { PHASE_LABEL, type EvidenceRun } from "@/lib/dominance/collect-types";
+import { PHASES, PHASE_LABEL, type EvidenceRun } from "@/lib/dominance/collect-types";
 import {
   CARD_TARGET,
   EXT_KINDS,
@@ -23,8 +23,10 @@ import { ActionButton, type RunResult, type StepFn } from "../../../_ui/ActionBu
 import { useActionStatus } from "../../../_ui/ActionStatus";
 import { STAGES } from "../../../_ui/Progress";
 import { runCollect } from "../../runCollect";
+import { setStatusAction } from "../../actions";
 import {
   writeDraftAction,
+  filledSlotsAction,
   addExternalAction,
   addFactAction,
   addPaperAction,
@@ -46,12 +48,15 @@ const PrevContext = createContext<Record<string, string>>({});
 export function EvidenceBoard({
   questionId,
   status,
+  v3 = null,
   table,
   run,
   letter,
   usedIds = [],
   prevById = {},
 }: {
+  /** 69차 B · V3(공개 라이선스 논문 있음) · 「채택하고 글 작성하기」를 열지 정한다 */
+  v3?: boolean | null;
   usedIds?: string[];
   prevById?: Record<string, string>;
   questionId: string;
@@ -81,10 +86,72 @@ export function EvidenceBoard({
     }
   };
 
-  const canWrite = ["adopted", "drafted"].includes(status) && table.filledSlots >= 3;
+  // 69차 B-2 · 검증 통과 · V3 있음이면 이 단추가 채택부터 한다
+  const adoptFirst = status === "validated" && v3 === true && !letter;
+  // 69차 B-1 · B-3 · 잠긴 이유를 단추 옆에 늘 글자로 보인다. 열려 있으면 null
+  const lockReason =
+    letter && letter.status !== "draft"
+      ? "글이 리뷰 단계에 있습니다"
+      : status === "validated" && v3 !== true
+        ? "공개 라이선스 논문이 없어 채택할 수 없습니다"
+        : adoptFirst
+          ? null
+          : !["adopted", "drafted"].includes(status)
+            ? "채택 전입니다"
+            : table.filledSlots < 3
+              ? `재료 칸 ${table.filledSlots}/4 · 3개가 필요합니다`
+              : null;
   const [writing, setWriting] = useState(false);
   const allFacts = SLOTS.flatMap((s) => table.slots[s].flatMap((g) => g.facts));
   const unverified = allFacts.filter((f) => !f.koVerifiedAt).length;
+  // 69차 B-2 · ① 이슈의 [채택]과 같은 서버 함수로 채택 → 증거 모으기가 돈 적이 없으면 돌림 → 칸이 3개 이상이면 초안 → 편집 화면
+  async function adoptAndWrite(step: StepFn): Promise<RunResult> {
+    if (unverified > 0 && !window.confirm(`확인되지 않은 뜻 ${unverified}개가 있습니다. 채택하고 확인하지 않은 뜻으로 글을 씁니다. 진행할까요?`)) return null;
+    const total = run ? 3 : 3 + PHASES.length;
+    step(1, total, "채택");
+    setMsg("채택하는 중…");
+    const a = await setStatusAction(questionId, "adopted");
+    if (a.error) {
+      setMsg(`채택 실패 · ${a.error}`);
+      return { ok: false, text: `채택 실패 · ${a.error}` };
+    }
+    if (!run) {
+      const c = await runCollect(questionId, setProgress, (i, _n, name) => step(1 + i, total, name));
+      setProgress(null);
+      if (c.error) {
+        const text = `채택했습니다 · 증거 모으기 실패 · ${c.error}`;
+        setMsg(text);
+        router.refresh();
+        return { ok: false, text };
+      }
+    }
+    step(total - 1, total, "재료 칸 세기");
+    const f = await filledSlotsAction(questionId);
+    if (!f.ok) {
+      setMsg(`채택했습니다 · 재료 칸을 읽지 못했습니다 · ${f.error}`);
+      router.refresh();
+      return { ok: false, text: `채택했습니다 · 재료 칸을 읽지 못했습니다 · ${f.error}` };
+    }
+    if (f.filled < 3) {
+      const text = `재료 칸 ${f.filled}/4 · 산업 칸에 외부 원천을 넣거나 검색어를 고쳐 다시 모으십시오`;
+      setMsg(text);
+      router.refresh();
+      return { ok: false, text };
+    }
+    step(total, total, "초안 쓰기(1분 안팎)");
+    setWriting(true);
+    setMsg("채택했습니다 · 사실 카드로 초안을 쓰는 중입니다(1분 안팎)…");
+    const r = await writeDraftAction(questionId);
+    setWriting(false);
+    if (!r.ok) {
+      setMsg(`채택했습니다 · 글 작성 실패 · ${r.error}`);
+      router.refresh();
+      return { ok: false, text: `채택했습니다 · 글 작성 실패 · ${r.error}` };
+    }
+    router.push(`/dominance/letters/${r.letterId}`);
+    return { ok: true, text: "채택하고 초안을 썼습니다. 편집 화면으로 옮겨 갑니다" };
+  }
+
   async function write(): Promise<RunResult> {
     // D44 · 초안은 확인된 뜻만 받는다. 확인 안 된 뜻이 있어도 운영자가 고르면 진행한다.
     if (unverified > 0 && !window.confirm(`확인되지 않은 뜻 ${unverified}개가 있습니다. 확인하지 않은 뜻으로 글을 씁니다. 진행할까요?`)) return null;
@@ -241,21 +308,19 @@ export function EvidenceBoard({
                 초안 열기
               </a>
             )}
+            {lockReason && (
+              <span className="text-xs text-amber-800 dark:text-amber-200" data-write-lock>
+                {lockReason}
+              </span>
+            )}
             <ActionButton
-              run={write}
-              stages={STAGES.write}
-              pendingText="쓰는 중…"
-              disabled={!canWrite || writing || pending || (letter !== null && letter.status !== "draft")}
-              title={
-                canWrite
-                  ? letter
-                    ? "새 판을 만듭니다(이전 판은 파일로 보관)"
-                    : "사실 카드만으로 초안을 씁니다"
-                  : "채택한 질문이고 재료 칸 3개 이상일 때 열립니다"
-              }
+              run={adoptFirst ? adoptAndWrite : write}
+              stages={adoptFirst ? undefined : STAGES.write}
+              pendingText={adoptFirst ? "채택하고 쓰는 중…" : "쓰는 중…"}
+              disabled={lockReason !== null || writing || pending}
               className="rounded-md bg-[color:var(--accent)] px-3 py-1.5 text-xs font-medium text-background disabled:opacity-40"
             >
-              {letter ? "글 작성하기 (새 판)" : "글 작성하기"}
+              {adoptFirst ? "채택하고 글 작성하기" : letter ? "글 작성하기 (새 판)" : "글 작성하기"}
               {unverified > 0 ? ` · 확인되지 않은 뜻 ${unverified}개` : ""}
             </ActionButton>
           </span>

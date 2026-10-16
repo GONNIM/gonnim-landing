@@ -7,6 +7,7 @@ import {
   addOwnerFact,
   addPaperByRef,
   deleteFact,
+  loadEvidence,
   moveFact,
   removeSource,
   setFactKo,
@@ -121,6 +122,16 @@ export async function writeDraftAction(
     refresh(id);
     revalidatePath("/dominance/letters");
     return { ok: true, letterId: r.letterId, created: r.created, seconds: Math.round((Date.now() - t0) / 1000) };
+  } catch (e) {
+    return { ok: false, error: errText(e) };
+  }
+}
+
+/** 69차 B-2 · 「채택하고 글 작성하기」 · 채택 · 증거 모으기 뒤의 재료 칸 수(화면의 표는 누르기 전 값이다) */
+export async function filledSlotsAction(id: string): Promise<{ ok: true; filled: number } | { ok: false; error: string }> {
+  const { db } = await dominanceContext();
+  try {
+    return { ok: true, filled: (await loadEvidence(db, id)).filledSlots };
   } catch (e) {
     return { ok: false, error: errText(e) };
   }
