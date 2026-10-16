@@ -11,7 +11,7 @@ import { ConvertPanel } from "./ConvertPanel";
 import { LETTER_STATUS_LABEL } from "@/lib/dominance/types";
 
 export const dynamic = "force-dynamic";
-// 쇼츠 대본은 GLM 을 한두 번 부른다
+// 쇼츠 대본은 Anthropic → OpenAI → GLM 순서로 한두 번 부른다(62차)
 export const maxDuration = 300;
 
 export default async function HistoryDetailPage({ params }: { params: Promise<{ id: string }> }) {

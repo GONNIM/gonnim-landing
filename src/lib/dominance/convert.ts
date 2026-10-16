@@ -3,11 +3,11 @@
 // 입력은 letterPackage(id) 하나뿐이다. 글의 DB 행은 바꾸지 않는다.
 // 결과는 ds-drafts/<글 id>/convert/blog-<시각>.md · shorts-<시각>.md 에 남긴다.
 // - 블로그 글: 코드만 쓴다(LLM 없음). 본문 문장은 그대로 옮기고, 블록을 소제목 넷으로 묶고, 태그를 각주 번호로 바꾼다.
-// - 쇼츠 대본: GLM main(D46) 한 번. 코드 검사에 걸리면 이유를 붙여 한 번 다시 부른다. 호출 기록 · 비용은 llm-calls 에 남는다(chat).
+// - 쇼츠 대본: 62차부터 callJsonWithFallback(Anthropic → OpenAI → GLM) 한 번. 코드 검사에 걸리면 이유를 붙여 한 번 다시 부른다. 호출 기록 · 비용은 llm-calls 에 남는다(chat).
 // 파일 첫 줄은 만든 정보(모델 · 토큰 · 비용 · 검사)를 담은 HTML 주석이다. 화면과 「복사」는 이 줄을 뺀다.
 
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { callJson, costOf, MODEL_MAIN, type Usage } from "./llm";
+import { callJsonWithFallback, costOf, type FallbackProvider, type FallbackResult, type Usage } from "./llm";
 import { extractNumbers } from "./card-check";
 import { DRAFT_BUCKET } from "./draft-store";
 import { categoryTerms, flagBlock } from "./filters";
@@ -27,6 +27,9 @@ export type ConvertInfo = {
   /** 쇼츠 · 다시 부른 뒤에도 남은 검사 이유(빈 배열이면 통과) */
   problems: string[];
   attempts: number;
+  /** 62차 B · 쇼츠 · 답한 공급자와 앞 단계 실패 이유(제목 추천과 같은 모양) */
+  provider?: FallbackProvider | null;
+  failures?: FallbackResult["failures"];
 };
 export type ConvertFile = { name: string; info: ConvertInfo; text: string };
 
@@ -195,16 +198,15 @@ async function makeShorts(pkg: LetterPackage): Promise<{ text: string; info: Omi
   let best: Shorts | null = null;
   let problems: string[] = [];
   let attempts = 0;
+  let last: FallbackResult | null = null;
   for (let attempt = 0; attempt < 2; attempt++) {
     attempts++;
     const prompt = attempt === 0 ? user : `${user}\n\n앞서 낸 대본이 검사에 걸렸다. 이유: ${problems.join(" / ")}\n이유를 고쳐 다시 낸다.`;
-    const raw = (await callJson(SHORTS_SYSTEM, prompt, 2000, {
-      tier: "main",
-      provider: "zai",
-      temperature: 0.4,
+    last = await callJsonWithFallback(SHORTS_SYSTEM, prompt, 2000, {
       stage: attempt === 0 ? "변환 · 쇼츠 대본" : "변환 · 쇼츠 대본(검사 뒤 다시)",
       usage,
-    })) as Partial<Shorts>;
+    });
+    const raw = last.data as Partial<Shorts>;
     const s: Shorts = {
       hook: String(raw.hook ?? "").trim(),
       core: (Array.isArray(raw.core) ? raw.core : []).map((x) => String(x).trim()),
@@ -215,7 +217,7 @@ async function makeShorts(pkg: LetterPackage): Promise<{ text: string; info: Omi
     problems = shortsProblems(s, pkg);
     if (!problems.length) break;
   }
-  return { text: shortsMarkdown(pkg, best!), info: { model: MODEL_MAIN, tokens, cost, problems, attempts } };
+  return { text: shortsMarkdown(pkg, best!), info: { model: last!.model, tokens, cost, problems, attempts, provider: last!.provider, failures: last!.failures } };
 }
 
 const INFO_RE = /^<!-- convert (\{.*\}) -->\n/;

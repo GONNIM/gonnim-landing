@@ -13,6 +13,9 @@ const KINDS: { kind: ConvertKind; make: string; label: string }[] = [
   { kind: "shorts", make: "쇼츠 대본 만들기", label: "쇼츠 대본" },
 ];
 
+// 62차 B · 답한 공급자 이름(llm.ts 의 PROVIDER_LABEL 과 같음 · 화면은 SDK 를 불러오지 않으려고 따로 둔다)
+const PROVIDER_LABEL: Record<string, string> = { anthropic: "Anthropic", openai: "OpenAI", zai: "GLM" };
+
 const usd = (c: number | null) => (c === null ? "비용 모름" : `$${c.toFixed(4)}`);
 
 export function ConvertPanel({ letterId, initial }: { letterId: string; initial: ConvertFile[] }) {
@@ -43,7 +46,7 @@ export function ConvertPanel({ letterId, initial }: { letterId: string; initial:
       <div>
         <h2 className="text-lg font-medium">변환</h2>
         <p className="mt-1 text-xs text-muted-foreground">
-          이 글의 꾸러미(본문 · 원천)만 씁니다. 글은 바꾸지 않습니다. 블로그 글은 본문 문장을 그대로 옮기고, 쇼츠 대본은 GLM 이 씁니다.
+          이 글의 꾸러미(본문 · 원천)만 씁니다. 글은 바꾸지 않습니다. 블로그 글은 본문 문장을 그대로 옮기고, 쇼츠 대본은 Anthropic → OpenAI → GLM 순서로 처음 답한 모델이 씁니다.
         </p>
       </div>
       <div className="grid gap-4 lg:grid-cols-2">
@@ -79,9 +82,15 @@ export function ConvertPanel({ letterId, initial }: { letterId: string; initial:
                     <div className="space-y-2">
                       <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
                         <span>
-                          {current.info.model ? `${current.info.model} · ${current.info.attempts}번 부름 · ` : "LLM 없음 · "}
+                          {current.info.model ? `${current.info.model} 로 작성 · ${current.info.attempts}번 부름 · ` : "LLM 없음 · "}
                           {usd(current.info.cost)}
                         </span>
+                        {current.info.failures && current.info.failures.length > 0 && (
+                          <span className="text-muted-foreground/70">
+                            {current.info.failures.map((f) => `${PROVIDER_LABEL[f.provider]} 사용 불가(${f.reason})`).join(" · ")} ·{" "}
+                            {PROVIDER_LABEL[current.info.provider ?? "zai"]} 으로 대신 작성
+                          </span>
+                        )}
                         {current.info.problems.length > 0 && (
                           <span className="text-amber-700 dark:text-amber-300">검사에 걸림: {current.info.problems.join(" · ")}</span>
                         )}
