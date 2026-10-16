@@ -124,6 +124,8 @@ export function EvidenceBoard({
     ),
   );
   const usedVerified = usedList.filter((x) => x.f.koVerifiedAt).length;
+  // 67차 A · 「파파고 결과 붙여 넣기」가 화면의 뜻 칸만 바꾼다(저장 · 확인 아님). seq 가 바뀌면 FactRow 가 받아 넣는다
+  const [fills, setFills] = useState<Record<string, { value: string; seq: number }>>({});
 
   // 53차 G · 「뜻 초안 다시 받기」 · 빈 뜻만
   async function refill(): Promise<RunResult> {
@@ -178,13 +180,25 @@ export function EvidenceBoard({
           <p className="text-xs text-muted-foreground">
             뜻 확인은 이 문장들만 하시면 됩니다. 나머지 카드 문장은 확인하지 않아도 됩니다(런북 13번).
           </p>
+          <PapagoAll
+            texts={usedList.map(({ f }) => f.text)}
+            keys={usedList.map(({ f }) => `${f.rowId}:${f.line}`)}
+            onFill={(values) =>
+              setFills((prev) => {
+                const next = { ...prev };
+                const seq = Date.now();
+                for (const [key, value] of Object.entries(values)) next[key] = { value, seq };
+                return next;
+              })
+            }
+          />
           <ol id="used-facts" className="scroll-mt-40 space-y-2">
             {usedList.map(({ f, slot, tag, title }) => (
               <div key={`${f.rowId}-${f.line}`}>
                 <p className="text-[11px] text-muted-foreground">
                   {tag} · {SLOT_LABEL[slot]} · {title.slice(0, 80)}
                 </p>
-                <FactRow f={f} slot={slot} questionId={questionId} busy={pending} act={act} wide />
+                <FactRow f={f} slot={slot} questionId={questionId} busy={pending} act={act} wide fill={fills[`${f.rowId}:${f.line}`]} />
               </div>
             ))}
           </ol>
@@ -457,14 +471,141 @@ function SourceCard({
   );
 }
 
-/** 41차 B · 파파고 번역 화면 주소(영어 → 한국어). 입력 한도 1,000자에 맞춰 앞부분만 넣는다. */
-function papagoUrl(text: string): string {
-  return `https://papago.naver.com/?sl=en&tl=ko&text=${encodeURIComponent(text.slice(0, 1000))}`;
+/** 41차 B · 파파고 번역 화면 주소(영어 → 한국어). 문장 하나는 앞 1,000자만 넣는다(67차 · 모두 보기는 3,000자) */
+function papagoUrl(text: string, max = 1000): string {
+  return `https://papago.naver.com/?sl=en&tl=ko&text=${encodeURIComponent(text.slice(0, max))}`;
 }
 
-function FactRow({ f, slot, questionId, busy, act, wide = false }: { f: Fact; slot: Slot; questionId: string; busy: boolean; act: Act; /** 53차 H · 노란 상자: 왼쪽 원문 · 오른쪽 뜻 두 칸 */ wide?: boolean }) {
+/** 67차 A · 파파고 웹 입력 한도(실측 3,000자 · 넘으면 뒷부분을 자른다). 넘으면 10문장씩 나눈다 */
+const PAPAGO_MAX = 3000;
+const PAPAGO_CHUNK = 10;
+
+/** 67차 A · 파파고 결과를 「숫자. 」 머리로 나눈다. 번호가 하나도 없으면 줄 순서로. 1부터 n 까지만 쓴다 */
+function parsePapago(text: string, n: number): Map<number, string> {
+  const lines = text.split(/\r?\n/);
+  const items = new Map<number, string>();
+  let cur: number | null = null;
+  for (const line of lines) {
+    const m = line.match(/^\s*(\d{1,3})\s*[.．](?:\s+|$)(.*)$/);
+    if (m) {
+      cur = Number(m[1]);
+      items.set(cur, m[2].trim());
+    } else if (cur !== null && line.trim()) {
+      items.set(cur, `${items.get(cur) ?? ""} ${line.trim()}`.trim());
+    }
+  }
+  if (cur === null) lines.map((l) => l.trim()).filter(Boolean).forEach((l, i) => items.set(i + 1, l));
+  return new Map([...items].filter(([i, v]) => i >= 1 && i <= n && v));
+}
+
+/** 67차 A · 노란 상자 · 「파파고로 모두 보기 ↗」 · 「파파고 결과 붙여 넣기」 */
+function PapagoAll({ texts, keys, onFill }: { texts: string[]; keys: string[]; onFill: (values: Record<string, string>) => void }) {
+  const [open, setOpen] = useState(false);
+  const [pasted, setPasted] = useState("");
+  const [msg, setMsg] = useState<string | null>(null);
+  const n = texts.length;
+  if (n === 0) return null;
+  const numbered = texts.map((t, i) => `${i + 1}. ${t}`);
+  const whole = numbered.join("\n");
+  const chunks =
+    whole.length <= PAPAGO_MAX
+      ? [{ from: 1, to: n, text: whole }]
+      : Array.from({ length: Math.ceil(n / PAPAGO_CHUNK) }, (_, c) => {
+          const from = c * PAPAGO_CHUNK + 1;
+          const to = Math.min(n, from + PAPAGO_CHUNK - 1);
+          return { from, to, text: numbered.slice(from - 1, to).join("\n") };
+        });
+  const link = "rounded-md border border-amber-500/50 px-2.5 py-1 text-xs text-amber-800 hover:bg-amber-500/10 dark:text-amber-200";
+
+  function fillNow() {
+    const got = parsePapago(pasted, n);
+    if (got.size === 0) {
+      setMsg(`${n}개 중 0개만 맞았습니다. 나머지는 비웠습니다`);
+      return;
+    }
+    // 화면의 뜻 칸 글자(아직 저장하지 않은 고침 포함)와 견준다
+    const box = document.getElementById("used-facts");
+    const current = new Map(
+      [...(box?.querySelectorAll<HTMLElement>("[data-fact-row]") ?? [])].map((r) => [
+        `${r.dataset.rowId}:${r.dataset.line}`,
+        r.querySelector<HTMLTextAreaElement>('textarea[aria-label="확인된 뜻"]')?.value ?? "",
+      ]),
+    );
+    const values: Record<string, string> = {};
+    let overwrite = 0;
+    for (const [i, v] of got) {
+      const key = keys[i - 1];
+      const now = (current.get(key) ?? "").trim();
+      if (now && now !== v) overwrite++;
+      values[key] = v;
+    }
+    if (overwrite > 0 && !window.confirm(`이미 있는 뜻 ${overwrite}개도 바꿉니다`)) return;
+    onFill(values);
+    setMsg(
+      got.size < n
+        ? `${n}개 중 ${got.size}개만 맞았습니다. 나머지는 비웠습니다`
+        : `${n}개 뜻 칸을 채웠습니다. 저장과 확인은 문장마다 「확인」 · 「고친 뜻만 저장」 또는 아래 「위 문장 ${n}개를 모두 읽고 확인했습니다」로 하십시오`,
+    );
+  }
+
+  return (
+    <div className="space-y-2">
+      <div className="flex flex-wrap items-center gap-2">
+        {chunks.length === 1 ? (
+          <a href={papagoUrl(chunks[0].text, PAPAGO_MAX)} target="_blank" rel="noopener" className={link}>
+            파파고로 모두 보기 ↗
+          </a>
+        ) : (
+          <>
+            <span className="text-xs text-muted-foreground">파파고로 모두 보기</span>
+            {chunks.map((c) => (
+              <a key={c.from} href={papagoUrl(c.text, PAPAGO_MAX)} target="_blank" rel="noopener" className={link}>
+                {c.from}~{c.to} ↗
+              </a>
+            ))}
+          </>
+        )}
+        <button type="button" onClick={() => setOpen(!open)} className={link} aria-expanded={open}>
+          파파고 결과 붙여 넣기
+        </button>
+      </div>
+      {open && (
+        <div className="space-y-2 rounded-md border border-amber-500/40 p-2">
+          <textarea
+            value={pasted}
+            onChange={(e) => setPasted(e.target.value)}
+            rows={6}
+            placeholder={"파파고 번역 결과를 그대로 붙여 넣으십시오. 「1. 」 「2. 」 번호대로 뜻 칸에 들어갑니다."}
+            className={`${input} w-full`}
+            aria-label="파파고 결과"
+          />
+          <div className="flex flex-wrap items-center gap-2 text-xs">
+            <button
+              type="button"
+              onClick={fillNow}
+              disabled={!pasted.trim()}
+              className="rounded-md border border-[color:var(--border)] px-2.5 py-1 hover:border-[color:var(--accent)] disabled:opacity-40"
+            >
+              뜻 칸에 채우기
+            </button>
+            <span className="text-muted-foreground">화면의 뜻 칸만 바꿉니다. 저장 · 확인은 하지 않습니다.</span>
+          </div>
+          {msg && <p className="text-xs text-amber-800 dark:text-amber-200" role="status">{msg}</p>}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function FactRow({ f, slot, questionId, busy, act, wide = false, fill }: { f: Fact; slot: Slot; questionId: string; busy: boolean; act: Act; /** 53차 H · 노란 상자: 왼쪽 원문 · 오른쪽 뜻 두 칸 */ wide?: boolean; /** 67차 A · 붙여 넣기로 채울 뜻(화면만) */ fill?: { value: string; seq: number } }) {
   const [subject, setSubject] = useState(f.subject ?? "");
   const [ko, setKo] = useState(f.ko ?? "");
+  // 67차 A · 새 채우기가 오면 뜻 칸 글자만 바꾼다(렌더 중 상태 맞추기 · 저장하지 않음)
+  const [seenFill, setSeenFill] = useState(fill);
+  if (fill !== seenFill) {
+    setSeenFill(fill);
+    if (fill) setKo(fill.value);
+  }
   const changed = ko.trim() !== (f.ko ?? "");
   const prev = useContext(PrevContext)[`${f.rowId}:${f.line}`];
   const rowRef = useRef<HTMLLIElement>(null);
