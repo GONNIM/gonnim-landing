@@ -10,6 +10,9 @@ import { requestTitleSuggestions } from "./title-actions";
 import type { TitleSuggestion, TitleSuggestions } from "@/lib/dominance/title-suggest";
 import { TITLE_TYPE_LABEL } from "@/lib/dominance/title-types";
 
+// 61차 · 답한 공급자 이름(llm.ts 의 PROVIDER_LABEL 과 같음 · 화면은 SDK 를 불러오지 않으려고 따로 둔다)
+const PROVIDER_LABEL: Record<string, string> = { anthropic: "Anthropic", openai: "OpenAI", zai: "GLM" };
+
 export function TitleSuggestBox({
   letterId,
   ready,
@@ -52,7 +55,7 @@ export function TitleSuggestBox({
         stages={STAGES.suggest}
         className="rounded-md border border-[color:var(--border)] px-3 py-1.5 text-foreground/85 hover:border-[color:var(--accent)] disabled:cursor-not-allowed disabled:opacity-50"
       >
-        {!ready ? "OPENAI_API_KEY 없음" : "제목·요약 추천 받기"}
+        {!ready ? "추천 키 없음" : "제목·요약 추천 받기"}
       </ActionButton>
       {done && <p className="text-emerald-700 dark:text-emerald-300">{done}</p>}
       {error && <p className="text-red-700 dark:text-red-300">{error}</p>}
@@ -61,8 +64,14 @@ export function TitleSuggestBox({
           <p className="text-muted-foreground">
             추천 {result.items.length}묶음 · 누르면 「제목」 · 「한 문장 요약」 칸에 들어갑니다 · {result.model} 로 추천
             {result.dropped.length > 0 && ` · 규칙에 걸려 뺀 묶음 ${result.dropped.length}개`}
-            {result.fallback_from === "openai" && (
-              <span className="text-muted-foreground/70"> · OpenAI 사용 불가({result.fallback_reason}) · GLM 으로 대신 추천</span>
+            {result.fallback_from && (
+              <span className="text-muted-foreground/70">
+                {" "}
+                · {(result.failures?.length ? result.failures : [{ provider: result.fallback_from, reason: result.fallback_reason ?? "" }])
+                  .map((f) => `${PROVIDER_LABEL[f.provider]} 사용 불가(${f.reason})`)
+                  .join(" · ")}{" "}
+                · {PROVIDER_LABEL[result.provider ?? "zai"]} 으로 대신 추천
+              </span>
             )}
           </p>
           {result.items.map((it) => (
