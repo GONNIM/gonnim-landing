@@ -42,10 +42,12 @@ export async function approveLetter(
 export async function unapproveLetter(
   letterId: string,
 ): Promise<{ error: string | null }> {
-  const { db } = await dominanceContext();
+  const { admin, db } = await dominanceContext();
 
+  // 65차 A · 취소 전 발행일을 감사 기록에 남기려고 먼저 읽는다
+  const { data: before } = await db.from("ds_letters").select("scheduled_for, approved_by").eq("id", letterId).maybeSingle<{ scheduled_for: string | null; approved_by: string | null }>();
   const now = new Date().toISOString();
-  const { error } = await db
+  const { data, error } = await db
     .from("ds_letters")
     .update({
       status: "reviewed",
@@ -55,9 +57,20 @@ export async function unapproveLetter(
       updated_at: now,
     })
     .eq("id", letterId)
-    .eq("status", "approved");
+    .eq("status", "approved")
+    .select("id");
 
   if (error) return { error: error.message };
+  if (data?.length) {
+    await db.from("ds_letter_audit").insert({
+      letter_id: letterId,
+      event: "approve_cancel",
+      model: null,
+      passed: true,
+      prompt_input: { scheduled_for: before?.scheduled_for ?? null, approved_by: before?.approved_by ?? null },
+      note: `${admin.email}: 승인 취소`,
+    });
+  }
 
   revalidateAll();
   return { error: null };

@@ -39,6 +39,14 @@ export default async function HistoryPage() {
     );
   }
   const rows = (data ?? []) as Row[];
+  // 65차 A · 「작성 완료」 칸은 감사 기록 review_submit 의 마지막 시각. 그 전에 나간 글은 「기록 없음」
+  const { data: submits } = await db
+    .from("ds_letter_audit")
+    .select("letter_id, created_at")
+    .eq("event", "review_submit")
+    .in("letter_id", rows.length ? rows.map((r) => r.id) : ["00000000-0000-0000-0000-000000000000"])
+    .order("created_at");
+  const finished = new Map(((submits ?? []) as { letter_id: string; created_at: string }[]).map((s) => [s.letter_id, s.created_at]));
   const upcoming = rows.filter((r) => r.status === "approved").sort((a, b) => (a.scheduled_for ?? "").localeCompare(b.scheduled_for ?? ""));
   const published = rows
     .filter((r) => r.status === "published")
@@ -79,9 +87,13 @@ export default async function HistoryPage() {
                       )}
                     </td>
                     <td className="py-2 pr-3 text-sm text-foreground">{r.title}</td>
-                    <td className="py-2 pr-3 text-muted-foreground" title="「작성 완료」는 감사 기록에 남지 않습니다">
-                      기록 없음
-                    </td>
+                    {finished.has(r.id) ? (
+                      <td className="py-2 pr-3 whitespace-nowrap">{formatKstDateTime(finished.get(r.id)!)}</td>
+                    ) : (
+                      <td className="py-2 pr-3 text-muted-foreground" title="65차 전에 「작성 완료」한 글은 감사 기록이 없습니다">
+                        기록 없음
+                      </td>
+                    )}
                     <td className="py-2 pr-3 whitespace-nowrap">{formatKstDateTime(r.reviewed_at)}</td>
                     <td className="py-2 pr-3 whitespace-nowrap">
                       {formatKstDateTime(r.approved_at)}

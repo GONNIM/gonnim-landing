@@ -23,7 +23,7 @@ export default async function HistoryDetailPage({ params }: { params: Promise<{ 
 
   const dates: [string, string][] = [
     ["발행일", formatKstDate(pkg.dates.scheduledFor)],
-    ["작성 완료", "기록 없음"],
+    ["작성 완료", pkg.dates.finished ? formatKstDateTime(pkg.dates.finished) : "기록 없음"],
     ["리뷰 통과", formatKstDateTime(pkg.dates.reviewed)],
     ["승인", `${formatKstDateTime(pkg.dates.approved)}${pkg.approvedKind ? ` · ${pkg.approvedKind}` : ""}`],
     ["발송", pkg.status === "published" ? `${formatKstDateTime(pkg.dates.sent ?? pkg.dates.published)} · 받는 수 ${pkg.sentCount ?? 0}` : "—"],

@@ -26,7 +26,7 @@ export type LetterPackage = {
   /** 모두 ISO 시각(scheduledFor 만 "YYYY-MM-DD") · 기록이 없으면 null */
   dates: {
     created: string | null;
-    /** 「작성 완료」는 감사 기록이 없다(59차 기준) · 늘 null */
+    /** 「작성 완료」 · 감사 기록 review_submit 의 마지막 시각(65차 A) · 그 전에 나간 글은 null */
     finished: string | null;
     reviewed: string | null;
     approved: string | null;
@@ -49,6 +49,8 @@ export const AUDIT_LABEL: Record<string, string> = {
   title_edit: "제목 · 요약 고침",
   approve: "승인(사람)",
   auto_approve: "승인(자동 · D55)",
+  review_submit: "작성 완료",
+  approve_cancel: "승인 취소",
 };
 
 type LetterRow = {
@@ -98,7 +100,7 @@ export async function letterPackage(db: SupabaseClient, letterId: string): Promi
       .sort((a, b) => (a.tag ?? "").localeCompare(b.tag ?? "", "en", { numeric: true })),
     dates: {
       created: letter.created_at,
-      finished: null,
+      finished: ((audit ?? []) as { event: string; created_at: string }[]).filter((a) => a.event === "review_submit").at(-1)?.created_at ?? null,
       reviewed: letter.reviewed_at,
       approved: letter.approved_at,
       scheduledFor: letter.scheduled_for,

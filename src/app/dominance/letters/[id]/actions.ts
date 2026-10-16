@@ -33,7 +33,7 @@ export async function finishWriting(
   letterId: string,
   patch: { title: string; summary: string; blocks: LetterBlock[] },
 ): Promise<{ error: string | null }> {
-  const { db } = await dominanceContext();
+  const { admin, db } = await dominanceContext();
 
   const blocks = flagBlocks(await withTagSources(db, letterId, patch.blocks));
   if (countFlags(blocks) > 0) {
@@ -44,7 +44,7 @@ export async function finishWriting(
     return { error: `빈 블록이 ${empty.length}개 있습니다.` };
   }
 
-  const { error } = await db
+  const { data, error } = await db
     .from("ds_letters")
     .update({
       title: patch.title,
@@ -54,7 +54,20 @@ export async function finishWriting(
       updated_at: new Date().toISOString(),
     })
     .eq("id", letterId)
-    .eq("status", "draft");
+    .eq("status", "draft")
+    .select("id");
+
+  // 65차 A · draft → review 로 바뀐 경우만 감사 기록 review_submit(「기록」의 「작성 완료」 시각)
+  if (!error && data?.length) {
+    await db.from("ds_letter_audit").insert({
+      letter_id: letterId,
+      event: "review_submit",
+      model: null,
+      passed: true,
+      prompt_input: null,
+      note: `${admin.email}: 작성 완료`,
+    });
+  }
 
   revalidatePath("/dominance/letters");
   revalidatePath("/dominance/review");
