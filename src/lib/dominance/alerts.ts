@@ -191,7 +191,7 @@ const NEXT_STEP: Record<Alert["code"], string> = {
   stale_review: "리뷰를 끝내거나 글을 버리십시오.",
   empty_pipeline: "글 목록에서 쓰는 중인 글을 이어 쓰거나, 발행 달력에서 날짜를 붙이십시오.",
   dead_link: "발행한 글의 근거가 열리지 않습니다. 정정이 필요한지 확인하십시오.",
-  no_audience: "구독자를 받은 뒤 발행 달력에서 [승인 취소] 후 새 날짜로 다시 승인하십시오. 지난 날짜는 크론이 보지 않습니다.",
+  no_audience: "구독자를 받은 뒤 발행 달력에서 [승인 취소] 후 새 날짜로 다시 승인하십시오. 승인된 채로 두면 지난 날짜 글도 다음 크론에 나갑니다.",
 };
 
 const SITE_URL = "https://gonnim.dev";

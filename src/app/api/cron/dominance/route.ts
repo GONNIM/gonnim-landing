@@ -20,7 +20,7 @@ import { fetchBroadcastState, pullResendUnsubscribes } from "@/lib/dominance/bro
 import { getDominanceClient } from "@/lib/dominance/db";
 import { pingHeartbeat } from "@/lib/dominance/heartbeat";
 import { kstDateAfter, kstToday } from "@/lib/dominance/kst";
-import { publishDue } from "@/lib/dominance/publish";
+import { lateSentLines, publishDue } from "@/lib/dominance/publish";
 import { saveRun, type RunStatus } from "@/lib/dominance/runlog";
 import { collectAll } from "@/lib/dominance/sources";
 
@@ -78,14 +78,16 @@ export async function GET(req: NextRequest) {
     autoLines = [`자동 날짜 붙이기 오류 · ${String(err).slice(0, 80)}`];
   }
 
-  // 2. 발행 · 오늘 날짜가 붙은 승인된 글만
+  // 2. 발행 · 오늘 이하 날짜가 붙은 승인된 글(66차 A · 지난 날짜 글도 보낸다)
   let publishedCount = 0;
+  let lateLines: string[] = [];
   let heldForNoAudience = 0;
   try {
     const published = await publishDue(db, today);
     publishedCount = published.published;
     heldForNoAudience = published.heldForNoAudience ?? 0;
     steps.publish = published;
+    lateLines = lateSentLines(published);
 
     for (const o of published.outcomes) {
       if (!o.ok) {
@@ -157,6 +159,7 @@ export async function GET(req: NextRequest) {
     (failedSteps.length > 0 ? ` · 실패 ${failedSteps.join(", ")}` : "") +
     (sourcesDead ? " · 원천 전부 0건" : "") +
     (heldForNoAudience ? ` · 구독자 0명 · 발행 보류 · 글 ${heldForNoAudience}건` : "") +
+    lateLines.map((l) => ` · ${l}`).join("") +
     autoLines.map((l) => ` · ${l}`).join("") +
     (publishingStarted() ? "" : ` · ${PRE_PUBLISHING_NOTE}`);
 

@@ -8,7 +8,7 @@ import { useActionStatus } from "../_ui/ActionStatus";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { formatKstDate, formatKstDateTime } from "@/lib/dominance/kst";
+import { formatKstDate, formatKstDateTime, TODAY_CLOSED_REASON } from "@/lib/dominance/kst";
 import type { LetterStatus } from "@/lib/dominance/types";
 import { sendTestEmail } from "../review/[id]/actions";
 import { approveLetter, checkMeanings, loadVoteChoices, recheckLinks, saveVoteChoices, unapproveLetter } from "./actions";
@@ -47,6 +47,7 @@ let draftCache: ApprovalDraft | null = null;
 export function ScheduleCalendar({
   month,
   today,
+  todayClosed,
   bounds,
   prevHref,
   nextHref,
@@ -58,6 +59,8 @@ export function ScheduleCalendar({
   started: boolean;
   month: string;
   today: string;
+  /** 66차 B · KST 07:00 이 지나 오늘 날짜에 붙일 수 없음(서버가 그린 시각 기준) */
+  todayClosed: boolean;
   bounds: {
     dayCount: number;
     firstWeekday: number;
@@ -107,6 +110,10 @@ export function ScheduleCalendar({
     setPicking(null);
     if (date < today) {
       setError("지난 날짜에는 붙일 수 없습니다.");
+      return;
+    }
+    if (date === today && todayClosed) {
+      setError(TODAY_CLOSED_REASON);
       return;
     }
     setTarget({ letter, date, ticked: APPROVE_CHECKS.map(() => false), meaningTicked: false, picked: null });
@@ -181,15 +188,17 @@ export function ScheduleCalendar({
             const date = inMonth ? dateOf(day) : null;
             const entries = date ? (byDate.get(date) ?? []) : [];
             const past = date !== null && date < today;
+            // 66차 B · 지난 날짜와, 07시가 지난 오늘은 붙일 수 없다
+            const closed = past || (date === today && todayClosed);
 
             return (
               <div
                 key={i}
                 onDragOver={(e) => {
-                  if (inMonth && !past) e.preventDefault();
+                  if (inMonth && !closed) e.preventDefault();
                 }}
                 onDrop={(e) => {
-                  if (!date || past) return;
+                  if (!date || closed) return;
                   e.preventDefault();
                   const id = e.dataTransfer.getData("text/plain");
                   if (id) onDrop(date, id);
@@ -251,8 +260,8 @@ export function ScheduleCalendar({
                       ))}
 
                       {entries.length === 0 &&
-                        (past ? (
-                          <span className="text-[11px] text-muted-foreground/40">
+                        (closed ? (
+                          <span className="text-[11px] text-muted-foreground/40" title={past ? undefined : TODAY_CLOSED_REASON}>
                             ·
                           </span>
                         ) : (

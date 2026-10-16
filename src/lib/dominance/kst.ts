@@ -10,6 +10,13 @@ export function kstToday(now: Date = new Date()): string {
   return new Date(now.getTime() + KST_OFFSET_MS).toISOString().slice(0, 10);
 }
 
+/** 66차 B · 오늘 날짜 승인을 막는 시각(KST 07:00 · 발행 크론 "0 22 * * *" UTC) */
+export const TODAY_CLOSED_REASON = "오늘 07시 발송은 끝났습니다. 내일 이후 날짜를 고르십시오.";
+/** 66차 B · KST 07:00 이 지났는가 · 지났으면 오늘 날짜에는 붙일 수 없다 */
+export function kstTodayClosed(now: Date = new Date()): boolean {
+  return new Date(now.getTime() + KST_OFFSET_MS).getUTCHours() >= 7;
+}
+
 /** YYYY-MM-DD · KST 기준 오늘 + days */
 export function kstDateAfter(days: number, now: Date = new Date()): string {
   return new Date(now.getTime() + KST_OFFSET_MS + days * 86_400_000)

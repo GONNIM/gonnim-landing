@@ -1,6 +1,8 @@
-// 발행 · 오늘(KST) 날짜가 붙은 승인된 글만 내보낸다.
+// 발행 · 오늘(KST) 이하 날짜가 붙은 승인된 글을 내보낸다.
 //
-// 읽는 조건이 `status='approved' AND scheduled_for = 오늘(KST)` 하나뿐이다.
+// 읽는 조건이 `status='approved' AND scheduled_for <= 오늘(KST)` 하나뿐이다.
+// 66차 A · 지난 날짜 글(그날 크론 뒤에 승인했거나, 그날 발행이 실패한 글)도 다음 크론에 나간다.
+// 발행 시각(published_at)은 실제로 보낸 시각이다. scheduled_for 는 바꾸지 않는다.
 // 다른 상태를 발행하는 경로는 여기에 없다 — 사람의 승인을 건너뛸 방법을 만들지 않는다.
 //
 // 순서가 중요하다. ① Storage JSON 을 먼저 올린다. 메일 안의 "웹에서 보기" 링크가
@@ -30,6 +32,8 @@ export type PublishOutcome = {
   letterId: string;
   slug: string;
   title: string;
+  /** 66차 A · 붙어 있던 발행일 · 오늘보다 앞이면 「지난 날짜 보냄」 */
+  scheduledFor: string;
   ok: boolean;
   error: string | null;
 };
@@ -53,6 +57,7 @@ type DueLetter = {
   title: string;
   summary: string | null;
   blocks: LetterBlock[];
+  scheduled_for: string;
 };
 
 type CorrectionRow = {
@@ -96,7 +101,7 @@ async function publishOne(
   letter: DueLetter,
   audienceCount: number,
 ): Promise<PublishOutcome> {
-  const base = { letterId: letter.id, slug: letter.slug, title: letter.title };
+  const base = { letterId: letter.id, slug: letter.slug, title: letter.title, scheduledFor: letter.scheduled_for };
 
   try {
     const sources = await loadLetterSources(db, letter.id);
@@ -188,6 +193,11 @@ async function publishOne(
   }
 }
 
+/** 66차 A · 크론 요약 줄 · 오늘보다 앞 날짜가 붙어 있던 글을 보냈으면 「지난 날짜 보냄 {제목} ({날짜})」 */
+export function lateSentLines(report: Pick<PublishReport, "date" | "outcomes">): string[] {
+  return report.outcomes.filter((o) => o.ok && o.scheduledFor < report.date).map((o) => `지난 날짜 보냄 ${o.title} (${o.scheduledFor})`);
+}
+
 export async function publishDue(
   db: SupabaseClient,
   date: string = kstToday(),
@@ -196,9 +206,10 @@ export async function publishDue(
 
   const { data, error } = await db
     .from("ds_letters")
-    .select("id, candidate_id, question_id, slug, title, summary, blocks")
-    .eq("scheduled_for", date)
+    .select("id, candidate_id, question_id, slug, title, summary, blocks, scheduled_for")
+    .lte("scheduled_for", date)
     .eq("status", "approved")
+    .order("scheduled_for", { ascending: true })
     .order("created_at", { ascending: true });
 
   if (error) throw new Error(`ds_letters 읽기 실패: ${error.message}`);

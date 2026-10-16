@@ -7,7 +7,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { meaningStatus } from "./card";
 import { readVoteCandidates, writeVoteCandidates, type VoteCandidate } from "./draft-store";
-import { kstDateAfter, kstToday } from "./kst";
+import { kstDateAfter, kstToday, kstTodayClosed, TODAY_CLOSED_REASON } from "./kst";
 import { loadLetterSources } from "./letters";
 import { PRE_PUBLISHING_REASON, publishingStarted } from "./publishing";
 import { linkCheckUrls, runReviewChecks } from "./review";
@@ -58,8 +58,10 @@ export async function approveLetterCore(
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return { error: "날짜 형식이 올바르지 않습니다", warning: null };
 
   const today = kstToday();
-  // 크론은 오늘 날짜만 본다. 지난 날짜를 붙이면 영원히 발행되지 않는다.
+  // 지난 날짜는 막는다(66차 A 부터 크론은 지난 날짜 글도 보내지만, 승인으로 지난 날짜를 만들지는 않는다).
   if (date < today) return { error: "지난 날짜에는 붙일 수 없습니다", warning: null };
+  // 66차 B · 오늘 07시(KST) 크론이 지나면 오늘 날짜도 막는다
+  if (date === today && kstTodayClosed()) return { error: TODAY_CLOSED_REASON, warning: null };
 
   const { data: letter } = await db
     .from("ds_letters")
@@ -106,7 +108,7 @@ export async function approveLetterCore(
 
   const warnings: string[] = [];
   if (sameDay && sameDay.length > 0) warnings.push(`이 날짜에 글이 ${sameDay.length + 1}편입니다. 모두 발행됩니다.`);
-  if (date === today) warnings.push("오늘 07시가 지났으면 내일 발행됩니다.");
+  if (date === today) warnings.push("오늘 07시에 발행됩니다."); // 66차 B · 07시 뒤 오늘 날짜는 위에서 막는다
   return { error: null, warning: warnings.join(" ") || null, links };
 }
 

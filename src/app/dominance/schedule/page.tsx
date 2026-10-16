@@ -6,7 +6,7 @@ import { loadSchedulePage } from "@/lib/dominance/page-data";
 import { publishingStarted } from "@/lib/dominance/publishing";
 import Link from "next/link";
 import { dominanceContext } from "@/lib/dominance/guard";
-import { kstToday } from "@/lib/dominance/kst";
+import { kstToday, kstTodayClosed } from "@/lib/dominance/kst";
 import { isMissingSchema, SchemaNotice } from "@/lib/dominance/schema-guard";
 import type { LetterStatus } from "@/lib/dominance/types";
 import { ScheduleCalendar } from "./ScheduleCalendar";
@@ -82,6 +82,7 @@ export default async function SchedulePage({
         started={publishingStarted()}
         month={month}
         today={kstToday()}
+        todayClosed={kstTodayClosed()}
         bounds={{
           dayCount: bounds.dayCount,
           firstWeekday: bounds.firstWeekday,
