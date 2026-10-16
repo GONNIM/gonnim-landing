@@ -87,7 +87,7 @@ const SHORTS_SYSTEM = `너는 한국어 과학 레터를 60초 세로 영상(쇼
 - captions: 화면 자막 5줄. 한 줄 20자 안. 대본을 따라가는 짧은 말.
 지킬 것:
 - core 의 칸 하나에는 문장 하나만 쓴다. 마침표나 물음표는 칸마다 끝에 한 번만 온다.
-- 말투는 「~습니다」로 통일한다. hook · core · closing 의 모든 문장은 「~니다.」로 끝내고, 묻는 문장은 「~니까?」로 끝낸다. 「~어요」 · 「~해요」 · 「~까요」 같은 「~요」 말투는 쓰지 않는다. 자막은 짧은 말이라 이 규칙에서 뺀다.
+- 말투는 「~습니다」로 통일한다. hook · core · closing 의 문장은 「~니다.」로 끝내고, 묻는 문장은 「~까?」나 「~까요?」로 끝낸다. 그 밖의 「~요」 끝맺음(「~어요」 · 「~해요」 · 「~네요」 · 「~죠」 등)은 쓰지 않는다. 자막은 짧은 말이라 이 규칙에서 뺀다.
 - 소리 내어 읽는 글(hook + core + closing)은 모두 합쳐 공백 빼고 300자 안(60초 안).
 - 글에 없는 수치 · 글에 없는 단정 금지. 수치는 글에 나온 그대로만 쓴다.
 - 과장 낱말(충격 · 경악 · 반드시 · 무조건 · 100% · 모두가) 금지. 느낌표 금지.
@@ -98,15 +98,16 @@ const SHORTS_SYSTEM = `너는 한국어 과학 레터를 60초 세로 영상(쇼
 /** 61차 B · 문장 끝(마침표 · 물음표 · 느낌표 뒤에 빈칸이나 글 끝). 6.5 같은 소수점은 세지 않는다 */
 const SENTENCE_END = /[.?!？](?=\s|$)/g;
 export const sentenceCount = (t: string) => Math.max(1, (t.trim().match(SENTENCE_END) ?? []).length);
-/** 61차 B · 「~요」 말투(~어요 · ~해요 · ~아요 · ~에요 · ~예요 · ~까요 · ~죠 등) */
-const YO_STYLE = /(어요|해요|아요|여요|에요|예요|돼요|와요|워요|까요|네요|죠)(?=[.?!？\s]|$)/;
-/** 61차 B · 문장마다 「~니다.」 · 「~니까?」 로 끝나는가 · 아닌 문장을 돌려준다 */
-function notFormal(t: string): string[] {
+/** 62차 A · 허용 끝맺음은 「~니다.」 · 「~까?」 · 「~까요?」. 그 밖의 「~요」 끝맺음(~어요 · ~해요 · ~네요 · ~죠 등)만 실패다 */
+const YO_END = /(요|죠)[.?!？]?$/;
+const ALLOWED_YO = /까요[?？]$/;
+/** 62차 A · 「~요」 끝맺음인데 「~까요?」가 아닌 문장을 돌려준다 */
+function yoSentences(t: string): string[] {
   return t
     .trim()
     .split(/(?<=[.?!？])\s+/)
     .map((x) => x.trim())
-    .filter((x) => x && !/(니다|니까)[.?!？]?$/.test(x));
+    .filter((x) => x && YO_END.test(x) && !ALLOWED_YO.test(x));
 }
 
 const spokenLen = (s: Shorts) => [s.hook, ...s.core, s.closing].join("").replace(/\s+/g, "").length;
@@ -127,8 +128,8 @@ export function shortsProblems(s: Shorts, pkg: LetterPackage): string[] {
   });
   const spoken: [string, string][] = [["훅", s.hook], ...s.core.map((c, i): [string, string] => [`핵심 ${i + 1}번`, c]), ["마무리", s.closing]];
   for (const [name, text] of spoken) {
-    if (YO_STYLE.test(text)) out.push(`${name} 「~요」 말투(「~습니다」로 통일)`);
-    else if (notFormal(text).length) out.push(`${name} 「~습니다」로 끝나지 않음 · 「${notFormal(text)[0].slice(-12)}」`);
+    const bad = yoSentences(text);
+    if (bad.length) out.push(`${name} 「~요」 끝맺음(「~니다.」 · 「~까?」 · 「~까요?」만 허용) · 「${bad[0].slice(-12)}」`);
   }
   const len = spokenLen(s);
   if (len > 300) out.push(`읽는 글 ${len}자(300자 안이어야 함)`);
